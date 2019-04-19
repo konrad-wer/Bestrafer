@@ -85,7 +85,6 @@ applyContextToType c (TEVar e) p =
 applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType c t p
 applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType c t p
 applyContextToType _ TUnit _ = return TUnit
---applyContextToType c (TMono m) =  TMono $ applyContextToMonotype c m
 
 applyContextToMonotype :: Context -> Monotype -> Monotype
 applyContextToMonotype c (MUVar u) =

@@ -1,0 +1,154 @@
+module AST where
+
+type Var = String
+
+--Source Syntax-------------------------------------
+
+data ArithmBinOp
+  = BinOpPlus
+  | BinOpMinus
+  | BinOpMult
+  | BinOpDiv
+  | BinOpRem
+
+data ArithmUnOp
+  = UnOpPlus
+  | UnOpMinus
+
+--TODO Arithm ?
+data Expr p
+  = EVar          p Var
+  | EUnit         p
+  | ELambda       p Var (Expr p)
+  | EApp          p (Expr p) (Spine p)
+  | ERec          p Var (Expr p)
+  | EAnnot        p (Expr p) Type
+  | EPair         p (Expr p) (Expr p)
+  | EInj1         p (Expr p)
+  | EInj2         p (Expr p)
+  | ECase         p (Expr p) [Branch p]
+  | ENil          p
+  | ECons         p (Expr p) (Expr p)
+  | EIf           p (Expr p) (Expr p) (Expr p)
+  | EArithmBinOp  p ArithmBinOp (Expr p) (Expr p)
+  | EArithmUnOp   p ArithmUnOp (Expr p)
+  deriving (Show)
+
+-- --TODO prawdopodobnie wyjebać
+-- data Value p
+--   = VVar          p Var
+--   | VUint         p
+--   | VLambda       p Var (Expr p)
+--   | VRec          p Var (Value p)
+--   | VAnnot        p (Value p) Type
+--   | VPair         p (Value p) (Value p)
+--   | VInj1         p (Value p)
+--   | VInj2         p (Value p)
+--   | VNil          p
+--   | VCons         p (Value p) (Value p)
+--   | VIf           p (Value p) (Value p) (Value p)
+--   | VArithmBinOp  p ArithmBinOp (Value p) (Value p)
+--   | VArithmUnOp   p ArithmUnOp (Value p)
+--   deriving (Show)
+
+type Spine p = [Expr p]
+
+data Pattern p
+  = PVar p Var
+  | PPair p (Pattern p) (Pattern p)
+  | PInj1 p (Pattern p)
+  | PInj2 p (Pattern p)
+  | PNil  p
+  | PCons p (Pattern p) (Pattern p)
+  | PWild p
+  deriving (Show)
+
+type Branch p = ([Pattern p], Expr p)
+
+--Types Syntax------------------------------------
+
+newtype UTypeVar = UTypeVar Var deriving (Show, Eq)
+newtype ETypeVar = ETypeVar Var deriving (Show, Eq)
+data TypeVar = U UTypeVar | E ETypeVar deriving (Show, Eq)
+
+data Kind = KStar | KNat deriving (Show, Eq)
+
+data Type
+  = TUnit
+  | TArrow Type Type
+  | TCoproduct Type Type
+  | TProduct Type Type
+  | TUVar UTypeVar
+  | TEVar ETypeVar
+  | TUniversal Var Kind Type
+  | TExistential Var Kind Type
+  | TImp Proposition Type
+  | TAnd Type Proposition
+  | TVec Monotype Type
+  -- | TMono Monotype
+  deriving (Show, Eq)
+
+type Proposition = (Monotype, Monotype)
+
+data Monotype
+  = MZero
+  | MSucc Monotype
+  | MUnit
+  | MUVar UTypeVar
+  | MEVar ETypeVar
+  | MArrow Monotype Monotype
+  | MCoproduct Monotype Monotype
+  | MProduct Monotype Monotype
+  deriving (Show, Eq)
+
+data ContextEntry
+  = CTypeVar TypeVar Kind
+  | CVar Var Type Principality
+  | CETypeVar ETypeVar Kind Monotype
+  | CUTypeVar UTypeVar Monotype --TODO Przemyśleć to
+  | CMarker Proposition
+  deriving (Show, Eq)
+
+--data CompleteContexEntry =
+--    CCTypeVar UTypeVar Kind
+--  | CCVar Var Type Principality
+--  | CCETypeVarEq ETypeVar Kind Monotype
+--  | CCUTypeVarEq UTypeVar Monotype
+
+type Context = [ContextEntry]
+--type CompleteContext = [CompleteContexEntry]
+
+data Principality = Principal | NotPrincipal deriving (Show, Eq)
+
+data Polarity = Neutral | Positive | Negative deriving (Show, Eq)
+
+polarity :: Type -> Polarity
+polarity TUniversal {} = Negative
+polarity TExistential {} = Positive
+polarity _ = Neutral
+
+nonpos :: Polarity -> Bool
+nonpos Positive = False
+nonpos _ = True
+
+nonneg :: Polarity -> Bool
+nonneg Negative = False
+nonneg _ = True
+
+join :: Polarity -> Polarity -> Polarity
+join Positive _ = Positive
+join Negative _ = Negative
+join Neutral Positive = Positive
+join Neutral Negative = Negative
+join Neutral Neutral = Negative
+
+instance Show ArithmBinOp where
+  show BinOpPlus = "+"
+  show BinOpMinus = "-"
+  show BinOpMult = "*"
+  show BinOpDiv = "/"
+  show BinOpRem = "%"
+
+instance Show ArithmUnOp where
+  show UnOpPlus = "+"
+  show UnOpMinus = "-"

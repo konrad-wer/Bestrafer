@@ -382,6 +382,218 @@ checkMonotypeHasKind_test5 () =
     Right () -> True
     _ -> False
 
+checkMonotypeHasKind_test6 :: Test
+checkMonotypeHasKind_test6 () =
+  case checkMonotypeHasKind context5 (MSucc $ MSucc (MUVar $ UTypeVar "xx")) () KNat of
+    Left (CheckKindUVarNotDeclaredError () "xx") -> True
+    _ -> False
+
+checkMonotypeHasKind_test7 :: Test
+checkMonotypeHasKind_test7 () =
+  case checkMonotypeHasKind context5 (MSucc $ MSucc (MEVar $ ETypeVar "")) () KNat of
+    Left (CheckKindEVarNotDeclaredError () "") -> True
+    _ -> False
+
+--checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
+checkPropWellFormedness_test1 :: Test
+checkPropWellFormedness_test1 () =
+  case checkPropWellFormedness [] (MZero, MZero) (5 :: Integer) of
+    Right () -> True
+    _ -> False
+
+checkPropWellFormedness_test2 :: Test
+checkPropWellFormedness_test2 () =
+  case checkPropWellFormedness [] (MZero, MSucc $ MSucc MZero) (5 :: Integer) of
+    Right () -> True
+    _ -> False
+
+checkPropWellFormedness_test3 :: Test
+checkPropWellFormedness_test3 () =
+  case checkPropWellFormedness [] (MSucc $ MSucc MZero, MProduct MUnit MUnit) (5 :: Integer) of
+    Left (CheckKindHasWrongKindError 5 KNat KStar) -> True
+    _ -> False
+
+checkPropWellFormedness_test4 :: Test
+checkPropWellFormedness_test4 () =
+  case checkPropWellFormedness [] (MSucc $ MSucc MZero, MProduct MUnit $ MSucc MZero) (5 :: Integer) of
+    Left (CheckKindHasWrongKindError 5 KStar KNat) -> True
+    _ -> False
+
+checkPropWellFormedness_test5 :: Test
+checkPropWellFormedness_test5 () =
+  case checkPropWellFormedness context1 (MSucc $ MSucc  (MEVar $ ETypeVar "b"), MProduct MUnit $ MSucc MZero) () of
+    Left (CheckKindHasWrongKindError () KStar KNat) -> True
+    _ -> False
+
+checkPropWellFormedness_test6 :: Test
+checkPropWellFormedness_test6 () =
+  case checkPropWellFormedness context5 (MSucc $ MSucc  (MUVar $ UTypeVar "x"), MEVar $ ETypeVar "x") () of
+    Right () -> True
+    _ -> False
+
+checkPropWellFormedness_test7 :: Test
+checkPropWellFormedness_test7 () =
+  case checkPropWellFormedness context5 (MSucc $ MSucc  (MUVar $ UTypeVar "r"), MEVar $ ETypeVar "x") () of
+    Left (CheckKindUVarNotDeclaredError () "r") -> True
+    _ -> False
+
+--checkTypeWellFormedness :: Context -> Type -> p -> Either (Error p) ()
+checkTypeWellFormedness_test1 :: Test
+checkTypeWellFormedness_test1 () =
+  case checkTypeWellFormedness context1 (TArrow TUnit $ TCoproduct TUnit (TProduct TUnit TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test2 :: Test
+checkTypeWellFormedness_test2 () =
+  case checkTypeWellFormedness context1 (TCoproduct (TUVar $ UTypeVar "y") (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "a"))) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test3 :: Test
+checkTypeWellFormedness_test3 () =
+  case checkTypeWellFormedness context1 (TCoproduct (TUVar $ UTypeVar "y") (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b"))) ((),()) of
+    Left (TypeFormednessInvalidKindError ((), ()) "b") -> True
+    _ -> False
+
+checkTypeWellFormedness_test4 :: Test
+checkTypeWellFormedness_test4 () =
+  case checkTypeWellFormedness [] (TCoproduct (TUVar $ UTypeVar "y") (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b"))) ((),()) of
+    Left (TypeFormednessUVarNotDeclaredError ((), ()) "y") -> True
+    _ -> False
+
+checkTypeWellFormedness_test5 :: Test
+checkTypeWellFormedness_test5 () =
+  case checkTypeWellFormedness [] (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b")) ((),()) of
+    Left (TypeFormednessEVarNotDeclaredError ((), ()) "z") -> True
+    _ -> False
+
+checkTypeWellFormedness_test6 :: Test
+checkTypeWellFormedness_test6 () =
+  case checkTypeWellFormedness context5 (TUVar $ UTypeVar "x")  (5 :: Integer) of
+    Left (TypeFormednessInvalidKindError 5 "x") -> True
+    _ -> False
+
+checkTypeWellFormedness_test7 :: Test
+checkTypeWellFormedness_test7 () =
+  case checkTypeWellFormedness context5 (TUniversal "x" KStar (TArrow (TUVar $ UTypeVar "x") TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test8 :: Test
+checkTypeWellFormedness_test8 () =
+  case checkTypeWellFormedness context5 (TUniversal "Konrad" KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test9 :: Test
+checkTypeWellFormedness_test9 () =
+  case checkTypeWellFormedness [] (TUniversal "Konrad" KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test10 :: Test
+checkTypeWellFormedness_test10 () =
+  case checkTypeWellFormedness context1 (TExistential "b" KStar (TArrow (TEVar $ ETypeVar "b") TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test11 :: Test
+checkTypeWellFormedness_test11 () =
+  case checkTypeWellFormedness context1 (TExistential "Konrad" KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test12 :: Test
+checkTypeWellFormedness_test12 () =
+  case checkTypeWellFormedness [] (TExistential "Konrad" KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test13 :: Test
+checkTypeWellFormedness_test13 () =
+  case checkTypeWellFormedness [] (TUniversal "x" KStar (TArrow (TUVar $ UTypeVar "y") TUnit)) () of
+    Left (TypeFormednessUVarNotDeclaredError () "y") -> True
+    _ -> False
+
+checkTypeWellFormedness_test14 :: Test
+checkTypeWellFormedness_test14 () =
+  case checkTypeWellFormedness [] (TExistential "x" KStar (TArrow (TEVar $ ETypeVar "y") TUnit)) () of
+    Left (TypeFormednessEVarNotDeclaredError () "y") -> True
+    _ -> False
+
+checkTypeWellFormedness_test15 :: Test
+checkTypeWellFormedness_test15 () =
+  case checkTypeWellFormedness context1 (TImp (MZero, MSucc MZero) (TArrow (TEVar $ ETypeVar "z") TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test16 :: Test
+checkTypeWellFormedness_test16 () =
+  case checkTypeWellFormedness [] (TImp (MZero, MZero) (TArrow (TEVar $ ETypeVar "y") TUnit)) () of
+    Left (TypeFormednessEVarNotDeclaredError () "y") -> True
+    _ -> False
+
+checkTypeWellFormedness_test17 :: Test
+checkTypeWellFormedness_test17 () =
+  case checkTypeWellFormedness [] (TExistential "x" KStar (TImp (MZero, MSucc MZero) (TArrow (TEVar $ ETypeVar "x") TUnit))) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test18 :: Test
+checkTypeWellFormedness_test18 () =
+  case checkTypeWellFormedness [] (TExistential "x" KStar (TImp (MZero, MSucc (MEVar $ ETypeVar "x")) (TArrow (TEVar $ ETypeVar "z") TUnit))) () of
+    Left (CheckKindHasWrongKindError () KNat KStar) -> True
+    _ -> False
+
+checkTypeWellFormedness_test19 :: Test
+checkTypeWellFormedness_test19 () =
+  case checkTypeWellFormedness context1 (TAnd (TArrow (TEVar $ ETypeVar "z") TUnit) (MEVar $ ETypeVar "b", MSucc MZero)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test20 :: Test
+checkTypeWellFormedness_test20 () =
+  case checkTypeWellFormedness context1 (TAnd (TArrow (TUVar $ UTypeVar "Haskell") TUnit) (MEVar $ ETypeVar "Konrad", MSucc MZero)) () of
+    Left (TypeFormednessUVarNotDeclaredError () "Haskell") -> True
+    _ -> False
+
+checkTypeWellFormedness_test21 :: Test
+checkTypeWellFormedness_test21 () =
+  case checkTypeWellFormedness [] (TUniversal "x" KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MUVar $ UTypeVar "x", MUnit))) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test22 :: Test
+checkTypeWellFormedness_test22 () =
+  case checkTypeWellFormedness [] (TUniversal "x" KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MEVar $ ETypeVar "x", MUnit))) () of
+    Left (CheckKindEVarNotDeclaredError () "x") -> True
+    _ -> False
+
+checkTypeWellFormedness_test23 :: Test
+checkTypeWellFormedness_test23 () =
+  case checkTypeWellFormedness context1 (TVec (MSucc $ MSucc (MEVar $ ETypeVar "b")) (TProduct TUnit TUnit)) () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormedness_test24 :: Test
+checkTypeWellFormedness_test24 () =
+  case checkTypeWellFormedness [] (TUniversal "n" KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n")) (TProduct TUnit (TUVar $ UTypeVar "n"))) () of
+    Left (TypeFormednessInvalidKindError () "n") -> True
+    _ -> False
+
+checkTypeWellFormedness_test25 :: Test
+checkTypeWellFormedness_test25 () =
+  case checkTypeWellFormedness [] (TExistential "x" KStar $ TVec (MSucc $ MSucc (MEVar $ ETypeVar "x")) (TProduct TUnit TUnit)) () of
+    Left (CheckKindHasWrongKindError () KNat KStar) -> True
+    _ -> False
+
+checkTypeWellFormedness_test26 :: Test
+checkTypeWellFormedness_test26 () =
+  case checkTypeWellFormedness context1 (TUniversal "n" KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n")) (TImp (MEVar $ ETypeVar "b", MUVar $ UTypeVar "n") (TProduct TUnit TUnit))) () of
+    Right () -> True
+    _ -> False
+
 tests :: [(TestName, Test)]
 tests = [("varContextLookup_test1", varContextLookup_test1),
          ("varContextLookup_test2", varContextLookup_test2),
@@ -440,7 +652,42 @@ tests = [("varContextLookup_test1", varContextLookup_test1),
          ("checkMonotypeHasKind_test2", checkMonotypeHasKind_test2),
          ("checkMonotypeHasKind_test3", checkMonotypeHasKind_test3),
          ("checkMonotypeHasKind_test4", checkMonotypeHasKind_test4),
-         ("checkMonotypeHasKind_test5", checkMonotypeHasKind_test5)]
+         ("checkMonotypeHasKind_test5", checkMonotypeHasKind_test5),
+         ("checkMonotypeHasKind_test6", checkMonotypeHasKind_test6),
+         ("checkMonotypeHasKind_test7", checkMonotypeHasKind_test7),
+         ("checkPropWellFormedness_test1", checkPropWellFormedness_test1),
+         ("checkPropWellFormedness_test2", checkPropWellFormedness_test2),
+         ("checkPropWellFormedness_test3", checkPropWellFormedness_test3),
+         ("checkPropWellFormedness_test4", checkPropWellFormedness_test4),
+         ("checkPropWellFormedness_test5", checkPropWellFormedness_test5),
+         ("checkPropWellFormedness_test6", checkPropWellFormedness_test6),
+         ("checkPropWellFormedness_test7", checkPropWellFormedness_test7),
+         ("checkTypeWellFormedness_test1", checkTypeWellFormedness_test1),
+         ("checkTypeWellFormedness_test2", checkTypeWellFormedness_test2),
+         ("checkTypeWellFormedness_test3", checkTypeWellFormedness_test3),
+         ("checkTypeWellFormedness_test4", checkTypeWellFormedness_test4),
+         ("checkTypeWellFormedness_test5", checkTypeWellFormedness_test5),
+         ("checkTypeWellFormedness_test6", checkTypeWellFormedness_test6),
+         ("checkTypeWellFormedness_test7", checkTypeWellFormedness_test7),
+         ("checkTypeWellFormedness_test8", checkTypeWellFormedness_test8),
+         ("checkTypeWellFormedness_test9", checkTypeWellFormedness_test9),
+         ("checkTypeWellFormedness_test10", checkTypeWellFormedness_test10),
+         ("checkTypeWellFormedness_test11", checkTypeWellFormedness_test11),
+         ("checkTypeWellFormedness_test12", checkTypeWellFormedness_test12),
+         ("checkTypeWellFormedness_test13", checkTypeWellFormedness_test13),
+         ("checkTypeWellFormedness_test14", checkTypeWellFormedness_test14),
+         ("checkTypeWellFormedness_test15", checkTypeWellFormedness_test15),
+         ("checkTypeWellFormedness_test16", checkTypeWellFormedness_test16),
+         ("checkTypeWellFormedness_test17", checkTypeWellFormedness_test17),
+         ("checkTypeWellFormedness_test18", checkTypeWellFormedness_test18),
+         ("checkTypeWellFormedness_test19", checkTypeWellFormedness_test19),
+         ("checkTypeWellFormedness_test20", checkTypeWellFormedness_test20),
+         ("checkTypeWellFormedness_test21", checkTypeWellFormedness_test21),
+         ("checkTypeWellFormedness_test22", checkTypeWellFormedness_test22),
+         ("checkTypeWellFormedness_test23", checkTypeWellFormedness_test23),
+         ("checkTypeWellFormedness_test24", checkTypeWellFormedness_test24),
+         ("checkTypeWellFormedness_test25", checkTypeWellFormedness_test25),
+         ("checkTypeWellFormedness_test26", checkTypeWellFormedness_test26)]
 
 runTest :: (TestName, Test) -> String
 runTest (name, t) =

@@ -302,6 +302,25 @@ unsolvedTypeVarContextLookup_test7 () =
     Just (CTypeVar (U (UTypeVar "x")) KNat) -> True
     _ -> False
 
+--monotypeToType :: Monotype -> p -> Either (Error p) Type
+monotypeToType_test1 :: Test
+monotypeToType_test1 () =
+  case monotypeToType (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "y"))) () of
+    Right (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar (UTypeVar "x")) (TEVar (ETypeVar "y")))) -> True
+    _ -> False
+
+monotypeToType_test2 :: Test
+monotypeToType_test2 () =
+  case monotypeToType (MSucc (MSucc (MSucc MZero))) () of
+    Left (MonotypeIsNotTypeError () (MSucc (MSucc (MSucc MZero)))) -> True
+    _ -> False
+
+monotypeToType_test3 :: Test
+monotypeToType_test3 () =
+  case monotypeToType (MArrow (MProduct MUnit $ MSucc MZero) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "y"))) () of
+    Left (MonotypeIsNotTypeError () (MSucc MZero)) -> True
+    _ -> False
+
 --inferMonotypeKind :: Context -> Monotype -> p -> Either (Error p) Kind
 inferMonotypeKind_test1 :: Test
 inferMonotypeKind_test1 () =
@@ -640,6 +659,9 @@ tests = [("varContextLookup_test1", varContextLookup_test1),
          ("unsolvedTypeVarContextLookup_test5", unsolvedTypeVarContextLookup_test5),
          ("unsolvedTypeVarContextLookup_test6", unsolvedTypeVarContextLookup_test6),
          ("unsolvedTypeVarContextLookup_test7", unsolvedTypeVarContextLookup_test7),
+         ("monotypeToType_test1", monotypeToType_test1),
+         ("monotypeToType_test2", monotypeToType_test2),
+         ("monotypeToType_test3", monotypeToType_test3),
          ("inferMonotypeKind_test1", inferMonotypeKind_test1),
          ("inferMonotypeKind_test2", inferMonotypeKind_test2),
          ("inferMonotypeKind_test3", inferMonotypeKind_test3),

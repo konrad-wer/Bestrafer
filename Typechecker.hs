@@ -1,7 +1,6 @@
 module Typechecker where
 
 import AST
-import Data.Semigroup
 
 data Error p
   = UndeclaredVariable p Var
@@ -10,7 +9,7 @@ data Error p
   | UndeclaredETypeVar p Var
   | TypeFormednessEVarNotDeclaredError p Var
   | TypeFormednessUVarNotDeclaredError p Var
-  | TypeFormednessInvalidMonotypeKind p Kind
+  | TypeFormednessInvalidKindError p Var
   | CheckKindHasWrongKindError p Kind Kind
   | CheckKindEVarNotDeclaredError p Var
   | CheckKindUVarNotDeclaredError p Var
@@ -131,28 +130,13 @@ checkTypeWellFormedness c (TEVar x @ (ETypeVar name)) p =
   case eTypeVarContextLookup c x of
     Just (CTypeVar _ KStar) -> return ()
     Just (CETypeVar _ KStar _) -> return ()
-    _ -> Left $ TypeFormednessEVarNotDeclaredError p name
+    Nothing -> Left $ TypeFormednessEVarNotDeclaredError p name
+    _ -> Left $ TypeFormednessInvalidKindError p name
 checkTypeWellFormedness c (TUVar x  @ (UTypeVar name)) p =
   case unsolvedTypeVarContextLookup c (U x) of
     Just (CTypeVar _ KStar) -> return ()
-    _ -> Left $ TypeFormednessUVarNotDeclaredError p name
-
-checkMonotypeWellFormedness :: Context -> Monotype -> p -> Either (Error p) ()
-checkMonotypeWellFormedness _ MUnit _ = return ()
-checkMonotypeWellFormedness c (MArrow m1 m2) p = checkMonotypeWellFormedness c m1 p >> checkMonotypeWellFormedness c m2 p
-checkMonotypeWellFormedness c (MCoproduct m1 m2) p = checkMonotypeWellFormedness c m1 p >> checkMonotypeWellFormedness c m2 p
-checkMonotypeWellFormedness c (MProduct m1 m2) p = checkMonotypeWellFormedness c m1 p >> checkMonotypeWellFormedness c m2 p
-checkMonotypeWellFormedness c (MEVar x @ (ETypeVar name)) p =
-  case eTypeVarContextLookup c x of
-    Just (CTypeVar _ KStar) -> return ()
-    Just (CETypeVar _ KStar _) -> return ()
-    _ -> Left $ TypeFormednessEVarNotDeclaredError p name
-checkMonotypeWellFormedness c (MUVar x @ (UTypeVar name)) p =
-  case unsolvedTypeVarContextLookup c (U x) of
-    Just (CTypeVar _ KStar) -> return ()
-    _ -> Left $ TypeFormednessUVarNotDeclaredError p name
-checkMonotypeWellFormedness _ MZero p = Left $ TypeFormednessInvalidMonotypeKind p KNat
-checkMonotypeWellFormedness _ MSucc {} p = Left $ TypeFormednessInvalidMonotypeKind p KNat
+    Nothing -> Left $ TypeFormednessUVarNotDeclaredError p name
+    _ -> Left $ TypeFormednessInvalidKindError p name
 
 checkMonotypeHasKind :: Context -> Monotype -> p -> Kind -> Either (Error p) ()
 checkMonotypeHasKind c m p k1 = do
@@ -180,9 +164,7 @@ inferMonotypeKind c (MUVar x @ (UTypeVar name)) p =
     _ -> Left $ CheckKindUVarNotDeclaredError p name
 
 checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
-checkPropWellFormedness c (m1, m2) p =
-  (checkMonotypeHasKind c m1 p KNat >> checkMonotypeHasKind c m2 p KNat) <>
-  (checkMonotypeHasKind c m1 p KStar >> checkMonotypeHasKind c m2 p KStar)
+checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotypeHasKind c m2 p
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr c (EUnit _) TUnit _ = return c

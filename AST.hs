@@ -105,18 +105,11 @@ data ContextEntry
   = CTypeVar TypeVar Kind
   | CVar Var Type Principality
   | CETypeVar ETypeVar Kind Monotype
-  | CUTypeVar UTypeVar Monotype --TODO Przemyśleć to
+  | CUTypeVarEq UTypeVar Monotype
   | CMarker Proposition
   deriving (Show, Eq)
 
---data CompleteContexEntry =
---    CCTypeVar UTypeVar Kind
---  | CCVar Var Type Principality
---  | CCETypeVarEq ETypeVar Kind Monotype
---  | CCUTypeVarEq UTypeVar Monotype
-
 type Context = [ContextEntry]
---type CompleteContext = [CompleteContexEntry]
 
 data Principality = Principal | NotPrincipal deriving (Show, Eq)
 

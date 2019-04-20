@@ -2,8 +2,6 @@ module Typechecker where
 
 import AST
 import Data.Semigroup
-import Data.Maybe
-import Control.Applicative
 
 data Error p
   = UndeclaredVariable p Var
@@ -26,26 +24,36 @@ varContextLookup  (entry @ (CVar y _ _): c) x p
 varContextLookup (_ : c) x p = varContextLookup c x p
 varContextLookup [] x p = Left $ UndeclaredVariable p x
 
-uTypeVarContextLookup :: Context -> UTypeVar -> Maybe ContextEntry
-uTypeVarContextLookup (entry @ (CUTypeVar b _) : c) a
+uTypeVarEqContextLookup :: Context -> UTypeVar -> Maybe ContextEntry
+uTypeVarEqContextLookup (entry @ (CUTypeVarEq b _) : c) a
   | a == b = return entry
-  | otherwise = uTypeVarContextLookup c a
-uTypeVarContextLookup (_ : c) a = uTypeVarContextLookup c a
-uTypeVarContextLookup [] _ = Nothing
+  | otherwise = uTypeVarEqContextLookup c a
+uTypeVarEqContextLookup (_ : c) a = uTypeVarEqContextLookup c a
+uTypeVarEqContextLookup [] _ = Nothing
+
+solvedETypeVarContextLookup :: Context -> ETypeVar -> Maybe ContextEntry
+solvedETypeVarContextLookup (entry @ (CETypeVar b _ _) : c) a
+  | a == b = return entry
+  | otherwise = solvedETypeVarContextLookup c a
+solvedETypeVarContextLookup (_ : c) a = solvedETypeVarContextLookup c a
+solvedETypeVarContextLookup [] _ = Nothing
 
 eTypeVarContextLookup :: Context -> ETypeVar -> Maybe ContextEntry
 eTypeVarContextLookup (entry @ (CETypeVar b _ _) : c) a
   | a == b = return entry
   | otherwise = eTypeVarContextLookup c a
+eTypeVarContextLookup (entry @ (CTypeVar (E b) _) : c) a
+  | a == b = return entry
+  | otherwise = eTypeVarContextLookup c a
 eTypeVarContextLookup (_ : c) a = eTypeVarContextLookup c a
 eTypeVarContextLookup [] _ = Nothing
 
-typeVarContextLookup :: Context -> TypeVar -> Maybe ContextEntry
-typeVarContextLookup (entry @ (CTypeVar b _) : c) a
+unsolvedTypeVarContextLookup :: Context -> TypeVar -> Maybe ContextEntry
+unsolvedTypeVarContextLookup (entry @ (CTypeVar b _) : c) a
   | a == b = return entry
-  | otherwise = typeVarContextLookup c a
-typeVarContextLookup (_ : c) a = typeVarContextLookup c a
-typeVarContextLookup [] _ = Nothing
+  | otherwise = unsolvedTypeVarContextLookup c a
+unsolvedTypeVarContextLookup (_ : c) a = unsolvedTypeVarContextLookup c a
+unsolvedTypeVarContextLookup [] _ = Nothing
 
 eTypeVarContextReplace :: Context -> ETypeVar -> Monotype -> p -> Either (Error p) Context
 eTypeVarContextReplace c @ (entry @ (CETypeVar (ETypeVar b) _ tau) : ct) (ETypeVar a) sigma p
@@ -69,8 +77,8 @@ monotypeToType n p = Left $ MonotypeIsNotTypeError p n
 
 applyContextToType :: Context -> Type -> p-> Either (Error p) Type
 applyContextToType c (TUVar u) p =
-  case uTypeVarContextLookup c u of
-    Just (CUTypeVar _ tau) -> monotypeToType (applyContextToMonotype c tau) p
+  case uTypeVarEqContextLookup c u of
+    Just (CUTypeVarEq _ tau) -> monotypeToType (applyContextToMonotype c tau) p
     _ -> return $ TUVar u
 applyContextToType c (TImp pr t) p = TImp (applyContextToProposition c pr) <$> applyContextToType c t p
 applyContextToType c (TAnd t pr) p = TAnd <$> applyContextToType c t p <*> pure (applyContextToProposition c pr)
@@ -79,7 +87,7 @@ applyContextToType c (TCoproduct t1 t2) p = TCoproduct <$> applyContextToType c 
 applyContextToType c (TProduct t1 t2) p = TProduct <$> applyContextToType c t1 p <*> applyContextToType c t2 p
 applyContextToType c (TVec n t) p = TVec (applyContextToMonotype c n) <$> applyContextToType c t p
 applyContextToType c (TEVar e) p =
-  case eTypeVarContextLookup c e of
+  case solvedETypeVarContextLookup c e of
     Just (CETypeVar _ _ tau) -> monotypeToType (applyContextToMonotype c tau) p
     _ -> return $ TEVar e
 applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType c t p
@@ -88,14 +96,14 @@ applyContextToType _ TUnit _ = return TUnit
 
 applyContextToMonotype :: Context -> Monotype -> Monotype
 applyContextToMonotype c (MUVar u) =
-  case uTypeVarContextLookup c u of
-    Just (CUTypeVar _ tau) -> applyContextToMonotype c tau
+  case uTypeVarEqContextLookup c u of
+    Just (CUTypeVarEq _ tau) -> applyContextToMonotype c tau
     _ -> MUVar u
 applyContextToMonotype c (MArrow m1 m2) = MArrow (applyContextToMonotype c m1) (applyContextToMonotype c m2)
 applyContextToMonotype c (MCoproduct m1 m2) = MCoproduct (applyContextToMonotype c m1) (applyContextToMonotype c m2)
 applyContextToMonotype c (MProduct m1 m2) = MProduct (applyContextToMonotype c m1) (applyContextToMonotype c m2)
 applyContextToMonotype c (MEVar e) =
-  case eTypeVarContextLookup c e of
+  case solvedETypeVarContextLookup c e of
     Just (CETypeVar _ _ tau) -> applyContextToMonotype c tau
     _ -> MEVar e
 applyContextToMonotype _ MUnit = MUnit
@@ -120,16 +128,14 @@ checkTypeWellFormedness c (TUniversal x k t) p = checkTypeWellFormedness (CTypeV
 checkTypeWellFormedness c (TExistential x k t) p = checkTypeWellFormedness (CTypeVar (E $ ETypeVar x) k : c) t p
 checkTypeWellFormedness c (TVec n t) p = checkMonotypeHasKind c n p KNat >> checkTypeWellFormedness c t p
 checkTypeWellFormedness c (TEVar x @ (ETypeVar name)) p =
-  if isJust (eTypeVarContextLookup c x) || isJust (typeVarContextLookup c (E x)) then
-    return ()
-  else
-    Left $ TypeFormednessEVarNotDeclaredError p name
+  case eTypeVarContextLookup c x of
+    Just (CTypeVar _ KStar) -> return ()
+    Just (CETypeVar _ KStar _) -> return ()
+    _ -> Left $ TypeFormednessEVarNotDeclaredError p name
 checkTypeWellFormedness c (TUVar x  @ (UTypeVar name)) p =
-  if isJust $ typeVarContextLookup c (U x)  then --TODO przekminić czy też nie to drugie
-    return ()
-  else
-    Left $ TypeFormednessUVarNotDeclaredError p name
---checkTypeWellFormedness c (TMono m) p = checkMonotypeWellFormedness c m p
+  case unsolvedTypeVarContextLookup c (U x) of
+    Just (CTypeVar _ KStar) -> return ()
+    _ -> Left $ TypeFormednessUVarNotDeclaredError p name
 
 checkMonotypeWellFormedness :: Context -> Monotype -> p -> Either (Error p) ()
 checkMonotypeWellFormedness _ MUnit _ = return ()
@@ -137,15 +143,14 @@ checkMonotypeWellFormedness c (MArrow m1 m2) p = checkMonotypeWellFormedness c m
 checkMonotypeWellFormedness c (MCoproduct m1 m2) p = checkMonotypeWellFormedness c m1 p >> checkMonotypeWellFormedness c m2 p
 checkMonotypeWellFormedness c (MProduct m1 m2) p = checkMonotypeWellFormedness c m1 p >> checkMonotypeWellFormedness c m2 p
 checkMonotypeWellFormedness c (MEVar x @ (ETypeVar name)) p =
-  if isJust (eTypeVarContextLookup c x) || isJust (typeVarContextLookup c (E x)) then
-    return ()
-  else
-    Left $ TypeFormednessEVarNotDeclaredError p name
+  case eTypeVarContextLookup c x of
+    Just (CTypeVar _ KStar) -> return ()
+    Just (CETypeVar _ KStar _) -> return ()
+    _ -> Left $ TypeFormednessEVarNotDeclaredError p name
 checkMonotypeWellFormedness c (MUVar x @ (UTypeVar name)) p =
-  if Data.Maybe.isJust $ typeVarContextLookup c (U x) then
-    return ()
-  else
-      Left $ TypeFormednessUVarNotDeclaredError p name
+  case unsolvedTypeVarContextLookup c (U x) of
+    Just (CTypeVar _ KStar) -> return ()
+    _ -> Left $ TypeFormednessUVarNotDeclaredError p name
 checkMonotypeWellFormedness _ MZero p = Left $ TypeFormednessInvalidMonotypeKind p KNat
 checkMonotypeWellFormedness _ MSucc {} p = Left $ TypeFormednessInvalidMonotypeKind p KNat
 
@@ -165,12 +170,12 @@ inferMonotypeKind c (MArrow m1 m2) p = checkMonotypeHasKind c m1 p KStar >> chec
 inferMonotypeKind c (MCoproduct m1 m2) p = checkMonotypeHasKind c m1 p KStar >> checkMonotypeHasKind c m2 p KStar >> return KStar
 inferMonotypeKind c (MProduct m1 m2) p = checkMonotypeHasKind c m1 p KStar >> checkMonotypeHasKind c m2 p KStar >> return KStar
 inferMonotypeKind c (MEVar x @ (ETypeVar name)) p =
-  case typeVarContextLookup c (E x) <|> eTypeVarContextLookup c x  of
+  case eTypeVarContextLookup c x of
     Just (CTypeVar _ k) -> return k
     Just (CETypeVar _ k _) -> return k
     _ ->  Left $ CheckKindEVarNotDeclaredError p name
 inferMonotypeKind c (MUVar x @ (UTypeVar name)) p =
-  case typeVarContextLookup c (U x) of
+  case unsolvedTypeVarContextLookup c (U x) of
     Just (CTypeVar _ k) -> return k
     _ -> Left $ CheckKindUVarNotDeclaredError p name
 

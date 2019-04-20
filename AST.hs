@@ -85,7 +85,6 @@ data Type
   | TImp Proposition Type
   | TAnd Type Proposition
   | TVec Monotype Type
-  -- | TMono Monotype
   deriving (Show, Eq)
 
 type Proposition = (Monotype, Monotype)

@@ -34,23 +34,6 @@ data Expr p
   | EArithmUnOp   p ArithmUnOp (Expr p)
   deriving (Show)
 
--- --TODO prawdopodobnie wyjebać
--- data Value p
---   = VVar          p Var
---   | VUint         p
---   | VLambda       p Var (Expr p)
---   | VRec          p Var (Value p)
---   | VAnnot        p (Value p) Type
---   | VPair         p (Value p) (Value p)
---   | VInj1         p (Value p)
---   | VInj2         p (Value p)
---   | VNil          p
---   | VCons         p (Value p) (Value p)
---   | VIf           p (Value p) (Value p) (Value p)
---   | VArithmBinOp  p ArithmBinOp (Value p) (Value p)
---   | VArithmUnOp   p ArithmUnOp (Value p)
---   deriving (Show)
-
 type Spine p = [Expr p]
 
 data Pattern p

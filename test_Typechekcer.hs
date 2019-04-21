@@ -321,6 +321,50 @@ monotypeToType_test3 () =
     Left (MonotypeIsNotTypeError () (MSucc MZero)) -> True
     _ -> False
 
+--applyContextToMonotype :: Context -> Monotype -> Monotype
+applyContextToMonotype_test1 :: Test
+applyContextToMonotype_test1 () =
+  case applyContextToMonotype [] (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "y"))) of
+    (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar (UTypeVar "x")) (MEVar (ETypeVar "y")))) -> True
+    _ -> False
+
+applyContextToMonotype_test2 :: Test
+applyContextToMonotype_test2 () =
+  case applyContextToMonotype context5 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "x"))) of
+    (MArrow (MProduct MUnit MUnit) (MCoproduct MZero MZero)) -> True
+    _ -> False
+
+applyContextToMonotype_test3 :: Test
+applyContextToMonotype_test3 () =
+  case applyContextToMonotype context5 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "y") (MEVar $ ETypeVar "x"))) of
+    (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar (UTypeVar "y")) MZero)) -> True
+    _ -> False
+
+applyContextToMonotype_test4 :: Test
+applyContextToMonotype_test4 () =
+  case applyContextToMonotype context1 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "k") (MEVar $ ETypeVar "z"))) of
+    (MArrow (MProduct MUnit MUnit) (MCoproduct MUnit (MProduct MUnit MUnit))) -> True
+    _ -> False
+
+--applyContextToProposition :: Context -> Proposition -> Proposition
+applyContextToProposition_test1 :: Test
+applyContextToProposition_test1 () =
+  case applyContextToProposition context5 (MUnit, MUnit) of
+    (MUnit, MUnit) -> True
+    _ -> False
+
+applyContextToProposition_test2 :: Test
+applyContextToProposition_test2 () =
+  case applyContextToProposition [] (MUVar (UTypeVar "x"), MEVar (ETypeVar "y")) of
+    (MUVar (UTypeVar "x"), MEVar (ETypeVar "y")) -> True
+    _ -> False
+
+applyContextToProposition_test3 :: Test
+applyContextToProposition_test3 () =
+  case applyContextToProposition context5 (MUVar (UTypeVar "x"), MEVar (ETypeVar "x")) of
+    (MZero, MZero) -> True
+    _ -> False
+
 --inferMonotypeKind :: Context -> Monotype -> p -> Either (Error p) Kind
 inferMonotypeKind_test1 :: Test
 inferMonotypeKind_test1 () =
@@ -662,6 +706,13 @@ tests = [("varContextLookup_test1", varContextLookup_test1),
          ("monotypeToType_test1", monotypeToType_test1),
          ("monotypeToType_test2", monotypeToType_test2),
          ("monotypeToType_test3", monotypeToType_test3),
+         ("applyContextToMonotype_test1", applyContextToMonotype_test1),
+         ("applyContextToMonotype_test2", applyContextToMonotype_test2),
+         ("applyContextToMonotype_test3", applyContextToMonotype_test3),
+         ("applyContextToMonotype_test4", applyContextToMonotype_test4),
+         ("applyContextToProposition_test1", applyContextToProposition_test1),
+         ("applyContextToProposition_test2", applyContextToProposition_test2),
+         ("applyContextToProposition_test3", applyContextToProposition_test3),
          ("inferMonotypeKind_test1", inferMonotypeKind_test1),
          ("inferMonotypeKind_test2", inferMonotypeKind_test2),
          ("inferMonotypeKind_test3", inferMonotypeKind_test3),

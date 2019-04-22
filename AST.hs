@@ -51,7 +51,7 @@ type Branch p = ([Pattern p], Expr p)
 --Types Syntax------------------------------------
 
 newtype UTypeVar = UTypeVar Var deriving (Show, Eq)
-newtype ETypeVar = ETypeVar Var deriving (Show, Eq)
+newtype ETypeVar = ETypeVar Var deriving (Show, Eq, Ord)
 data TypeVar = U UTypeVar | E ETypeVar deriving (Show, Eq)
 
 data Kind = KStar | KNat deriving (Show, Eq)

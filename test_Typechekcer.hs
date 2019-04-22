@@ -1,5 +1,6 @@
 import AST
 import Typechecker
+import qualified Data.Set as Set
 
 type Test = () -> Bool
 type TestName = String
@@ -26,6 +27,112 @@ context5 :: Context
 context5 = [CUTypeVarEq (UTypeVar "x") MZero, CETypeVar (ETypeVar "x") KNat (MSucc MZero), CUTypeVarEq (UTypeVar "x") MUnit,
             CVar "x" TUnit Principal, CTypeVar (E $ ETypeVar "x") KStar, CETypeVar (ETypeVar "x") KStar $ MProduct MUnit MUnit,
             CTypeVar (U $ UTypeVar "x") KNat, CTypeVar (E $ ETypeVar "x") KStar, CTypeVar (U $ UTypeVar "x") KStar]
+
+--freeExistentialVariablesOfMonotype :: Monotype -> Set.Set ETypeVar
+freeExistentialVariablesOfMonotype_test1 :: Test
+freeExistentialVariablesOfMonotype_test1 () =
+  case Set.toList . freeExistentialVariablesOfMonotype $ MProduct (MArrow (MUVar $ UTypeVar "x") MUnit) (MCoproduct MUnit MUnit) of
+    [] -> True
+    _ -> False
+
+freeExistentialVariablesOfMonotype_test2 :: Test
+freeExistentialVariablesOfMonotype_test2 () =
+  case Set.toList . freeExistentialVariablesOfMonotype $ MProduct (MArrow (MUVar $ UTypeVar "x")
+       (MEVar $ ETypeVar "a")) (MCoproduct (MEVar $ ETypeVar "b") (MEVar $ ETypeVar "c")) of
+    [ETypeVar "a", ETypeVar "b", ETypeVar "c"] -> True
+    _ -> False
+
+freeExistentialVariablesOfMonotype_test3 :: Test
+freeExistentialVariablesOfMonotype_test3 () =
+  case Set.toList . freeExistentialVariablesOfMonotype $ MSucc (MSucc MZero) of
+    [] -> True
+    _ -> False
+
+freeExistentialVariablesOfMonotype_test4 :: Test
+freeExistentialVariablesOfMonotype_test4 () =
+  case Set.toList . freeExistentialVariablesOfMonotype $ MSucc (MSucc (MUVar $ UTypeVar "x")) of
+    [] -> True
+    _ -> False
+
+freeExistentialVariablesOfMonotype_test5 :: Test
+freeExistentialVariablesOfMonotype_test5 () =
+  case Set.toList . freeExistentialVariablesOfMonotype $ MSucc (MSucc (MEVar $ ETypeVar "x")) of
+    [ETypeVar "x"] -> True
+    _ -> False
+
+--freeExistentialVariablesOfProp :: Proposition -> Set.Set ETypeVar
+freeExistentialVariablesOfProp_test1 :: Test
+freeExistentialVariablesOfProp_test1 () =
+  case Set.toList . freeExistentialVariablesOfProp $ (MSucc MZero, MArrow (MUVar $ UTypeVar "x") MUnit) of
+    [] -> True
+    _ -> False
+
+freeExistentialVariablesOfProp_test2 :: Test
+freeExistentialVariablesOfProp_test2 () =
+  case Set.toList . freeExistentialVariablesOfProp $ (MSucc (MEVar $ ETypeVar "x") , MArrow (MUVar $ UTypeVar "x") MUnit) of
+    [ETypeVar "x"] -> True
+    _ -> False
+
+freeExistentialVariablesOfProp_test3 :: Test
+freeExistentialVariablesOfProp_test3 () =
+  case Set.toList . freeExistentialVariablesOfProp $ (MSucc (MUVar $ UTypeVar "x") , MArrow (MEVar $ ETypeVar "a") (MEVar $ ETypeVar "b")) of
+    [ETypeVar "a", ETypeVar "b"] -> True
+    _ -> False
+
+freeExistentialVariablesOfProp_test4 :: Test
+freeExistentialVariablesOfProp_test4 () =
+  case Set.toList . freeExistentialVariablesOfProp $ (MSucc (MEVar $ ETypeVar "U") , MArrow (MEVar $ ETypeVar "W") (MEVar $ ETypeVar "r")) of
+    [ETypeVar "U", ETypeVar "W",  ETypeVar "r"] -> True
+    _ -> False
+
+--freeExistentialVariables :: Type -> Set.Set ETypeVar
+freeExistentialVariables_test1 :: Test
+freeExistentialVariables_test1 () =
+  case Set.toList . freeExistentialVariables $ TProduct (TArrow (TUVar $ UTypeVar "x") TUnit) (TCoproduct TUnit TUnit) of
+    [] -> True
+    _ -> False
+
+freeExistentialVariables_test2 :: Test
+freeExistentialVariables_test2 () =
+  case Set.toList . freeExistentialVariables $ TProduct (TArrow (TUVar $ UTypeVar "x") (TEVar $ ETypeVar "g"))
+       (TCoproduct (TEVar $ ETypeVar "h") (TEVar $ ETypeVar "c")) of
+    [ETypeVar "c", ETypeVar "g", ETypeVar "h"] -> True
+    _ -> False
+
+freeExistentialVariables_test3 :: Test
+freeExistentialVariables_test3 () =
+  case Set.toList . freeExistentialVariables $ TExistential "x" KStar $ TProduct (TArrow (TEVar $ ETypeVar "x") TUnit) (TCoproduct TUnit TUnit) of
+    [] -> True
+    _ -> False
+
+freeExistentialVariables_test4 :: Test
+freeExistentialVariables_test4 () =
+  case Set.toList . freeExistentialVariables $ TUniversal "x" KStar $ TProduct (TArrow (TEVar $ ETypeVar "x") TUnit) (TCoproduct TUnit TUnit) of
+    [ETypeVar "x"] -> True
+    _ -> False
+
+freeExistentialVariables_test5 :: Test
+freeExistentialVariables_test5 () =
+  case Set.toList . freeExistentialVariables $ TUniversal "U" KNat $ TExistential "x" KStar $
+       TImp (MSucc (MEVar $ ETypeVar "U") , MArrow (MEVar $ ETypeVar "W") (MEVar $ ETypeVar "r"))
+       (TProduct (TArrow (TEVar $ ETypeVar "x") TUnit) (TCoproduct (TEVar $ ETypeVar "y") TUnit)) of
+    [ETypeVar "U", ETypeVar "W", ETypeVar "r", ETypeVar "y"] -> True
+    _ -> False
+
+freeExistentialVariables_test6 :: Test
+freeExistentialVariables_test6 () =
+  case Set.toList . freeExistentialVariables $ TUniversal "U" KNat $ TExistential "x" KStar $
+       TAnd (TVec (MSucc (MEVar $ ETypeVar "a")) (TProduct (TArrow (TEVar $ ETypeVar "x") TUnit) (TCoproduct (TEVar $ ETypeVar "y") TUnit)))
+       (MSucc (MEVar $ ETypeVar "U") , MArrow (MEVar $ ETypeVar "W") (MEVar $ ETypeVar "r")) of
+    [ETypeVar "U", ETypeVar "W",  ETypeVar "a", ETypeVar "r", ETypeVar "y"] -> True
+    _ -> False
+
+freeExistentialVariables_test7 :: Test
+freeExistentialVariables_test7 () =
+  case Set.toList . freeExistentialVariables $ TExistential "h" KNat $  TExistential "c" KStar $ TExistential "g" KStar $
+       TProduct (TArrow (TUVar $ UTypeVar "x") (TEVar $ ETypeVar "g")) (TCoproduct (TEVar $ ETypeVar "h") (TEVar $ ETypeVar "c")) of
+    [] -> True
+    _ -> False
 
 --varContextLookup :: Context -> Expr p -> Either (Error p) ContextEntry
 varContextLookup_test1 :: Test
@@ -417,7 +524,8 @@ applyContextToType_test6 () =
 
 applyContextToType_test7 :: Test
 applyContextToType_test7 () =
-  case applyContextToType [CUTypeVarEq (UTypeVar "x") (MSucc (MSucc MZero))] (TImp (MUVar $ UTypeVar "x", MZero) (TCoproduct (TUVar $ UTypeVar "x") TUnit)) () of
+  case applyContextToType [CUTypeVarEq (UTypeVar "x") (MSucc (MSucc MZero))] (TImp (MUVar $ UTypeVar "x", MZero)
+       (TCoproduct (TUVar $ UTypeVar "x") TUnit)) () of
     Left (MonotypeIsNotTypeError () (MSucc (MSucc MZero))) -> True
     _ -> False
 
@@ -757,12 +865,29 @@ checkTypeWellFormedness_test25 () =
 
 checkTypeWellFormedness_test26 :: Test
 checkTypeWellFormedness_test26 () =
-  case checkTypeWellFormedness context1 (TUniversal "n" KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n")) (TImp (MEVar $ ETypeVar "b", MUVar $ UTypeVar "n") (TProduct TUnit TUnit))) () of
+  case checkTypeWellFormedness context1 (TUniversal "n" KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
+       (TImp (MEVar $ ETypeVar "b", MUVar $ UTypeVar "n") (TProduct TUnit TUnit))) () of
     Right () -> True
     _ -> False
 
 tests :: [(TestName, Test)]
-tests = [("varContextLookup_test1", varContextLookup_test1),
+tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOfMonotype_test1),
+         ("freeExistentialVariablesOfMonotype_test2", freeExistentialVariablesOfMonotype_test2),
+         ("freeExistentialVariablesOfMonotype_test3", freeExistentialVariablesOfMonotype_test3),
+         ("freeExistentialVariablesOfMonotype_test4", freeExistentialVariablesOfMonotype_test4),
+         ("freeExistentialVariablesOfMonotype_test5", freeExistentialVariablesOfMonotype_test5),
+         ("freeExistentialVariablesOfProp_test1", freeExistentialVariablesOfProp_test1),
+         ("freeExistentialVariablesOfProp_test2", freeExistentialVariablesOfProp_test2),
+         ("freeExistentialVariablesOfProp_test3", freeExistentialVariablesOfProp_test3),
+         ("freeExistentialVariablesOfProp_test4", freeExistentialVariablesOfProp_test4),
+         ("freeExistentialVariables_test1", freeExistentialVariables_test1),
+         ("freeExistentialVariables_test2", freeExistentialVariables_test2),
+         ("freeExistentialVariables_test3", freeExistentialVariables_test3),
+         ("freeExistentialVariables_test4", freeExistentialVariables_test4),
+         ("freeExistentialVariables_test5", freeExistentialVariables_test5),
+         ("freeExistentialVariables_test6", freeExistentialVariables_test6),
+         ("freeExistentialVariables_test7", freeExistentialVariables_test7),
+         ("varContextLookup_test1", varContextLookup_test1),
          ("varContextLookup_test2", varContextLookup_test2),
          ("varContextLookup_test3", varContextLookup_test3),
          ("varContextLookup_test4", varContextLookup_test4),

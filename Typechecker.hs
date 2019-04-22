@@ -208,9 +208,6 @@ checkExpr c (EUnit _) TUnit _ = return c
 checkExpr c (EUnit p) (TEVar a) _ = eTypeVarContextReplace c a MUnit p
 checkExpr _ _ _ _ = undefined
 
--- checkValue :: Context -> Value p -> Type -> Principality -> Either (Error p) Context
--- checkValue _ _ _ = undefined
-
 inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
 inferExpr c (EVar p x) = do
   (CVar _ t pr) <- varContextLookup c x p
@@ -221,7 +218,4 @@ inferExpr c (EAnnot p e t) = do
   t2 <- applyContextToType c t p
   c2 <- checkExpr c e t2 Principal
   return (t2, Principal, c2)
-
 inferExpr _ _ = undefined
--- inferValue :: Context -> Value p -> Either (Error p) (Type, Principality, Context)
--- inferValue _ _ = undefined

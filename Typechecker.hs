@@ -4,16 +4,16 @@ import AST
 import qualified Data.Set as Set
 
 data Error p
-  = UndeclaredVariable p Var
+  = UndeclaredVariableError p Var
   | InternalCompilerError String
   | ETypeVarMismatchError p Monotype Monotype
-  | UndeclaredETypeVar p Var
-  | TypeFormednessEVarNotDeclaredError p Var
-  | TypeFormednessUVarNotDeclaredError p Var
+  | UndeclaredETypeVarError p Var
+  | TypeFormednessEVarUndeclaredError p Var
+  | TypeFormednessUVarUndeclaredError p Var
   | TypeFormednessInvalidKindError p Var
   | CheckKindHasWrongKindError p Kind Kind
-  | CheckKindEVarNotDeclaredError p Var
-  | CheckKindUVarNotDeclaredError p Var
+  | CheckKindEVarUndeclaredError p Var
+  | CheckKindUVarUndeclaredError p Var
   | MonotypeIsNotTypeError p Monotype
   | TypeFormednessPrcFEVError p [ETypeVar]
   deriving (Show, Eq)
@@ -49,7 +49,7 @@ varContextLookup  (entry @ (CVar y _ _): c) x p
   | x == y = return entry
   | otherwise = varContextLookup c x p
 varContextLookup (_ : c) x p = varContextLookup c x p
-varContextLookup [] x p = Left $ UndeclaredVariable p x
+varContextLookup [] x p = Left $ UndeclaredVariableError p x
 
 uTypeVarEqContextLookup :: Context -> UTypeVar -> Maybe ContextEntry
 uTypeVarEqContextLookup (entry @ (CUTypeVarEq b _) : c) a
@@ -97,7 +97,7 @@ eTypeVarContextReplace (entry @  (CTypeVar (E (ETypeVar b)) k) : ct) (ETypeVar a
   | a == b = return $ CETypeVar (ETypeVar a) k sigma : ct
   | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) sigma p
 eTypeVarContextReplace (entry : ct) a sigma p = (:) entry <$> eTypeVarContextReplace ct a sigma p
-eTypeVarContextReplace [] (ETypeVar a) _ p = Left $ UndeclaredETypeVar p a
+eTypeVarContextReplace [] (ETypeVar a) _ p = Left $ UndeclaredETypeVarError p a
 
 monotypeToType :: Monotype -> p -> Either (Error p) Type
 monotypeToType MUnit _ = return TUnit
@@ -167,12 +167,12 @@ checkTypeWellFormedness c (TEVar x @ (ETypeVar name)) p =
   case eTypeVarContextLookup c x of
     Just (CTypeVar _ KStar) -> return ()
     Just (CETypeVar _ KStar _) -> return ()
-    Nothing -> Left $ TypeFormednessEVarNotDeclaredError p name
+    Nothing -> Left $ TypeFormednessEVarUndeclaredError p name
     _ -> Left $ TypeFormednessInvalidKindError p name
 checkTypeWellFormedness c (TUVar x  @ (UTypeVar name)) p =
   case unsolvedTypeVarContextLookup c (U x) of
     Just (CTypeVar _ KStar) -> return ()
-    Nothing -> Left $ TypeFormednessUVarNotDeclaredError p name
+    Nothing -> Left $ TypeFormednessUVarUndeclaredError p name
     _ -> Left $ TypeFormednessInvalidKindError p name
 
 checkMonotypeHasKind :: Context -> Monotype -> p -> Kind -> Either (Error p) ()
@@ -194,11 +194,11 @@ inferMonotypeKind c (MEVar x @ (ETypeVar name)) p =
   case eTypeVarContextLookup c x of
     Just (CTypeVar _ k) -> return k
     Just (CETypeVar _ k _) -> return k
-    _ ->  Left $ CheckKindEVarNotDeclaredError p name
+    _ ->  Left $ CheckKindEVarUndeclaredError p name
 inferMonotypeKind c (MUVar x @ (UTypeVar name)) p =
   case unsolvedTypeVarContextLookup c (U x) of
     Just (CTypeVar _ k) -> return k
-    _ -> Left $ CheckKindUVarNotDeclaredError p name
+    _ -> Left $ CheckKindUVarUndeclaredError p name
 
 checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
 checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotypeHasKind c m2 p

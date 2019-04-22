@@ -5,15 +5,17 @@ type Test = () -> Bool
 type TestName = String
 
 context1 :: Context
-context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") MZero, CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit,
-            CUTypeVarEq (UTypeVar "k") MUnit, CVar "r" TUnit NotPrincipal, CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "b") KNat MZero]
+context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
+            CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CUTypeVarEq (UTypeVar "k") MUnit,
+            CVar "r" TUnit NotPrincipal, CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
 
 context2 :: Context
 context2 = [CTypeVar (E $ ETypeVar "a") KNat, CTypeVar (E $ ETypeVar "b") KStar, CTypeVar (E $ ETypeVar "c") KStar]
 
 context3 :: Context
-context3 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") MZero, CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit,
-            CUTypeVarEq (UTypeVar "k") MUnit, CVar "r" TUnit NotPrincipal, CETypeVar (ETypeVar "a") KStar MUnit, CETypeVar (ETypeVar "b") KNat MZero]
+context3 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
+            CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CUTypeVarEq (UTypeVar "k") MUnit,
+            CVar "r" TUnit NotPrincipal, CETypeVar (ETypeVar "a") KStar MUnit, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
 
 context4 :: Context
 context4 = [CVar "zz" TUnit NotPrincipal, CVar "x" TUnit NotPrincipal, CTypeVar (U $ UTypeVar "x") KStar, CUTypeVarEq (UTypeVar "x") MZero,
@@ -21,7 +23,7 @@ context4 = [CVar "zz" TUnit NotPrincipal, CVar "x" TUnit NotPrincipal, CTypeVar 
             CETypeVar (ETypeVar "x") KStar $ MProduct MUnit MUnit, CTypeVar (U $ UTypeVar "x") KNat, CTypeVar (E $ ETypeVar "x") KStar]
 
 context5 :: Context
-context5 = [CUTypeVarEq (UTypeVar "x") MZero, CETypeVar (ETypeVar "x") KNat MZero, CUTypeVarEq (UTypeVar "x") MUnit,
+context5 = [CUTypeVarEq (UTypeVar "x") MZero, CETypeVar (ETypeVar "x") KNat (MSucc MZero), CUTypeVarEq (UTypeVar "x") MUnit,
             CVar "x" TUnit Principal, CTypeVar (E $ ETypeVar "x") KStar, CETypeVar (ETypeVar "x") KStar $ MProduct MUnit MUnit,
             CTypeVar (U $ UTypeVar "x") KNat, CTypeVar (E $ ETypeVar "x") KStar, CTypeVar (U $ UTypeVar "x") KStar]
 
@@ -90,7 +92,7 @@ uTypeVarEqContextLookup_test2 () =
 uTypeVarEqContextLookup_test3 :: Test
 uTypeVarEqContextLookup_test3 () =
   case uTypeVarEqContextLookup context1 $ UTypeVar "n" of
-    Just (CUTypeVarEq (UTypeVar "n") MZero) -> True
+    Just (CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero)))) -> True
     _ -> False
 
 uTypeVarEqContextLookup_test4 :: Test
@@ -108,6 +110,12 @@ uTypeVarEqContextLookup_test5 () =
 uTypeVarEqContextLookup_test6 :: Test
 uTypeVarEqContextLookup_test6 () =
   case uTypeVarEqContextLookup context4 $ UTypeVar "x" of
+    Nothing -> True
+    _ -> False
+
+uTypeVarEqContextLookup_test7 :: Test
+uTypeVarEqContextLookup_test7 () =
+  case uTypeVarEqContextLookup context5 $ UTypeVar "x" of
     Just (CUTypeVarEq (UTypeVar "x") MZero) -> True
     _ -> False
 
@@ -133,7 +141,7 @@ solvedETypeVarContextLookup_test3 () =
 solvedETypeVarContextLookup_test4 :: Test
 solvedETypeVarContextLookup_test4 () =
  case solvedETypeVarContextLookup context1 $ ETypeVar "b" of
-   Just (CETypeVar (ETypeVar "b") KNat MZero) -> True
+   Just (CETypeVar (ETypeVar "b") KNat (MSucc MZero)) -> True
    _ -> False
 
 solvedETypeVarContextLookup_test5 :: Test
@@ -146,6 +154,12 @@ solvedETypeVarContextLookup_test6 :: Test
 solvedETypeVarContextLookup_test6 () =
   case solvedETypeVarContextLookup context4 $ ETypeVar "x" of
     Just (CETypeVar (ETypeVar "x") KNat MZero) -> True
+    _ -> False
+
+solvedETypeVarContextLookup_test7 :: Test
+solvedETypeVarContextLookup_test7 () =
+  case solvedETypeVarContextLookup [CTypeVar (E $ ETypeVar "x") KStar, CETypeVar (ETypeVar "x") KNat (MSucc MZero)] $ ETypeVar "x" of
+    Nothing -> True
     _ -> False
 
 --eTypeVarContextLookup :: Context -> ETypeVar -> Maybe ContextEntry
@@ -170,7 +184,7 @@ eTypeVarContextLookup_test3 () =
 eTypeVarContextLookup_test4 :: Test
 eTypeVarContextLookup_test4 () =
  case eTypeVarContextLookup context1 $ ETypeVar "b" of
-   Just (CETypeVar (ETypeVar "b") KNat MZero) -> True
+   Just (CETypeVar (ETypeVar "b") KNat (MSucc MZero)) -> True
    _ -> False
 
 eTypeVarContextLookup_test5 :: Test
@@ -224,7 +238,7 @@ eTypeVarContextReplace_test3 () =
 
 eTypeVarContextReplace_test4 :: Test
 eTypeVarContextReplace_test4 () =
-  case eTypeVarContextReplace context1 (ETypeVar "b") MZero "1, 3" of
+  case eTypeVarContextReplace context1 (ETypeVar "b") (MSucc MZero) "1, 3" of
     Right c -> c == context1
     _ -> False
 
@@ -257,7 +271,6 @@ eTypeVarContextReplace_test9 () =
   case eTypeVarContextReplace [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero] (ETypeVar "a") (MProduct MUnit MUnit) () of
     Right [CETypeVar (ETypeVar "a") KStar (MProduct MUnit MUnit), CETypeVar (ETypeVar "a") KNat MZero] -> True
     _ -> False
-
 
 --unsolvedTypeVarContextLookup :: Context -> TypeVar -> Maybe ContextEntry
 unsolvedTypeVarContextLookup_test1 :: Test
@@ -331,13 +344,13 @@ applyContextToMonotype_test1 () =
 applyContextToMonotype_test2 :: Test
 applyContextToMonotype_test2 () =
   case applyContextToMonotype context5 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "x"))) of
-    (MArrow (MProduct MUnit MUnit) (MCoproduct MZero MZero)) -> True
+    (MArrow (MProduct MUnit MUnit) (MCoproduct MZero (MSucc MZero))) -> True
     _ -> False
 
 applyContextToMonotype_test3 :: Test
 applyContextToMonotype_test3 () =
   case applyContextToMonotype context5 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "y") (MEVar $ ETypeVar "x"))) of
-    (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar (UTypeVar "y")) MZero)) -> True
+    (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar (UTypeVar "y")) (MSucc MZero))) -> True
     _ -> False
 
 applyContextToMonotype_test4 :: Test
@@ -362,7 +375,98 @@ applyContextToProposition_test2 () =
 applyContextToProposition_test3 :: Test
 applyContextToProposition_test3 () =
   case applyContextToProposition context5 (MUVar (UTypeVar "x"), MEVar (ETypeVar "x")) of
-    (MZero, MZero) -> True
+    (MZero, MSucc MZero) -> True
+    _ -> False
+
+--applyContextToType :: Context -> Type -> p-> Either (Error p) Type
+applyContextToType_test1 :: Test
+applyContextToType_test1 () =
+  case applyContextToType [] (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar $ UTypeVar "x") (TEVar $ ETypeVar "y"))) () of
+    Right (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar (UTypeVar "x")) (TEVar (ETypeVar "y")))) -> True
+    _ -> False
+
+applyContextToType_test2 :: Test
+applyContextToType_test2 () =
+  case applyContextToType context5 (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar $ UTypeVar "x") (TEVar $ ETypeVar "x"))) () of
+    Left (MonotypeIsNotTypeError () MZero) -> True
+    _ -> False
+
+applyContextToType_test3 :: Test
+applyContextToType_test3 () =
+  case applyContextToType context5 (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar $ UTypeVar "y") (TEVar $ ETypeVar "x"))) () of
+    Left (MonotypeIsNotTypeError () (MSucc MZero)) -> True
+    _ -> False
+
+applyContextToType_test4 :: Test
+applyContextToType_test4 () =
+  case applyContextToType context1 (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar $ UTypeVar "k") (TEVar $ ETypeVar "z"))) () of
+    Right (TArrow (TProduct TUnit TUnit) (TCoproduct TUnit (TProduct TUnit TUnit))) -> True
+    _ -> False
+
+applyContextToType_test5 :: Test
+applyContextToType_test5 () =
+  case applyContextToType context5 (TVec (MUVar $ UTypeVar "x") (TCoproduct TUnit TUnit)) () of
+    Right (TVec MZero (TCoproduct TUnit TUnit)) -> True
+    _ -> False
+
+applyContextToType_test6 :: Test
+applyContextToType_test6 () =
+  case applyContextToType context5 (TImp (MUVar $ UTypeVar "x", MZero) (TCoproduct TUnit TUnit)) () of
+    Right (TImp (MZero, MZero) (TCoproduct TUnit TUnit)) -> True
+    _ -> False
+
+applyContextToType_test7 :: Test
+applyContextToType_test7 () =
+  case applyContextToType [CUTypeVarEq (UTypeVar "x") (MSucc (MSucc MZero))] (TImp (MUVar $ UTypeVar "x", MZero) (TCoproduct (TUVar $ UTypeVar "x") TUnit)) () of
+    Left (MonotypeIsNotTypeError () (MSucc (MSucc MZero))) -> True
+    _ -> False
+
+applyContextToType_test8 :: Test
+applyContextToType_test8 () =
+  case applyContextToType context1 (TAnd (TCoproduct TUnit TUnit) (MUVar $ UTypeVar "n", MEVar $ ETypeVar "b")) () of
+    Right (TAnd (TCoproduct TUnit TUnit) (MSucc (MSucc (MSucc MZero)), MSucc MZero)) -> True
+    _ -> False
+
+applyContextToType_test9 :: Test
+applyContextToType_test9 () =
+  case applyContextToType context1 (TAnd (TUVar $ UTypeVar "n") (MUVar $ UTypeVar "n", MEVar $ ETypeVar "b")) () of
+    Left (MonotypeIsNotTypeError () (MSucc (MSucc (MSucc MZero)))) -> True
+    _ -> False
+
+applyContextToType_test10 :: Test
+applyContextToType_test10 () =
+  case applyContextToType context5 (TUniversal "x" KNat (TVec (MUVar $ UTypeVar "x") (TCoproduct TUnit TUnit))) () of
+    Right (TUniversal "x" KNat (TVec (MUVar (UTypeVar "x")) (TCoproduct TUnit TUnit))) -> True
+    _ -> False
+
+applyContextToType_test11 :: Test
+applyContextToType_test11 () =
+  case applyContextToType context1 (TUniversal "x" KStar (TVec (MUVar $ UTypeVar "n") (TCoproduct TUnit TUnit))) () of
+    Right (TUniversal "x" KStar (TVec (MSucc (MSucc (MSucc MZero))) (TCoproduct TUnit TUnit))) -> True
+    _ -> False
+
+applyContextToType_test12 :: Test
+applyContextToType_test12 () =
+  case applyContextToType context1 (TUniversal "x" KStar (TVec (MUVar $ UTypeVar "n") (TCoproduct (TUVar $ UTypeVar "x") TUnit))) () of
+    Right (TUniversal "x" KStar (TVec (MSucc (MSucc (MSucc MZero))) (TCoproduct (TUVar (UTypeVar "x")) TUnit))) -> True
+    _ -> False
+
+applyContextToType_test13 :: Test
+applyContextToType_test13  () =
+  case applyContextToType context1 (TExistential "b" KNat (TImp (MUVar (UTypeVar "n"), MEVar (ETypeVar "b")) (TVec (MEVar (ETypeVar "b")) TUnit))) () of
+    Right (TExistential "b" KNat (TImp (MSucc (MSucc (MSucc MZero)), MEVar (ETypeVar "b")) (TVec (MEVar (ETypeVar "b")) TUnit))) -> True
+    _ -> False
+
+applyContextToType_test14 :: Test
+applyContextToType_test14  () =
+  case applyContextToType context5 (TExistential "x" KNat (TImp (MUVar (UTypeVar "x"), MEVar (ETypeVar "x")) (TVec (MUVar (UTypeVar "x")) TUnit))) () of
+    Right (TExistential "x" KNat (TImp (MZero, MEVar (ETypeVar "x")) (TVec MZero TUnit))) -> True
+    _ -> False
+
+applyContextToType_test15 :: Test
+applyContextToType_test15  () =
+  case applyContextToType context5 (TExistential "x" KNat (TImp (MEVar (ETypeVar "x"), MEVar (ETypeVar "x")) (TVec MZero (TUVar (UTypeVar "x"))))) "1,3" of
+    Left (MonotypeIsNotTypeError "1,3" MZero) -> True
     _ -> False
 
 --inferMonotypeKind :: Context -> Monotype -> p -> Either (Error p) Kind
@@ -672,12 +776,14 @@ tests = [("varContextLookup_test1", varContextLookup_test1),
          ("uTypeVarEqContextLookup_test4", uTypeVarEqContextLookup_test4),
          ("uTypeVarEqContextLookup_test5", uTypeVarEqContextLookup_test5),
          ("uTypeVarEqContextLookup_test6", uTypeVarEqContextLookup_test6),
+         ("uTypeVarEqContextLookup_test7", uTypeVarEqContextLookup_test7),
          ("solvedETypeVarContextLookup_test1", solvedETypeVarContextLookup_test1),
          ("solvedETypeVarContextLookup_test2", solvedETypeVarContextLookup_test2),
          ("solvedETypeVarContextLookup_test3", solvedETypeVarContextLookup_test3),
          ("solvedETypeVarContextLookup_test4", solvedETypeVarContextLookup_test4),
          ("solvedETypeVarContextLookup_test5", solvedETypeVarContextLookup_test5),
          ("solvedETypeVarContextLookup_test6", solvedETypeVarContextLookup_test6),
+         ("solvedETypeVarContextLookup_test7", solvedETypeVarContextLookup_test7),
          ("eTypeVarContextLookup_test1", eTypeVarContextLookup_test1),
          ("eTypeVarContextLookup_test2", eTypeVarContextLookup_test2),
          ("eTypeVarContextLookup_test3", eTypeVarContextLookup_test3),
@@ -713,6 +819,21 @@ tests = [("varContextLookup_test1", varContextLookup_test1),
          ("applyContextToProposition_test1", applyContextToProposition_test1),
          ("applyContextToProposition_test2", applyContextToProposition_test2),
          ("applyContextToProposition_test3", applyContextToProposition_test3),
+         ("applyContextToType_test1", applyContextToType_test1),
+         ("applyContextToType_test2", applyContextToType_test2),
+         ("applyContextToType_test3", applyContextToType_test3),
+         ("applyContextToType_test4", applyContextToType_test4),
+         ("applyContextToType_test5", applyContextToType_test5),
+         ("applyContextToType_test6", applyContextToType_test6),
+         ("applyContextToType_test7", applyContextToType_test7),
+         ("applyContextToType_test8", applyContextToType_test8),
+         ("applyContextToType_test9", applyContextToType_test9),
+         ("applyContextToType_test10", applyContextToType_test10),
+         ("applyContextToType_test11", applyContextToType_test11),
+         ("applyContextToType_test12", applyContextToType_test12),
+         ("applyContextToType_test13", applyContextToType_test13),
+         ("applyContextToType_test14", applyContextToType_test14),
+         ("applyContextToType_test15", applyContextToType_test15),
          ("inferMonotypeKind_test1", inferMonotypeKind_test1),
          ("inferMonotypeKind_test2", inferMonotypeKind_test2),
          ("inferMonotypeKind_test3", inferMonotypeKind_test3),

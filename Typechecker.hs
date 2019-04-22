@@ -27,12 +27,18 @@ uTypeVarEqContextLookup :: Context -> UTypeVar -> Maybe ContextEntry
 uTypeVarEqContextLookup (entry @ (CUTypeVarEq b _) : c) a
   | a == b = return entry
   | otherwise = uTypeVarEqContextLookup c a
+uTypeVarEqContextLookup (CTypeVar (U b) _ : c) a
+  | a == b = Nothing
+  | otherwise = uTypeVarEqContextLookup c a
 uTypeVarEqContextLookup (_ : c) a = uTypeVarEqContextLookup c a
 uTypeVarEqContextLookup [] _ = Nothing
 
 solvedETypeVarContextLookup :: Context -> ETypeVar -> Maybe ContextEntry
 solvedETypeVarContextLookup (entry @ (CETypeVar b _ _) : c) a
   | a == b = return entry
+  | otherwise = solvedETypeVarContextLookup c a
+solvedETypeVarContextLookup (CTypeVar (E b) _ : c) a
+  | a == b = Nothing
   | otherwise = solvedETypeVarContextLookup c a
 solvedETypeVarContextLookup (_ : c) a = solvedETypeVarContextLookup c a
 solvedETypeVarContextLookup [] _ = Nothing
@@ -89,8 +95,8 @@ applyContextToType c (TEVar e) p =
   case solvedETypeVarContextLookup c e of
     Just (CETypeVar _ _ tau) -> monotypeToType (applyContextToMonotype c tau) p
     _ -> return $ TEVar e
-applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType c t p
-applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType c t p
+applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType (CTypeVar (U $ UTypeVar a) k : c) t p --TODO przemyśleć / zapytać
+applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType (CTypeVar (E $ ETypeVar a) k : c) t p
 applyContextToType _ TUnit _ = return TUnit
 
 applyContextToMonotype :: Context -> Monotype -> Monotype
@@ -107,7 +113,7 @@ applyContextToMonotype c (MEVar e) =
     _ -> MEVar e
 applyContextToMonotype _ MUnit = MUnit
 applyContextToMonotype _ MZero = MZero
-applyContextToMonotype c (MSucc n) = applyContextToMonotype c n
+applyContextToMonotype c (MSucc n) = MSucc (applyContextToMonotype c n)
 
 applyContextToProposition :: Context -> Proposition -> Proposition
 applyContextToProposition c (m1, m2) = (applyContextToMonotype c m1, applyContextToMonotype c m2)

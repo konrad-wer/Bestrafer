@@ -870,6 +870,166 @@ checkTypeWellFormedness_test26 () =
     Right () -> True
     _ -> False
 
+--checkTypeWellFormednessWithPrnc :: Context -> Type -> Principality -> p -> Either (Error p) ()
+checkTypeWellFormednessWithPrnc_test1 :: Test
+checkTypeWellFormednessWithPrnc_test1 () =
+  case checkTypeWellFormednessWithPrnc context1 (TArrow TUnit $ TCoproduct TUnit (TProduct TUnit TUnit)) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test2 :: Test
+checkTypeWellFormednessWithPrnc_test2 () =
+  case checkTypeWellFormednessWithPrnc context1 (TCoproduct (TUVar $ UTypeVar "y") (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "a"))) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "a", ETypeVar "z"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test3 :: Test
+checkTypeWellFormednessWithPrnc_test3 () =
+  case checkTypeWellFormednessWithPrnc context1 (TCoproduct (TUVar $ UTypeVar "y") (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b"))) Principal ((),()) of
+    Left (TypeFormednessPrcFEVError ((),()) [ETypeVar "b", ETypeVar "z"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test4 :: Test
+checkTypeWellFormednessWithPrnc_test4 () =
+  case checkTypeWellFormednessWithPrnc [] (TCoproduct (TUVar $ UTypeVar "y") (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b"))) Principal ((),()) of
+    Left (TypeFormednessPrcFEVError ((),()) [ETypeVar "b", ETypeVar "z"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test5 :: Test
+checkTypeWellFormednessWithPrnc_test5 () =
+  case checkTypeWellFormednessWithPrnc [] (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b")) Principal ((),()) of
+    Left (TypeFormednessPrcFEVError ((),()) [ETypeVar "b", ETypeVar "z"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test6 :: Test
+checkTypeWellFormednessWithPrnc_test6 () =
+  case checkTypeWellFormednessWithPrnc context5 (TUVar $ UTypeVar "x") Principal (5 :: Integer) of
+    Left (TypeFormednessInvalidKindError 5 "x") -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test7 :: Test
+checkTypeWellFormednessWithPrnc_test7 () =
+  case checkTypeWellFormednessWithPrnc context5 (TUniversal "x" KStar (TArrow (TUVar $ UTypeVar "x") TUnit)) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test8 :: Test
+checkTypeWellFormednessWithPrnc_test8 () =
+  case checkTypeWellFormednessWithPrnc context5 (TUniversal "Konrad" KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test9 :: Test
+checkTypeWellFormednessWithPrnc_test9 () =
+  case checkTypeWellFormednessWithPrnc [] (TUniversal "Konrad" KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test10 :: Test
+checkTypeWellFormednessWithPrnc_test10 () =
+  case checkTypeWellFormednessWithPrnc context1 (TExistential "b" KStar (TArrow (TEVar $ ETypeVar "b") TUnit)) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test11 :: Test
+checkTypeWellFormednessWithPrnc_test11 () =
+  case checkTypeWellFormednessWithPrnc context1 (TExistential "Konrad" KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test12 :: Test
+checkTypeWellFormednessWithPrnc_test12 () =
+  case checkTypeWellFormednessWithPrnc [] (TExistential "Konrad" KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test13 :: Test
+checkTypeWellFormednessWithPrnc_test13 () =
+  case checkTypeWellFormednessWithPrnc [] (TUniversal "x" KStar (TArrow (TUVar $ UTypeVar "y") TUnit)) Principal () of
+    Left (TypeFormednessUVarNotDeclaredError () "y") -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test14 :: Test
+checkTypeWellFormednessWithPrnc_test14 () =
+  case checkTypeWellFormednessWithPrnc [] (TExistential "x" KStar (TArrow (TEVar $ ETypeVar "y") TUnit)) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "y"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test15 :: Test
+checkTypeWellFormednessWithPrnc_test15 () =
+  case checkTypeWellFormednessWithPrnc context1 (TImp (MZero, MSucc MZero) (TArrow (TEVar $ ETypeVar "z") TUnit)) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "z"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test16 :: Test
+checkTypeWellFormednessWithPrnc_test16 () =
+  case checkTypeWellFormednessWithPrnc [] (TImp (MZero, MZero) (TArrow (TEVar $ ETypeVar "y") TUnit)) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "y"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test17 :: Test
+checkTypeWellFormednessWithPrnc_test17 () =
+  case checkTypeWellFormednessWithPrnc [] (TExistential "x" KStar (TImp (MZero, MSucc MZero) (TArrow (TEVar $ ETypeVar "x") TUnit))) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test18 :: Test
+checkTypeWellFormednessWithPrnc_test18 () =
+  case checkTypeWellFormednessWithPrnc [] (TExistential "x" KStar (TImp (MZero, MSucc (MEVar $ ETypeVar "x"))
+       (TArrow (TEVar $ ETypeVar "z") TUnit))) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "z"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test19 :: Test
+checkTypeWellFormednessWithPrnc_test19 () =
+  case checkTypeWellFormednessWithPrnc context1 (TAnd (TArrow (TEVar $ ETypeVar "z") TUnit) (MEVar $ ETypeVar "b", MSucc MZero)) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "b", ETypeVar "z"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test20 :: Test
+checkTypeWellFormednessWithPrnc_test20 () =
+  case checkTypeWellFormednessWithPrnc context1 (TAnd (TArrow (TUVar $ UTypeVar "Haskell") TUnit) (MEVar $ ETypeVar "Konrad", MSucc MZero)) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "Konrad"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test21 :: Test
+checkTypeWellFormednessWithPrnc_test21 () =
+  case checkTypeWellFormednessWithPrnc [] (TUniversal "x" KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MUVar $ UTypeVar "x", MUnit))) Principal () of
+    Right () -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test22 :: Test
+checkTypeWellFormednessWithPrnc_test22 () =
+  case checkTypeWellFormednessWithPrnc [] (TUniversal "x" KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MEVar $ ETypeVar "x", MUnit))) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "x"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test23 :: Test
+checkTypeWellFormednessWithPrnc_test23 () =
+  case checkTypeWellFormednessWithPrnc context1 (TVec (MSucc $ MSucc (MEVar $ ETypeVar "b")) (TProduct TUnit TUnit)) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "b"]) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test24 :: Test
+checkTypeWellFormednessWithPrnc_test24 () =
+  case checkTypeWellFormednessWithPrnc [] (TUniversal "n" KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
+       (TProduct TUnit (TUVar $ UTypeVar "n"))) Principal () of
+    Left (TypeFormednessInvalidKindError () "n") -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test25 :: Test
+checkTypeWellFormednessWithPrnc_test25 () =
+  case checkTypeWellFormednessWithPrnc [] (TExistential "x" KStar $ TVec (MSucc $ MSucc (MEVar $ ETypeVar "x")) (TProduct TUnit TUnit)) Principal () of
+    Left (CheckKindHasWrongKindError () KNat KStar) -> True
+    _ -> False
+
+checkTypeWellFormednessWithPrnc_test26 :: Test
+checkTypeWellFormednessWithPrnc_test26 () =
+  case checkTypeWellFormednessWithPrnc context1 (TUniversal "n" KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
+       (TImp (MEVar $ ETypeVar "b", MUVar $ UTypeVar "n") (TProduct TUnit TUnit))) Principal () of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "b"]) -> True
+    _ -> False
+
 tests :: [(TestName, Test)]
 tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOfMonotype_test1),
          ("freeExistentialVariablesOfMonotype_test2", freeExistentialVariablesOfMonotype_test2),
@@ -1006,7 +1166,33 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("checkTypeWellFormedness_test23", checkTypeWellFormedness_test23),
          ("checkTypeWellFormedness_test24", checkTypeWellFormedness_test24),
          ("checkTypeWellFormedness_test25", checkTypeWellFormedness_test25),
-         ("checkTypeWellFormedness_test26", checkTypeWellFormedness_test26)]
+         ("checkTypeWellFormedness_test26", checkTypeWellFormedness_test26),
+         ("checkTypeWellFormednessWithPrnc_test1", checkTypeWellFormednessWithPrnc_test1),
+         ("checkTypeWellFormednessWithPrnc_test2", checkTypeWellFormednessWithPrnc_test2),
+         ("checkTypeWellFormednessWithPrnc_test3", checkTypeWellFormednessWithPrnc_test3),
+         ("checkTypeWellFormednessWithPrnc_test4", checkTypeWellFormednessWithPrnc_test4),
+         ("checkTypeWellFormednessWithPrnc_test5", checkTypeWellFormednessWithPrnc_test5),
+         ("checkTypeWellFormednessWithPrnc_test6", checkTypeWellFormednessWithPrnc_test6),
+         ("checkTypeWellFormednessWithPrnc_test7", checkTypeWellFormednessWithPrnc_test7),
+         ("checkTypeWellFormednessWithPrnc_test8", checkTypeWellFormednessWithPrnc_test8),
+         ("checkTypeWellFormednessWithPrnc_test9", checkTypeWellFormednessWithPrnc_test9),
+         ("checkTypeWellFormednessWithPrnc_test10", checkTypeWellFormednessWithPrnc_test10),
+         ("checkTypeWellFormednessWithPrnc_test11", checkTypeWellFormednessWithPrnc_test11),
+         ("checkTypeWellFormednessWithPrnc_test12", checkTypeWellFormednessWithPrnc_test12),
+         ("checkTypeWellFormednessWithPrnc_test13", checkTypeWellFormednessWithPrnc_test13),
+         ("checkTypeWellFormednessWithPrnc_test14", checkTypeWellFormednessWithPrnc_test14),
+         ("checkTypeWellFormednessWithPrnc_test15", checkTypeWellFormednessWithPrnc_test15),
+         ("checkTypeWellFormednessWithPrnc_test16", checkTypeWellFormednessWithPrnc_test16),
+         ("checkTypeWellFormednessWithPrnc_test17", checkTypeWellFormednessWithPrnc_test17),
+         ("checkTypeWellFormednessWithPrnc_test18", checkTypeWellFormednessWithPrnc_test18),
+         ("checkTypeWellFormednessWithPrnc_test19", checkTypeWellFormednessWithPrnc_test19),
+         ("checkTypeWellFormednessWithPrnc_test20", checkTypeWellFormednessWithPrnc_test20),
+         ("checkTypeWellFormednessWithPrnc_test21", checkTypeWellFormednessWithPrnc_test21),
+         ("checkTypeWellFormednessWithPrnc_test22", checkTypeWellFormednessWithPrnc_test22),
+         ("checkTypeWellFormednessWithPrnc_test23", checkTypeWellFormednessWithPrnc_test23),
+         ("checkTypeWellFormednessWithPrnc_test24", checkTypeWellFormednessWithPrnc_test24),
+         ("checkTypeWellFormednessWithPrnc_test25", checkTypeWellFormednessWithPrnc_test25),
+         ("checkTypeWellFormednessWithPrnc_test26", checkTypeWellFormednessWithPrnc_test26)]
 
 runTest :: (TestName, Test) -> String
 runTest (name, t) =

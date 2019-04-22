@@ -1,6 +1,7 @@
 module Typechecker where
 
 import AST
+import qualified Data.Set as Set
 
 data Error p
   = UndeclaredVariable p Var
@@ -15,6 +16,32 @@ data Error p
   | CheckKindUVarNotDeclaredError p Var
   | MonotypeIsNotTypeError p Monotype
   deriving (Show, Eq)
+
+freeExistentialVariables :: Type -> Set.Set ETypeVar
+freeExistentialVariables TUnit = Set.empty
+freeExistentialVariables (TArrow t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
+freeExistentialVariables (TCoproduct t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
+freeExistentialVariables (TProduct t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
+freeExistentialVariables (TUVar _) = Set.empty
+freeExistentialVariables (TEVar x) = Set.singleton x
+freeExistentialVariables (TUniversal _ _ t) = freeExistentialVariables t
+freeExistentialVariables (TExistential x _ t) = Set.delete (ETypeVar x) $ freeExistentialVariables t
+freeExistentialVariables (TImp p t) = Set.union (freeExistentialVariablesOfProp p) (freeExistentialVariables t)
+freeExistentialVariables (TAnd t p) = Set.union (freeExistentialVariables t) (freeExistentialVariablesOfProp p)
+freeExistentialVariables (TVec n t) = Set.union (freeExistentialVariablesOfMonotype n) (freeExistentialVariables t)
+
+freeExistentialVariablesOfProp :: Proposition -> Set.Set ETypeVar
+freeExistentialVariablesOfProp (m1, m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
+
+freeExistentialVariablesOfMonotype :: Monotype -> Set.Set ETypeVar
+freeExistentialVariablesOfMonotype MUnit = Set.empty
+freeExistentialVariablesOfMonotype MZero = Set.empty
+freeExistentialVariablesOfMonotype (MSucc n) = freeExistentialVariablesOfMonotype n
+freeExistentialVariablesOfMonotype (MArrow m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
+freeExistentialVariablesOfMonotype (MCoproduct m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
+freeExistentialVariablesOfMonotype (MProduct m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
+freeExistentialVariablesOfMonotype (MUVar _) = Set.empty
+freeExistentialVariablesOfMonotype (MEVar x) = Set.singleton x
 
 varContextLookup :: Context -> Var -> p -> Either (Error p) ContextEntry
 varContextLookup  (entry @ (CVar y _ _): c) x p

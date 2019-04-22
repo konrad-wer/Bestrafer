@@ -216,6 +216,11 @@ inferExpr c (EVar p x) = do
   (CVar _ t pr) <- varContextLookup c x p
   t2 <- applyContextToType c t p
   return (t2, pr, c)
+inferExpr c (EAnnot p e t) = do
+  checkTypeWellFormednessWithPrnc c t Principal p
+  t2 <- applyContextToType c t p
+  c2 <- checkExpr c e t2 Principal
+  return (t2, Principal, c2)
 
 inferExpr _ _ = undefined
 -- inferValue :: Context -> Value p -> Either (Error p) (Type, Principality, Context)

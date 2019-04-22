@@ -15,6 +15,7 @@ data Error p
   | CheckKindEVarNotDeclaredError p Var
   | CheckKindUVarNotDeclaredError p Var
   | MonotypeIsNotTypeError p Monotype
+  | TypeFormednessPrcFEVError p [ETypeVar]
   deriving (Show, Eq)
 
 freeExistentialVariables :: Type -> Set.Set ETypeVar
@@ -147,7 +148,10 @@ applyContextToProposition c (m1, m2) = (applyContextToMonotype c m1, applyContex
 
 checkTypeWellFormednessWithPrnc :: Context -> Type -> Principality -> p -> Either (Error p) ()
 checkTypeWellFormednessWithPrnc c t NotPrincipal p = checkTypeWellFormedness c t p
-checkTypeWellFormednessWithPrnc _ _ Principal _ = undefined
+checkTypeWellFormednessWithPrnc c t Principal p =
+  case Set.toList . freeExistentialVariables $ t of
+    [] -> checkTypeWellFormedness c t p
+    vars -> Left $ TypeFormednessPrcFEVError p vars
 
 checkTypeWellFormedness :: Context -> Type -> p -> Either (Error p) ()
 checkTypeWellFormedness _ TUnit _ = return ()

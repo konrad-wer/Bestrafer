@@ -290,56 +290,72 @@ eTypeVarContextLookup_test9 () =
 --eTypeVarContextReplace :: Context -> ETypeVar -> Monotype -> p -> Either (Error p) Context
 eTypeVarContextReplace_test1 :: Test
 eTypeVarContextReplace_test1 () =
-  case eTypeVarContextReplace [] (ETypeVar "x") MUnit "1, 3" of
+  case eTypeVarContextReplace [] (ETypeVar "x") MUnit [] "1, 3" of
     Left (UndeclaredETypeVarError "1, 3" (ETypeVar "x")) -> True
     _ -> False
 
 eTypeVarContextReplace_test2 :: Test
 eTypeVarContextReplace_test2 () =
-  case eTypeVarContextReplace context2 (ETypeVar "b") MUnit "1, 3" of
+  case eTypeVarContextReplace context2 (ETypeVar "b") MUnit [] "1, 3" of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CETypeVar (ETypeVar "b") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 eTypeVarContextReplace_test3 :: Test
 eTypeVarContextReplace_test3 () =
-  case eTypeVarContextReplace context2 (ETypeVar "c") (MProduct MUnit MUnit) "1, 3" of
+  case eTypeVarContextReplace context2 (ETypeVar "c") (MProduct MUnit MUnit) [] "1, 3" of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CTypeVar (E (ETypeVar "b")) KStar, CETypeVar (ETypeVar "c") KStar (MProduct MUnit MUnit)] -> True
     _ -> False
 
 eTypeVarContextReplace_test4 :: Test
 eTypeVarContextReplace_test4 () =
-  case eTypeVarContextReplace context1 (ETypeVar "b") (MSucc MZero) "1, 3" of
+  case eTypeVarContextReplace context1 (ETypeVar "b") (MSucc MZero) [] "1, 3" of
     Right c -> c == context1
     _ -> False
 
 eTypeVarContextReplace_test5 :: Test
 eTypeVarContextReplace_test5 () =
-  case eTypeVarContextReplace context1 (ETypeVar "a") MUnit "1, 3" of
+  case eTypeVarContextReplace context1 (ETypeVar "a") MUnit [] "1, 3" of
     Right c -> c == context3
     _ -> False
 
 eTypeVarContextReplace_test6 :: Test
 eTypeVarContextReplace_test6 () =
-  case eTypeVarContextReplace context1 (ETypeVar "z") MUnit "1, 3" of
+  case eTypeVarContextReplace context1 (ETypeVar "z") MUnit [] "1, 3" of
     Left (ETypeVarMismatchError "1, 3" (MProduct MUnit MUnit) MUnit) -> True
     _ -> False
 
 eTypeVarContextReplace_test7 :: Test
 eTypeVarContextReplace_test7 () =
-  case eTypeVarContextReplace context1 (ETypeVar "Konrad") MUnit "1, 3" of
+  case eTypeVarContextReplace context1 (ETypeVar "Konrad") MUnit [] "1, 3" of
     Left (UndeclaredETypeVarError "1, 3" (ETypeVar "Konrad")) -> True
     _ -> False
 
 eTypeVarContextReplace_test8 :: Test
 eTypeVarContextReplace_test8 () =
-  case eTypeVarContextReplace context4 (ETypeVar "x") MUnit "1, 3" of
+  case eTypeVarContextReplace context4 (ETypeVar "x") MUnit [] "1, 3" of
     Left (ETypeVarMismatchError "1, 3" MZero MUnit) -> True
     _ -> False
 
 eTypeVarContextReplace_test9 :: Test
 eTypeVarContextReplace_test9 () =
-  case eTypeVarContextReplace [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero] (ETypeVar "a") (MProduct MUnit MUnit) () of
+  case eTypeVarContextReplace [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero]
+       (ETypeVar "a") (MProduct MUnit MUnit) [] () of
     Right [CETypeVar (ETypeVar "a") KStar (MProduct MUnit MUnit), CETypeVar (ETypeVar "a") KNat MZero] -> True
+    _ -> False
+
+eTypeVarContextReplace_test10 :: Test
+eTypeVarContextReplace_test10 () =
+  case eTypeVarContextReplace [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero]
+       (ETypeVar "a") (MProduct MUnit MUnit) [CTypeVar (E (ETypeVar "b")) KStar] () of
+    Right [CETypeVar (ETypeVar "a") KStar (MProduct MUnit MUnit), CTypeVar (E (ETypeVar "b")) KStar, CETypeVar (ETypeVar "a") KNat MZero] -> True
+    _ -> False
+
+eTypeVarContextReplace_test11 :: Test
+eTypeVarContextReplace_test11 () =
+  case eTypeVarContextReplace context2 (ETypeVar "b") (MProduct MUnit MUnit)
+        [CTypeVar (E (ETypeVar "t")) KStar, CUTypeVarEq (UTypeVar "r") MZero, CETypeVar (ETypeVar "c") KStar MUnit] () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CETypeVar (ETypeVar "b") KStar (MProduct MUnit MUnit), CTypeVar (E (ETypeVar "t")) KStar,
+           CUTypeVarEq (UTypeVar "r") MZero, CETypeVar (ETypeVar "c") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 --unsolvedTypeVarContextLookup :: Context -> TypeVar -> Maybe ContextEntry
@@ -1130,6 +1146,8 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("eTypeVarContextReplace_test7", eTypeVarContextReplace_test7),
          ("eTypeVarContextReplace_test8", eTypeVarContextReplace_test8),
          ("eTypeVarContextReplace_test9", eTypeVarContextReplace_test9),
+         ("eTypeVarContextReplace_test10", eTypeVarContextReplace_test10),
+         ("eTypeVarContextReplace_test11", eTypeVarContextReplace_test11),
          ("unsolvedTypeVarContextLookup_test1", unsolvedTypeVarContextLookup_test1),
          ("unsolvedTypeVarContextLookup_test2", unsolvedTypeVarContextLookup_test2),
          ("unsolvedTypeVarContextLookup_test3", unsolvedTypeVarContextLookup_test3),

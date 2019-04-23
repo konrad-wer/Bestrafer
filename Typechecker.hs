@@ -204,6 +204,21 @@ checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotyp
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr c (EUnit _) TUnit _ = return c
 checkExpr c (EUnit p) (TEVar a) _ = eTypeVarContextReplace c a MUnit [] p
+checkExpr c (EPair _ e1 e2) (TProduct t1 t2) pr = do
+  c2 <- checkExpr c e1 t1 pr
+  checkExpr c2 e2 t2 pr
+checkExpr c (EPair p e1 e2) (TEVar a) _ =
+  let a1 = ETypeVar $ eTypeVarName a ++ "-1" in
+  let a2 = ETypeVar $ eTypeVarName a ++ "-2" in do
+  c2 <- eTypeVarContextReplace c a (MProduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
+  c3 <- checkExpr c2 e1 (TEVar a1) NotPrincipal
+  checkExpr c3 e2 (TEVar a2) NotPrincipal
+checkExpr c (EInjk _ e k) (TCoproduct t1 t2) pr = checkExpr c e ([t1, t2] !! k) pr
+checkExpr c (EInjk p e k) (TEVar a) _ =
+  let a1 = ETypeVar $ eTypeVarName a ++ "-1" in
+  let a2 = ETypeVar $ eTypeVarName a ++ "-2" in do
+  c2 <- eTypeVarContextReplace c a (MCoproduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
+  checkExpr c2 e ([TEVar a1, TEVar a2] !! k) NotPrincipal
 checkExpr _ _ _ _ = undefined
 
 inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)

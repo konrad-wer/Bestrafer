@@ -75,16 +75,16 @@ unsolvedTypeVarContextLookup (entry @ (CTypeVar b _) : c) a
 unsolvedTypeVarContextLookup (_ : c) a = unsolvedTypeVarContextLookup c a
 unsolvedTypeVarContextLookup [] _ = Nothing
 
-eTypeVarContextReplace :: Context -> ETypeVar -> Monotype -> p -> Either (Error p) Context
-eTypeVarContextReplace c @ (entry @ (CETypeVar (ETypeVar b) _ tau) : ct) (ETypeVar a) sigma p
+eTypeVarContextReplace :: Context -> ETypeVar -> Monotype -> [ContextEntry] -> p -> Either (Error p) Context
+eTypeVarContextReplace c @ (entry @ (CETypeVar (ETypeVar b) _ tau) : ct) (ETypeVar a) sigma extraEntries p
   | a == b && tau == sigma = return c
   | a == b && tau /= sigma = Left $ ETypeVarMismatchError p tau sigma
-  | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) sigma p
-eTypeVarContextReplace (entry @  (CTypeVar (E (ETypeVar b)) k) : ct) (ETypeVar a) sigma p
-  | a == b = return $ CETypeVar (ETypeVar a) k sigma : ct
-  | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) sigma p
-eTypeVarContextReplace (entry : ct) a sigma p = (:) entry <$> eTypeVarContextReplace ct a sigma p
-eTypeVarContextReplace [] a _ p = Left $ UndeclaredETypeVarError p a
+  | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) sigma extraEntries p
+eTypeVarContextReplace (entry @  (CTypeVar (E (ETypeVar b)) k) : ct) (ETypeVar a) sigma extraEntries p
+  | a == b = return $ CETypeVar (ETypeVar a) k sigma : extraEntries ++ ct
+  | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) sigma extraEntries p
+eTypeVarContextReplace (entry : ct) a sigma extraEntries p = (:) entry <$> eTypeVarContextReplace ct a sigma extraEntries p
+eTypeVarContextReplace [] a _ _ p = Left $ UndeclaredETypeVarError p a
 
 monotypeToType :: Monotype -> p -> Either (Error p) Type
 monotypeToType MUnit _ = return TUnit
@@ -203,7 +203,7 @@ checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotyp
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr c (EUnit _) TUnit _ = return c
-checkExpr c (EUnit p) (TEVar a) _ = eTypeVarContextReplace c a MUnit p
+checkExpr c (EUnit p) (TEVar a) _ = eTypeVarContextReplace c a MUnit [] p
 checkExpr _ _ _ _ = undefined
 
 inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)

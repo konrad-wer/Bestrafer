@@ -8,7 +8,7 @@ type TestName = String
 context1 :: Context
 context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
             CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CUTypeVarEq (UTypeVar "k") MUnit,
-            CVar "r" TUnit NotPrincipal, CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
+            CVar "r" (TEVar $ ETypeVar "z") NotPrincipal, CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
 
 context2 :: Context
 context2 = [CTypeVar (E $ ETypeVar "a") KNat, CTypeVar (E $ ETypeVar "b") KStar, CTypeVar (E $ ETypeVar "c") KStar]
@@ -16,16 +16,16 @@ context2 = [CTypeVar (E $ ETypeVar "a") KNat, CTypeVar (E $ ETypeVar "b") KStar,
 context3 :: Context
 context3 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
             CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CUTypeVarEq (UTypeVar "k") MUnit,
-            CVar "r" TUnit NotPrincipal, CETypeVar (ETypeVar "a") KStar MUnit, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
+            CVar "r" (TEVar $ ETypeVar "z") NotPrincipal, CETypeVar (ETypeVar "a") KStar MUnit, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
 
 context4 :: Context
-context4 = [CVar "zz" TUnit NotPrincipal, CVar "x" TUnit NotPrincipal, CTypeVar (U $ UTypeVar "x") KStar, CUTypeVarEq (UTypeVar "x") MZero,
+context4 = [CVar "zz" (TEVar $ ETypeVar "r")  NotPrincipal, CVar "x" TUnit NotPrincipal, CTypeVar (U $ UTypeVar "x") KStar, CUTypeVarEq (UTypeVar "x") MZero,
             CETypeVar (ETypeVar "x") KNat MZero, CUTypeVarEq (UTypeVar "x") MUnit, CVar "x" TUnit Principal, CTypeVar (E $ ETypeVar "x") KStar,
             CETypeVar (ETypeVar "x") KStar $ MProduct MUnit MUnit, CTypeVar (U $ UTypeVar "x") KNat, CTypeVar (E $ ETypeVar "x") KStar]
 
 context5 :: Context
 context5 = [CUTypeVarEq (UTypeVar "x") MZero, CETypeVar (ETypeVar "x") KNat (MSucc MZero), CUTypeVarEq (UTypeVar "x") MUnit,
-            CVar "x" TUnit Principal, CTypeVar (E $ ETypeVar "x") KStar, CETypeVar (ETypeVar "x") KStar $ MProduct MUnit MUnit,
+            CVar "x" (TUVar $ UTypeVar "x") Principal, CTypeVar (E $ ETypeVar "x") KStar, CETypeVar (ETypeVar "x") KStar $ MProduct MUnit MUnit,
             CTypeVar (U $ UTypeVar "x") KNat, CTypeVar (E $ ETypeVar "x") KStar, CTypeVar (U $ UTypeVar "x") KStar]
 
 --freeExistentialVariablesOfMonotype :: Monotype -> Set.Set ETypeVar
@@ -180,7 +180,13 @@ varContextLookup_test7 () =
 varContextLookup_test8 :: Test
 varContextLookup_test8 () =
   case varContextLookup context5 "x" "1 , 3" of
-    Right (CVar "x" TUnit Principal) -> True
+    Right (CVar "x" (TUVar (UTypeVar "x")) Principal) -> True
+    _ -> False
+
+varContextLookup_test9 :: Test
+varContextLookup_test9 () =
+  case varContextLookup context1 "r" "1 , 3" of
+    Right (CVar "r" (TEVar (ETypeVar "z")) NotPrincipal) -> True
     _ -> False
 
 --uTypeVarEqContextLookup :: Context -> UTypeVar -> Maybe ContextEntry
@@ -224,49 +230,6 @@ uTypeVarEqContextLookup_test7 :: Test
 uTypeVarEqContextLookup_test7 () =
   case uTypeVarEqContextLookup context5 $ UTypeVar "x" of
     Just (CUTypeVarEq (UTypeVar "x") MZero) -> True
-    _ -> False
-
---solvedETypeVarContextLookup :: Context -> ETypeVar -> Maybe ContextEntry
-solvedETypeVarContextLookup_test1 :: Test
-solvedETypeVarContextLookup_test1 () =
-  case solvedETypeVarContextLookup [] $ ETypeVar "x" of
-    Nothing -> True
-    _ -> False
-
-solvedETypeVarContextLookup_test2 :: Test
-solvedETypeVarContextLookup_test2 () =
-  case solvedETypeVarContextLookup context1 $ ETypeVar "x" of
-    Nothing -> True
-    _ -> False
-
-solvedETypeVarContextLookup_test3 :: Test
-solvedETypeVarContextLookup_test3 () =
-  case solvedETypeVarContextLookup context1 $ ETypeVar "z" of
-    Just (CETypeVar (ETypeVar "z") KStar (MProduct MUnit MUnit)) -> True
-    _ -> False
-
-solvedETypeVarContextLookup_test4 :: Test
-solvedETypeVarContextLookup_test4 () =
- case solvedETypeVarContextLookup context1 $ ETypeVar "b" of
-   Just (CETypeVar (ETypeVar "b") KNat (MSucc MZero)) -> True
-   _ -> False
-
-solvedETypeVarContextLookup_test5 :: Test
-solvedETypeVarContextLookup_test5 () =
- case solvedETypeVarContextLookup context1 $ ETypeVar "Konrad" of
-   Nothing -> True
-   _ -> False
-
-solvedETypeVarContextLookup_test6 :: Test
-solvedETypeVarContextLookup_test6 () =
-  case solvedETypeVarContextLookup context4 $ ETypeVar "x" of
-    Just (CETypeVar (ETypeVar "x") KNat MZero) -> True
-    _ -> False
-
-solvedETypeVarContextLookup_test7 :: Test
-solvedETypeVarContextLookup_test7 () =
-  case solvedETypeVarContextLookup [CTypeVar (E $ ETypeVar "x") KStar, CETypeVar (ETypeVar "x") KNat (MSucc MZero)] $ ETypeVar "x" of
-    Nothing -> True
     _ -> False
 
 --eTypeVarContextLookup :: Context -> ETypeVar -> Maybe ContextEntry
@@ -328,7 +291,7 @@ eTypeVarContextLookup_test9 () =
 eTypeVarContextReplace_test1 :: Test
 eTypeVarContextReplace_test1 () =
   case eTypeVarContextReplace [] (ETypeVar "x") MUnit "1, 3" of
-    Left (UndeclaredETypeVarError "1, 3" "x") -> True
+    Left (UndeclaredETypeVarError "1, 3" (ETypeVar "x")) -> True
     _ -> False
 
 eTypeVarContextReplace_test2 :: Test
@@ -364,7 +327,7 @@ eTypeVarContextReplace_test6 () =
 eTypeVarContextReplace_test7 :: Test
 eTypeVarContextReplace_test7 () =
   case eTypeVarContextReplace context1 (ETypeVar "Konrad") MUnit "1, 3" of
-    Left (UndeclaredETypeVarError "1, 3" "Konrad") -> True
+    Left (UndeclaredETypeVarError "1, 3" (ETypeVar "Konrad")) -> True
     _ -> False
 
 eTypeVarContextReplace_test8 :: Test
@@ -444,52 +407,52 @@ monotypeToType_test3 () =
 --applyContextToMonotype :: Context -> Monotype -> Monotype
 applyContextToMonotype_test1 :: Test
 applyContextToMonotype_test1 () =
-  case applyContextToMonotype [] (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "y"))) of
-    (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar (UTypeVar "x")) (MEVar (ETypeVar "y")))) -> True
+  case applyContextToMonotype [] (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "y"))) () of
+    Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
     _ -> False
 
 applyContextToMonotype_test2 :: Test
 applyContextToMonotype_test2 () =
-  case applyContextToMonotype context5 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "x"))) of
-    (MArrow (MProduct MUnit MUnit) (MCoproduct MZero (MSucc MZero))) -> True
+  case applyContextToMonotype context5 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "x"))) () of
+    Right (MArrow (MProduct MUnit MUnit) (MCoproduct MZero (MSucc MZero))) -> True
     _ -> False
 
 applyContextToMonotype_test3 :: Test
 applyContextToMonotype_test3 () =
-  case applyContextToMonotype context5 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "y") (MEVar $ ETypeVar "x"))) of
-    (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar (UTypeVar "y")) (MSucc MZero))) -> True
+  case applyContextToMonotype context5 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "y") (MEVar $ ETypeVar "x"))) () of
+    Right (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar (UTypeVar "y")) (MSucc MZero))) -> True
     _ -> False
 
 applyContextToMonotype_test4 :: Test
 applyContextToMonotype_test4 () =
-  case applyContextToMonotype context1 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "k") (MEVar $ ETypeVar "z"))) of
-    (MArrow (MProduct MUnit MUnit) (MCoproduct MUnit (MProduct MUnit MUnit))) -> True
+  case applyContextToMonotype context1 (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "k") (MEVar $ ETypeVar "z"))) () of
+    Right (MArrow (MProduct MUnit MUnit) (MCoproduct MUnit (MProduct MUnit MUnit))) -> True
     _ -> False
 
 --applyContextToProposition :: Context -> Proposition -> Proposition
 applyContextToProposition_test1 :: Test
 applyContextToProposition_test1 () =
-  case applyContextToProposition context5 (MUnit, MUnit) of
-    (MUnit, MUnit) -> True
+  case applyContextToProposition context5 (MUnit, MUnit) () of
+    Right (MUnit, MUnit) -> True
     _ -> False
 
 applyContextToProposition_test2 :: Test
 applyContextToProposition_test2 () =
-  case applyContextToProposition [] (MUVar (UTypeVar "x"), MEVar (ETypeVar "y")) of
-    (MUVar (UTypeVar "x"), MEVar (ETypeVar "y")) -> True
+  case applyContextToProposition [] (MUVar (UTypeVar "x"), MEVar (ETypeVar "y")) () of
+    Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
     _ -> False
 
 applyContextToProposition_test3 :: Test
 applyContextToProposition_test3 () =
-  case applyContextToProposition context5 (MUVar (UTypeVar "x"), MEVar (ETypeVar "x")) of
-    (MZero, MSucc MZero) -> True
+  case applyContextToProposition context5 (MUVar (UTypeVar "x"), MEVar (ETypeVar "x")) () of
+    Right (MZero, MSucc MZero) -> True
     _ -> False
 
 --applyContextToType :: Context -> Type -> p-> Either (Error p) Type
 applyContextToType_test1 :: Test
 applyContextToType_test1 () =
   case applyContextToType [] (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar $ UTypeVar "x") (TEVar $ ETypeVar "y"))) () of
-    Right (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar (UTypeVar "x")) (TEVar (ETypeVar "y")))) -> True
+    Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
     _ -> False
 
 applyContextToType_test2 :: Test
@@ -501,7 +464,7 @@ applyContextToType_test2 () =
 applyContextToType_test3 :: Test
 applyContextToType_test3 () =
   case applyContextToType context5 (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar $ UTypeVar "y") (TEVar $ ETypeVar "x"))) () of
-    Left (MonotypeIsNotTypeError () (MSucc MZero)) -> True
+    Left (TypeHasWrongKindError () (TEVar (ETypeVar "x")) KStar KNat) -> True
     _ -> False
 
 applyContextToType_test4 :: Test
@@ -587,7 +550,7 @@ inferMonotypeKind_test1 () =
 inferMonotypeKind_test2 :: Test
 inferMonotypeKind_test2 () =
   case inferMonotypeKind [] (MSucc $ MSucc MUnit) "1, 3" of
-    Left (CheckKindHasWrongKindError "1, 3" KNat KStar) -> True
+    Left (MonotypeHasWrongKindError "1, 3" MUnit KNat KStar) -> True
     _ -> False
 
 inferMonotypeKind_test3 :: Test
@@ -599,19 +562,19 @@ inferMonotypeKind_test3 () =
 inferMonotypeKind_test4 :: Test
 inferMonotypeKind_test4 () =
   case inferMonotypeKind context1 (MArrow  (MEVar $ ETypeVar "b")  (MEVar $ ETypeVar "z")) "1, 3" of
-    Left (CheckKindHasWrongKindError "1, 3" KStar KNat) -> True
+    Left (MonotypeHasWrongKindError "1, 3" (MEVar (ETypeVar "b")) KStar KNat) -> True
     _ -> False
 
 inferMonotypeKind_test5 :: Test
 inferMonotypeKind_test5 () =
   case inferMonotypeKind context1 (MUVar $ UTypeVar "n") "1, 3" of
-    Left (CheckKindUVarUndeclaredError "1, 3" "n") -> True
+    Left (UndeclaredUTypeVarError "1, 3" (UTypeVar "n")) -> True
     _ -> False
 
 inferMonotypeKind_test6 :: Test
 inferMonotypeKind_test6 () =
   case inferMonotypeKind context1 (MEVar $ ETypeVar "Konrad") (1 :: Integer, 3 :: Integer) of
-    Left (CheckKindEVarUndeclaredError (1, 3) "Konrad") -> True
+    Left (UndeclaredETypeVarError (1, 3) (ETypeVar "Konrad")) -> True
     _ -> False
 
 inferMonotypeKind_test7 :: Test
@@ -623,7 +586,7 @@ inferMonotypeKind_test7 () =
 inferMonotypeKind_test8 :: Test
 inferMonotypeKind_test8 () =
   case inferMonotypeKind context2 (MCoproduct (MProduct MUnit MUnit) (MSucc $ MSucc MZero)) ("1", "3") of
-    Left (CheckKindHasWrongKindError ("1", "3") KStar KNat) -> True
+    Left (MonotypeHasWrongKindError ("1", "3") (MSucc (MSucc MZero)) KStar KNat) -> True
     _ -> False
 
 --checkMonotypeHasKind :: Context -> Monotype -> p -> Kind -> Either (Error p) ()
@@ -642,7 +605,7 @@ checkMonotypeHasKind_test2 () =
 checkMonotypeHasKind_test3 :: Test
 checkMonotypeHasKind_test3 () =
   case checkMonotypeHasKind [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero] (MSucc $ MSucc (MEVar $ ETypeVar "a")) () KNat of
-    Left (CheckKindHasWrongKindError () KNat KStar) -> True
+    Left (MonotypeHasWrongKindError () (MEVar (ETypeVar "a")) KNat KStar) -> True
     _ -> False
 
 checkMonotypeHasKind_test4 :: Test
@@ -660,13 +623,13 @@ checkMonotypeHasKind_test5 () =
 checkMonotypeHasKind_test6 :: Test
 checkMonotypeHasKind_test6 () =
   case checkMonotypeHasKind context5 (MSucc $ MSucc (MUVar $ UTypeVar "xx")) () KNat of
-    Left (CheckKindUVarUndeclaredError () "xx") -> True
+    Left (UndeclaredUTypeVarError () (UTypeVar "xx")) -> True
     _ -> False
 
 checkMonotypeHasKind_test7 :: Test
 checkMonotypeHasKind_test7 () =
   case checkMonotypeHasKind context5 (MSucc $ MSucc (MEVar $ ETypeVar "")) () KNat of
-    Left (CheckKindEVarUndeclaredError () "") -> True
+    Left (UndeclaredETypeVarError () (ETypeVar "")) -> True
     _ -> False
 
 --checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
@@ -685,19 +648,19 @@ checkPropWellFormedness_test2 () =
 checkPropWellFormedness_test3 :: Test
 checkPropWellFormedness_test3 () =
   case checkPropWellFormedness [] (MSucc $ MSucc MZero, MProduct MUnit MUnit) (5 :: Integer) of
-    Left (CheckKindHasWrongKindError 5 KNat KStar) -> True
+    Left (MonotypeHasWrongKindError 5 (MProduct MUnit MUnit) KNat KStar) -> True
     _ -> False
 
 checkPropWellFormedness_test4 :: Test
 checkPropWellFormedness_test4 () =
   case checkPropWellFormedness [] (MSucc $ MSucc MZero, MProduct MUnit $ MSucc MZero) (5 :: Integer) of
-    Left (CheckKindHasWrongKindError 5 KStar KNat) -> True
+    Left (MonotypeHasWrongKindError 5 (MSucc MZero) KStar KNat) -> True
     _ -> False
 
 checkPropWellFormedness_test5 :: Test
 checkPropWellFormedness_test5 () =
   case checkPropWellFormedness context1 (MSucc $ MSucc  (MEVar $ ETypeVar "b"), MProduct MUnit $ MSucc MZero) () of
-    Left (CheckKindHasWrongKindError () KStar KNat) -> True
+    Left (MonotypeHasWrongKindError () (MSucc MZero) KStar KNat) -> True
     _ -> False
 
 checkPropWellFormedness_test6 :: Test
@@ -709,7 +672,7 @@ checkPropWellFormedness_test6 () =
 checkPropWellFormedness_test7 :: Test
 checkPropWellFormedness_test7 () =
   case checkPropWellFormedness context5 (MSucc $ MSucc  (MUVar $ UTypeVar "r"), MEVar $ ETypeVar "x") () of
-    Left (CheckKindUVarUndeclaredError () "r") -> True
+    Left (UndeclaredUTypeVarError () (UTypeVar "r")) -> True
     _ -> False
 
 --checkTypeWellFormedness :: Context -> Type -> p -> Either (Error p) ()
@@ -728,25 +691,25 @@ checkTypeWellFormedness_test2 () =
 checkTypeWellFormedness_test3 :: Test
 checkTypeWellFormedness_test3 () =
   case checkTypeWellFormedness context1 (TCoproduct (TUVar $ UTypeVar "y") (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b"))) ((),()) of
-    Left (TypeFormednessInvalidKindError ((), ()) "b") -> True
+    Left (TypeHasWrongKindError ((), ()) (TEVar (ETypeVar "b")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormedness_test4 :: Test
 checkTypeWellFormedness_test4 () =
   case checkTypeWellFormedness [] (TCoproduct (TUVar $ UTypeVar "y") (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b"))) ((),()) of
-    Left (TypeFormednessUVarUndeclaredError ((), ()) "y") -> True
+    Left (UndeclaredUTypeVarError ((), ()) (UTypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormedness_test5 :: Test
 checkTypeWellFormedness_test5 () =
   case checkTypeWellFormedness [] (TProduct (TEVar $ ETypeVar "z") (TEVar $ ETypeVar "b")) ((),()) of
-    Left (TypeFormednessEVarUndeclaredError ((), ()) "z") -> True
+    Left (UndeclaredETypeVarError ((), ()) (ETypeVar "z")) -> True
     _ -> False
 
 checkTypeWellFormedness_test6 :: Test
 checkTypeWellFormedness_test6 () =
-  case checkTypeWellFormedness context5 (TUVar $ UTypeVar "x")  (5 :: Integer) of
-    Left (TypeFormednessInvalidKindError 5 "x") -> True
+  case checkTypeWellFormedness context5 (TUVar $ UTypeVar "x") (5 :: Integer) of
+    Left (TypeHasWrongKindError 5 (TUVar (UTypeVar "x")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormedness_test7 :: Test
@@ -788,13 +751,13 @@ checkTypeWellFormedness_test12 () =
 checkTypeWellFormedness_test13 :: Test
 checkTypeWellFormedness_test13 () =
   case checkTypeWellFormedness [] (TUniversal "x" KStar (TArrow (TUVar $ UTypeVar "y") TUnit)) () of
-    Left (TypeFormednessUVarUndeclaredError () "y") -> True
+    Left (UndeclaredUTypeVarError () (UTypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormedness_test14 :: Test
 checkTypeWellFormedness_test14 () =
   case checkTypeWellFormedness [] (TExistential "x" KStar (TArrow (TEVar $ ETypeVar "y") TUnit)) () of
-    Left (TypeFormednessEVarUndeclaredError () "y") -> True
+    Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormedness_test15 :: Test
@@ -806,7 +769,7 @@ checkTypeWellFormedness_test15 () =
 checkTypeWellFormedness_test16 :: Test
 checkTypeWellFormedness_test16 () =
   case checkTypeWellFormedness [] (TImp (MZero, MZero) (TArrow (TEVar $ ETypeVar "y") TUnit)) () of
-    Left (TypeFormednessEVarUndeclaredError () "y") -> True
+    Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormedness_test17 :: Test
@@ -818,7 +781,7 @@ checkTypeWellFormedness_test17 () =
 checkTypeWellFormedness_test18 :: Test
 checkTypeWellFormedness_test18 () =
   case checkTypeWellFormedness [] (TExistential "x" KStar (TImp (MZero, MSucc (MEVar $ ETypeVar "x")) (TArrow (TEVar $ ETypeVar "z") TUnit))) () of
-    Left (CheckKindHasWrongKindError () KNat KStar) -> True
+    Left (MonotypeHasWrongKindError () (MEVar (ETypeVar "x")) KNat KStar) -> True
     _ -> False
 
 checkTypeWellFormedness_test19 :: Test
@@ -830,7 +793,7 @@ checkTypeWellFormedness_test19 () =
 checkTypeWellFormedness_test20 :: Test
 checkTypeWellFormedness_test20 () =
   case checkTypeWellFormedness context1 (TAnd (TArrow (TUVar $ UTypeVar "Haskell") TUnit) (MEVar $ ETypeVar "Konrad", MSucc MZero)) () of
-    Left (TypeFormednessUVarUndeclaredError () "Haskell") -> True
+    Left (UndeclaredUTypeVarError () (UTypeVar "Haskell")) -> True
     _ -> False
 
 checkTypeWellFormedness_test21 :: Test
@@ -842,7 +805,7 @@ checkTypeWellFormedness_test21 () =
 checkTypeWellFormedness_test22 :: Test
 checkTypeWellFormedness_test22 () =
   case checkTypeWellFormedness [] (TUniversal "x" KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MEVar $ ETypeVar "x", MUnit))) () of
-    Left (CheckKindEVarUndeclaredError () "x") -> True
+    Left (UndeclaredETypeVarError () (ETypeVar "x")) -> True
     _ -> False
 
 checkTypeWellFormedness_test23 :: Test
@@ -854,13 +817,13 @@ checkTypeWellFormedness_test23 () =
 checkTypeWellFormedness_test24 :: Test
 checkTypeWellFormedness_test24 () =
   case checkTypeWellFormedness [] (TUniversal "n" KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n")) (TProduct TUnit (TUVar $ UTypeVar "n"))) () of
-    Left (TypeFormednessInvalidKindError () "n") -> True
+    Left (TypeHasWrongKindError () (TUVar (UTypeVar "n")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormedness_test25 :: Test
 checkTypeWellFormedness_test25 () =
   case checkTypeWellFormedness [] (TExistential "x" KStar $ TVec (MSucc $ MSucc (MEVar $ ETypeVar "x")) (TProduct TUnit TUnit)) () of
-    Left (CheckKindHasWrongKindError () KNat KStar) -> True
+    Left (MonotypeHasWrongKindError () (MEVar (ETypeVar "x")) KNat KStar) -> True
     _ -> False
 
 checkTypeWellFormedness_test26 :: Test
@@ -904,7 +867,7 @@ checkTypeWellFormednessWithPrnc_test5 () =
 checkTypeWellFormednessWithPrnc_test6 :: Test
 checkTypeWellFormednessWithPrnc_test6 () =
   case checkTypeWellFormednessWithPrnc context5 (TUVar $ UTypeVar "x") Principal (5 :: Integer) of
-    Left (TypeFormednessInvalidKindError 5 "x") -> True
+    Left (TypeHasWrongKindError 5 (TUVar (UTypeVar "x")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test7 :: Test
@@ -946,7 +909,7 @@ checkTypeWellFormednessWithPrnc_test12 () =
 checkTypeWellFormednessWithPrnc_test13 :: Test
 checkTypeWellFormednessWithPrnc_test13 () =
   case checkTypeWellFormednessWithPrnc [] (TUniversal "x" KStar (TArrow (TUVar $ UTypeVar "y") TUnit)) Principal () of
-    Left (TypeFormednessUVarUndeclaredError () "y") -> True
+    Left (UndeclaredUTypeVarError () (UTypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test14 :: Test
@@ -1014,13 +977,13 @@ checkTypeWellFormednessWithPrnc_test24 :: Test
 checkTypeWellFormednessWithPrnc_test24 () =
   case checkTypeWellFormednessWithPrnc [] (TUniversal "n" KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
        (TProduct TUnit (TUVar $ UTypeVar "n"))) Principal () of
-    Left (TypeFormednessInvalidKindError () "n") -> True
+    Left (TypeHasWrongKindError () (TUVar (UTypeVar "n")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test25 :: Test
 checkTypeWellFormednessWithPrnc_test25 () =
   case checkTypeWellFormednessWithPrnc [] (TExistential "x" KStar $ TVec (MSucc $ MSucc (MEVar $ ETypeVar "x")) (TProduct TUnit TUnit)) Principal () of
-    Left (CheckKindHasWrongKindError () KNat KStar) -> True
+    Left (MonotypeHasWrongKindError () (MEVar (ETypeVar "x")) KNat KStar) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test26 :: Test
@@ -1064,7 +1027,56 @@ checkExpr_EUnit_test5 () =
 checkExpr_EUnit_test6 :: Test
 checkExpr_EUnit_test6 () =
   case checkExpr context3 (EUnit ()) (TEVar $ ETypeVar "Konrad") Principal of
-    Left (UndeclaredETypeVarError () "Konrad") -> True
+    Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
+    _ -> False
+
+--inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
+inferExpr_EVar_test1 :: Test
+inferExpr_EVar_test1 () =
+  case inferExpr context1 (EVar () "r") of
+    Right (TProduct TUnit TUnit, NotPrincipal, c) -> c == context1
+    _ -> False
+
+inferExpr_EVar_test2 :: Test
+inferExpr_EVar_test2 () =
+  case inferExpr context1 (EVar () "x") of
+    Right (TUnit, Principal, c) -> c == context1
+    _ -> False
+
+inferExpr_EVar_test3 :: Test
+inferExpr_EVar_test3 () =
+  case inferExpr context5 (EVar () "x") of
+    Left (MonotypeIsNotTypeError () MZero) -> True
+    _ -> False
+
+inferExpr_EVar_test4 :: Test
+inferExpr_EVar_test4 () =
+  case inferExpr context5 (EVar () "y") of
+    Left (UndeclaredVariableError () "y") -> True
+    _ -> False
+
+inferExpr_EVar_test5 :: Test
+inferExpr_EVar_test5 () =
+  case inferExpr context4 (EVar () "zz") of
+    Left (UndeclaredETypeVarError () (ETypeVar "r")) -> True
+    _ -> False
+
+inferExpr_EVar_test6 :: Test
+inferExpr_EVar_test6 () =
+  case inferExpr [CVar "zz" (TUVar $ UTypeVar "v") Principal] (EVar () "zz") of
+    Right (TUVar (UTypeVar "v"), Principal, c)  -> c == [CVar "zz" (TUVar $ UTypeVar "v") Principal]
+    _ -> False
+
+inferExpr_EVar_test7 :: Test
+inferExpr_EVar_test7 () =
+  case inferExpr [CVar "zz" (TUVar $ UTypeVar "v") Principal, CUTypeVarEq (UTypeVar "v") (MCoproduct MUnit MUnit)] (EVar () "zz") of
+    Right (TCoproduct TUnit TUnit, Principal, c)  -> c == [CVar "zz" (TUVar $ UTypeVar "v") Principal, CUTypeVarEq (UTypeVar "v") (MCoproduct MUnit MUnit)]
+    _ -> False
+
+inferExpr_EVar_test8 :: Test
+inferExpr_EVar_test8 () =
+  case inferExpr [] (EVar () "zz") of
+    Left (UndeclaredVariableError () "zz") -> True
     _ -> False
 
 tests :: [(TestName, Test)]
@@ -1092,6 +1104,7 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("varContextLookup_test6", varContextLookup_test6),
          ("varContextLookup_test7", varContextLookup_test7),
          ("varContextLookup_test8", varContextLookup_test8),
+         ("varContextLookup_test9", varContextLookup_test9),
          ("uTypeVarEqContextLookup_test1", uTypeVarEqContextLookup_test1),
          ("uTypeVarEqContextLookup_test2", uTypeVarEqContextLookup_test2),
          ("uTypeVarEqContextLookup_test3", uTypeVarEqContextLookup_test3),
@@ -1099,13 +1112,6 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("uTypeVarEqContextLookup_test5", uTypeVarEqContextLookup_test5),
          ("uTypeVarEqContextLookup_test6", uTypeVarEqContextLookup_test6),
          ("uTypeVarEqContextLookup_test7", uTypeVarEqContextLookup_test7),
-         ("solvedETypeVarContextLookup_test1", solvedETypeVarContextLookup_test1),
-         ("solvedETypeVarContextLookup_test2", solvedETypeVarContextLookup_test2),
-         ("solvedETypeVarContextLookup_test3", solvedETypeVarContextLookup_test3),
-         ("solvedETypeVarContextLookup_test4", solvedETypeVarContextLookup_test4),
-         ("solvedETypeVarContextLookup_test5", solvedETypeVarContextLookup_test5),
-         ("solvedETypeVarContextLookup_test6", solvedETypeVarContextLookup_test6),
-         ("solvedETypeVarContextLookup_test7", solvedETypeVarContextLookup_test7),
          ("eTypeVarContextLookup_test1", eTypeVarContextLookup_test1),
          ("eTypeVarContextLookup_test2", eTypeVarContextLookup_test2),
          ("eTypeVarContextLookup_test3", eTypeVarContextLookup_test3),
@@ -1235,7 +1241,15 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("checkExpr_EUnit_test3", checkExpr_EUnit_test3),
          ("checkExpr_EUnit_test4", checkExpr_EUnit_test4),
          ("checkExpr_EUnit_test5", checkExpr_EUnit_test5),
-         ("checkExpr_EUnit_test6", checkExpr_EUnit_test6)]
+         ("checkExpr_EUnit_test6", checkExpr_EUnit_test6),
+         ("inferExpr_EVar_test1", inferExpr_EVar_test1),
+         ("inferExpr_EVar_test2", inferExpr_EVar_test2),
+         ("inferExpr_EVar_test3", inferExpr_EVar_test3),
+         ("inferExpr_EVar_test4", inferExpr_EVar_test4),
+         ("inferExpr_EVar_test5", inferExpr_EVar_test5),
+         ("inferExpr_EVar_test6", inferExpr_EVar_test6),
+         ("inferExpr_EVar_test7", inferExpr_EVar_test7),
+         ("inferExpr_EVar_test8", inferExpr_EVar_test8)]
 
 runTest :: (TestName, Test) -> String
 runTest (name, t) =

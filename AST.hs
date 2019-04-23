@@ -24,8 +24,7 @@ data Expr p
   | ERec          p Var (Expr p)
   | EAnnot        p (Expr p) Type
   | EPair         p (Expr p) (Expr p)
-  | EInj1         p (Expr p)
-  | EInj2         p (Expr p)
+  | EInjk         p (Expr p) Int
   | ECase         p (Expr p) [Branch p]
   | ENil          p
   | ECons         p (Expr p) (Expr p)
@@ -39,8 +38,7 @@ type Spine p = [Expr p]
 data Pattern p
   = PVar p Var
   | PPair p (Pattern p) (Pattern p)
-  | PInj1 p (Pattern p)
-  | PInj2 p (Pattern p)
+  | PInjk p (Pattern p) Int
   | PNil  p
   | PCons p (Pattern p) (Pattern p)
   | PWild p

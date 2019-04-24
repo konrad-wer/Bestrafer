@@ -1046,6 +1046,68 @@ checkExpr_EUnit_test6 () =
     Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
     _ -> False
 
+checkExpr_EUnit_test7 :: Test
+checkExpr_EUnit_test7 () =
+  case checkExpr context3 (EUnit ()) (TEVar $ ETypeVar "a") Principal of
+    Right c -> c == context3
+    _ -> False
+
+checkExpr_EPair_test1 :: Test
+checkExpr_EPair_test1 () =
+  case checkExpr context1 (EPair () (EUnit ()) (EUnit ())) (TProduct TUnit TUnit) Principal of
+    Right c -> c == context1
+    _ -> False
+
+checkExpr_EPair_test2 :: Test
+checkExpr_EPair_test2 () =
+  case checkExpr context5 (EPair () (EPair () (EUnit ()) (EUnit ())) (EUnit ())) (TProduct (TProduct TUnit TUnit) TUnit) NotPrincipal of
+    Right c -> c == context5
+    _ -> False
+
+checkExpr_EPair_test3 :: Test
+checkExpr_EPair_test3 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EPair () (EPair () (EUnit ()) (EUnit ())) (EUnit ())) (TEVar $ ETypeVar "x") Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                     CETypeVar (ETypeVar "x-1") KStar (MProduct (MEVar (ETypeVar "x-1-1")) (MEVar (ETypeVar "x-1-2"))),
+                     CETypeVar (ETypeVar "x-1-1") KStar MUnit, CETypeVar (ETypeVar "x-1-2") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+    _ -> False
+
+checkExpr_EPair_test4 :: Test
+checkExpr_EPair_test4 () =
+  case checkExpr context1 (EPair () (EUnit ()) (EUnit ())) (TEVar $ ETypeVar "z") Principal of
+    Left (ETypeVarMismatchError ()  (MProduct MUnit MUnit) (MProduct (MEVar (ETypeVar "z-1")) (MEVar (ETypeVar "z-2")))) -> True
+    _ -> False
+
+checkExpr_EPair_test5 :: Test
+checkExpr_EPair_test5 () =
+  case checkExpr [CETypeVar (ETypeVar "x") KStar (MProduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                  CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+                  (EPair () (EUnit ()) (EUnit ())) (TEVar $ ETypeVar "x") Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                     CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+    _ -> False
+
+checkExpr_EPair_test6 :: Test
+checkExpr_EPair_test6 () =
+  case checkExpr context1 (EPair () (EUnit ()) (EUnit ())) (TEVar $ ETypeVar "zz") Principal of
+    Left (UndeclaredETypeVarError () (ETypeVar "zz")) -> True
+    _ -> False
+
+checkExpr_EPair_test7 :: Test
+checkExpr_EPair_test7 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EPair () (EPair () (EPair () (EUnit ()) (EUnit ())) (EUnit ()))
+                 (EPair () (EUnit ()) (EUnit ()))) (TProduct (TEVar $ ETypeVar "x") (TEVar $ ETypeVar "x")) Principal of
+    Left (ETypeVarMismatchError () (MProduct (MEVar (ETypeVar "x-1-1")) (MEVar(ETypeVar "x-1-2"))) MUnit) -> True
+    _ -> False
+
+checkExpr_EPair_test8 :: Test
+checkExpr_EPair_test8 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EPair () (EPair () (EUnit ()) (EUnit ()))
+                 (EPair () (EUnit ()) (EUnit ()))) (TProduct (TEVar $ ETypeVar "x") (TEVar $ ETypeVar "x")) Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                     CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+    _ -> False
+
 --inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
 inferExpr_EVar_test1 :: Test
 inferExpr_EVar_test1 () =
@@ -1260,6 +1322,15 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("checkExpr_EUnit_test4", checkExpr_EUnit_test4),
          ("checkExpr_EUnit_test5", checkExpr_EUnit_test5),
          ("checkExpr_EUnit_test6", checkExpr_EUnit_test6),
+         ("checkExpr_EUnit_test7", checkExpr_EUnit_test7),
+         ("checkExpr_EPair_test1", checkExpr_EPair_test1),
+         ("checkExpr_EPair_test2", checkExpr_EPair_test2),
+         ("checkExpr_EPair_test3", checkExpr_EPair_test3),
+         ("checkExpr_EPair_test4", checkExpr_EPair_test4),
+         ("checkExpr_EPair_test5", checkExpr_EPair_test5),
+         ("checkExpr_EPair_test6", checkExpr_EPair_test6),
+         ("checkExpr_EPair_test7", checkExpr_EPair_test7),
+         ("checkExpr_EPair_test8", checkExpr_EPair_test8),
          ("inferExpr_EVar_test1", inferExpr_EVar_test1),
          ("inferExpr_EVar_test2", inferExpr_EVar_test2),
          ("inferExpr_EVar_test3", inferExpr_EVar_test3),

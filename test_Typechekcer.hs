@@ -5,6 +5,8 @@ import qualified Data.Set as Set
 type Test = () -> Bool
 type TestName = String
 
+--TODO tests that not typecheck
+
 context1 :: Context
 context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
             CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CUTypeVarEq (UTypeVar "k") MUnit,
@@ -1074,7 +1076,7 @@ checkExpr_EPair_test3 () =
 
 checkExpr_EPair_test4 :: Test
 checkExpr_EPair_test4 () =
-  case checkExpr context1 (EPair () (EUnit ()) (EUnit ())) (TEVar $ ETypeVar "z") Principal of
+  case checkExpr context1 (EPair () (EUnit ()) (EUnit ())) (TEVar $ ETypeVar "z") NotPrincipal of
     Left (ETypeVarMismatchError ()  (MProduct MUnit MUnit) (MProduct (MEVar (ETypeVar "z-1")) (MEVar (ETypeVar "z-2")))) -> True
     _ -> False
 
@@ -1082,7 +1084,7 @@ checkExpr_EPair_test5 :: Test
 checkExpr_EPair_test5 () =
   case checkExpr [CETypeVar (ETypeVar "x") KStar (MProduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
                   CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
-                  (EPair () (EUnit ()) (EUnit ())) (TEVar $ ETypeVar "x") Principal of
+                 (EPair () (EUnit ()) (EUnit ())) (TEVar $ ETypeVar "x") Principal of
     Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
                      CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
     _ -> False
@@ -1096,7 +1098,7 @@ checkExpr_EPair_test6 () =
 checkExpr_EPair_test7 :: Test
 checkExpr_EPair_test7 () =
   case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EPair () (EPair () (EPair () (EUnit ()) (EUnit ())) (EUnit ()))
-                 (EPair () (EUnit ()) (EUnit ()))) (TProduct (TEVar $ ETypeVar "x") (TEVar $ ETypeVar "x")) Principal of
+                 (EPair () (EUnit ()) (EUnit ()))) (TProduct (TEVar $ ETypeVar "x") (TEVar $ ETypeVar "x")) NotPrincipal of
     Left (ETypeVarMismatchError () (MProduct (MEVar (ETypeVar "x-1-1")) (MEVar(ETypeVar "x-1-2"))) MUnit) -> True
     _ -> False
 
@@ -1106,6 +1108,90 @@ checkExpr_EPair_test8 () =
                  (EPair () (EUnit ()) (EUnit ()))) (TProduct (TEVar $ ETypeVar "x") (TEVar $ ETypeVar "x")) Principal of
     Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
                      CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+    _ -> False
+
+checkExpr_EInjk_test1 :: Test
+checkExpr_EInjk_test1 () =
+  case checkExpr [] (EInjk () (EPair () (EUnit ()) (EUnit ())) 1) (TCoproduct (TUVar (UTypeVar "x")) (TProduct TUnit TUnit)) NotPrincipal of
+    Right [] -> True
+    _ -> False
+
+checkExpr_EInjk_test2 :: Test
+checkExpr_EInjk_test2 () =
+  case checkExpr [] (EInjk () (EPair () (EUnit ()) (EUnit ())) 0) (TCoproduct TUnit (TProduct TUnit TUnit)) Principal of
+    Right [] -> True
+    _ -> False
+
+checkExpr_EInjk_test3 :: Test
+checkExpr_EInjk_test3 () =
+  case checkExpr [] (EInjk () (EUnit ()) 0) (TCoproduct TUnit (TProduct TUnit TUnit)) Principal of
+    Right [] -> True
+    _ -> False
+
+checkExpr_EInjk_test4 :: Test
+checkExpr_EInjk_test4 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EInjk () (EUnit ()) 0) (TEVar (ETypeVar "x")) Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                     CETypeVar (ETypeVar "x-1") KStar MUnit, CTypeVar (E (ETypeVar "x-2")) KStar]
+    _ -> False
+
+checkExpr_EInjk_test5 :: Test
+checkExpr_EInjk_test5 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EInjk () (EUnit ()) 1) (TEVar (ETypeVar "x")) Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                     CTypeVar (E (ETypeVar "x-1")) KStar,  CETypeVar (ETypeVar "x-2") KStar MUnit]
+    _ -> False
+
+checkExpr_EInjk_test6 :: Test
+checkExpr_EInjk_test6 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EInjk () (EPair () (EUnit ()) (EUnit ())) 0) (TEVar $ ETypeVar "x") Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                     CETypeVar (ETypeVar "x-1") KStar (MProduct (MEVar (ETypeVar "x-1-1")) (MEVar (ETypeVar "x-1-2"))),
+                     CETypeVar (ETypeVar "x-1-1") KStar MUnit, CETypeVar (ETypeVar "x-1-2") KStar MUnit, CTypeVar (E (ETypeVar "x-2")) KStar]
+    _ -> False
+
+checkExpr_EInjk_test7 :: Test
+checkExpr_EInjk_test7 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EInjk () (EPair () (EUnit ()) (EUnit ())) 1) (TEVar $ ETypeVar "x") Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))), CTypeVar (E (ETypeVar "x-1")) KStar,
+                     CETypeVar (ETypeVar "x-2") KStar (MProduct (MEVar (ETypeVar "x-2-1")) (MEVar (ETypeVar "x-2-2"))),
+                     CETypeVar (ETypeVar "x-2-1") KStar MUnit, CETypeVar (ETypeVar "x-2-2") KStar MUnit]
+    _ -> False
+
+checkExpr_EInjk_test8 :: Test
+checkExpr_EInjk_test8 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EInjk () (EPair () (EUnit ()) (EUnit ())) 0) (TEVar $ ETypeVar "y") Principal of
+    Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
+    _ -> False
+
+checkExpr_EInjk_test9 :: Test
+checkExpr_EInjk_test9 () =
+  case checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (EInjk () (EPair () (EUnit ()) (EUnit ())) 1) (TEVar $ ETypeVar "k") Principal of
+    Left (UndeclaredETypeVarError () (ETypeVar "k")) -> True
+    _ -> False
+
+checkExpr_EInjk_test10 :: Test
+checkExpr_EInjk_test10 () =
+  case checkExpr [CETypeVar (ETypeVar "x") KStar (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                  CETypeVar (ETypeVar "x-1") KStar MUnit, CTypeVar (E (ETypeVar "x-2")) KStar]
+                 (EInjk () (EUnit ()) 0) (TEVar (ETypeVar "x")) Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                     CETypeVar (ETypeVar "x-1") KStar MUnit, CTypeVar (E (ETypeVar "x-2")) KStar]
+    _ -> False
+
+checkExpr_EInjk_test11 :: Test
+checkExpr_EInjk_test11 () =
+  case checkExpr [CETypeVar (ETypeVar "x") KStar (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                  CETypeVar (ETypeVar "x-1") KStar MUnit, CTypeVar (E (ETypeVar "x-2")) KStar]
+                 (EInjk () (EUnit ()) 1) (TEVar (ETypeVar "x")) Principal of
+    Right c -> c == [CETypeVar (ETypeVar "x") KStar (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2"))),
+                     CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+    _ -> False
+
+checkExpr_EInjk_test12 :: Test
+checkExpr_EInjk_test12 () =
+  case checkExpr [CETypeVar (ETypeVar "x") KStar MUnit] (EInjk () (EUnit ()) 1) (TEVar (ETypeVar "x")) Principal of
+    Left (ETypeVarMismatchError () MUnit (MCoproduct (MEVar (ETypeVar "x-1")) (MEVar (ETypeVar "x-2")))) -> True
     _ -> False
 
 --inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
@@ -1331,6 +1417,18 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("checkExpr_EPair_test6", checkExpr_EPair_test6),
          ("checkExpr_EPair_test7", checkExpr_EPair_test7),
          ("checkExpr_EPair_test8", checkExpr_EPair_test8),
+         ("checkExpr_EInjk_test1", checkExpr_EInjk_test1),
+         --("checkExpr_EInjk_test2", checkExpr_EInjk_test2),
+         ("checkExpr_EInjk_test3", checkExpr_EInjk_test3),
+         ("checkExpr_EInjk_test4", checkExpr_EInjk_test4),
+         ("checkExpr_EInjk_test5", checkExpr_EInjk_test5),
+         ("checkExpr_EInjk_test6", checkExpr_EInjk_test6),
+         ("checkExpr_EInjk_test7", checkExpr_EInjk_test7),
+         ("checkExpr_EInjk_test8", checkExpr_EInjk_test8),
+         ("checkExpr_EInjk_test9", checkExpr_EInjk_test9),
+         ("checkExpr_EInjk_test10", checkExpr_EInjk_test10),
+         ("checkExpr_EInjk_test11", checkExpr_EInjk_test11),
+         ("checkExpr_EInjk_test12", checkExpr_EInjk_test12),
          ("inferExpr_EVar_test1", inferExpr_EVar_test1),
          ("inferExpr_EVar_test2", inferExpr_EVar_test2),
          ("inferExpr_EVar_test3", inferExpr_EVar_test3),
@@ -1342,7 +1440,7 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
 
 runTest :: (TestName, Test) -> String
 runTest (name, t) =
-  name ++ " - " ++  if t() then
+  name ++ " - " ++  if t () then
     "Passed\n"
   else
     "Failed!\n"

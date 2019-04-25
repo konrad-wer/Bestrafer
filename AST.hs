@@ -95,26 +95,6 @@ data Principality = Principal | NotPrincipal deriving (Show, Eq)
 
 data Polarity = Neutral | Positive | Negative deriving (Show, Eq)
 
-polarity :: Type -> Polarity
-polarity TUniversal {} = Negative
-polarity TExistential {} = Positive
-polarity _ = Neutral
-
-nonpos :: Polarity -> Bool
-nonpos Positive = False
-nonpos _ = True
-
-nonneg :: Polarity -> Bool
-nonneg Negative = False
-nonneg _ = True
-
-join :: Polarity -> Polarity -> Polarity
-join Positive _ = Positive
-join Negative _ = Negative
-join Neutral Positive = Positive
-join Neutral Negative = Negative
-join Neutral Neutral = Negative
-
 instance Show ArithmBinOp where
   show BinOpPlus = "+"
   show BinOpMinus = "-"

@@ -1,5 +1,6 @@
 import AST
 import Typechecker
+import TypecheckerUtils
 import qualified Data.Set as Set
 
 type Test = () -> Bool

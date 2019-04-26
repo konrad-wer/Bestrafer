@@ -67,7 +67,7 @@ checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotyp
 subtype :: Context -> Type -> Polarity -> Type -> p -> Either (Error p) Context
 subtype c t1 pol t2 p
   | not (headedByUniversal t1) && not (headedByExistential t1) &&
-    not (headedByUniversal t2) && not (headedByExistential t2) = equivalent c t1 t2 p
+    not (headedByUniversal t2) && not (headedByExistential t2) = equivalentType c t1 t2 p
   | headedByUniversal t1 && not (headedByUniversal t2) && neg pol = undefined
   | headedByUniversal t2 && neg pol = undefined
   | headedByExistential t1 && pos pol = undefined
@@ -78,12 +78,21 @@ subtype c t1 pol t2 p
   | neg pol && (nonneg . polarity $ t1) && (pos . polarity $ t2) = subtype c t1 Positive t2 p
   | otherwise = undefined
 
-equivalent :: Context -> Type -> Type -> p -> Either (Error p) Context
-equivalent = undefined
+equivalentType :: Context -> Type -> Type -> p -> Either (Error p) Context
+equivalentType = undefined
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr c (EUnit _) TUnit _ = return c
 checkExpr c (EUnit p) (TEVar a) _ = eTypeVarContextReplace c a MUnit [] p
+checkExpr c (ELambda _ x e) (TArrow t1 t2) pr = do
+  c2 <- checkExpr (CVar x t1 pr : CMarker : c) e t2 pr
+  return $ dropContextToMarker c2
+checkExpr c (ELambda p x e) (TEVar a) _ =
+  let a1 = ETypeVar $ eTypeVarName a ++ "-1" in
+  let a2 = ETypeVar $ eTypeVarName a ++ "-2" in do
+  c2 <- eTypeVarContextReplace c a (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
+  c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
+  return $ dropContextToMarker c3
 checkExpr c (EPair _ e1 e2) (TProduct t1 t2) pr = do
   c2 <- checkExpr c e1 t1 pr
   checkExpr c2 e2 t2 pr

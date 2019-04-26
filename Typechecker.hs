@@ -65,7 +65,21 @@ checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
 checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotypeHasKind c m2 p
 
 subtype :: Context -> Type -> Polarity -> Type -> p -> Either (Error p) Context
-subtype  _ = undefined
+subtype c t1 pol t2 p
+  | not (headedByUniversal t1) && not (headedByExistential t1) &&
+    not (headedByUniversal t2) && not (headedByExistential t2) = equivalent c t1 t2 p
+  | headedByUniversal t1 && not (headedByUniversal t2) && neg pol = undefined
+  | headedByUniversal t2 && neg pol = undefined
+  | headedByExistential t1 && pos pol = undefined
+  | not (headedByExistential t1) && headedByExistential t2 && pos pol = undefined
+  | pos pol && (neg . polarity $ t1) && (nonpos . polarity $ t2) = subtype c t1 Negative t2 p
+  | pos pol && (nonpos . polarity $ t1) && (neg . polarity $ t2) = subtype c t1 Negative t2 p
+  | neg pol && (pos . polarity $ t1) && (nonneg . polarity $ t2) = subtype c t1 Positive t2 p
+  | neg pol && (nonneg . polarity $ t1) && (pos . polarity $ t2) = subtype c t1 Positive t2 p
+  | otherwise = undefined
+
+equivalent :: Context -> Type -> Type -> p -> Either (Error p) Context
+equivalent = undefined
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr c (EUnit _) TUnit _ = return c

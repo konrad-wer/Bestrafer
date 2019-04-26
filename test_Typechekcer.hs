@@ -10,15 +10,15 @@ type TestName = String
 
 context1 :: Context
 context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
-            CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CUTypeVarEq (UTypeVar "k") MUnit,
+            CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CMarker, CUTypeVarEq (UTypeVar "k") MUnit, CMarker,
             CVar "r" (TEVar $ ETypeVar "z") NotPrincipal, CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
 
 context2 :: Context
-context2 = [CTypeVar (E $ ETypeVar "a") KNat, CTypeVar (E $ ETypeVar "b") KStar, CTypeVar (E $ ETypeVar "c") KStar]
+context2 = [CTypeVar (E $ ETypeVar "a") KNat, CMarker, CTypeVar (E $ ETypeVar "b") KStar, CTypeVar (E $ ETypeVar "c") KStar]
 
 context3 :: Context
 context3 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
-            CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CUTypeVarEq (UTypeVar "k") MUnit,
+            CETypeVar (ETypeVar "z") KStar $ MProduct MUnit MUnit, CMarker, CUTypeVarEq (UTypeVar "k") MUnit, CMarker,
             CVar "r" (TEVar $ ETypeVar "z") NotPrincipal, CETypeVar (ETypeVar "a") KStar MUnit, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
 
 context4 :: Context
@@ -300,13 +300,13 @@ eTypeVarContextReplace_test1 () =
 eTypeVarContextReplace_test2 :: Test
 eTypeVarContextReplace_test2 () =
   case eTypeVarContextReplace context2 (ETypeVar "b") MUnit [] "1, 3" of
-    Right [CTypeVar (E (ETypeVar "a")) KNat, CETypeVar (ETypeVar "b") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 eTypeVarContextReplace_test3 :: Test
 eTypeVarContextReplace_test3 () =
   case eTypeVarContextReplace context2 (ETypeVar "c") (MProduct MUnit MUnit) [] "1, 3" of
-    Right [CTypeVar (E (ETypeVar "a")) KNat, CTypeVar (E (ETypeVar "b")) KStar, CETypeVar (ETypeVar "c") KStar (MProduct MUnit MUnit)] -> True
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CETypeVar (ETypeVar "c") KStar (MProduct MUnit MUnit)] -> True
     _ -> False
 
 eTypeVarContextReplace_test4 :: Test
@@ -357,7 +357,7 @@ eTypeVarContextReplace_test11 :: Test
 eTypeVarContextReplace_test11 () =
   case eTypeVarContextReplace context2 (ETypeVar "b") (MProduct MUnit MUnit)
         [CTypeVar (E (ETypeVar "t")) KStar, CUTypeVarEq (UTypeVar "r") MZero, CETypeVar (ETypeVar "c") KStar MUnit] () of
-    Right [CTypeVar (E (ETypeVar "a")) KNat, CETypeVar (ETypeVar "b") KStar (MProduct MUnit MUnit), CTypeVar (E (ETypeVar "t")) KStar,
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MProduct MUnit MUnit), CTypeVar (E (ETypeVar "t")) KStar,
            CUTypeVarEq (UTypeVar "r") MZero, CETypeVar (ETypeVar "c") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
@@ -403,6 +403,39 @@ unsolvedTypeVarContextLookup_test7 () =
   case unsolvedTypeVarContextLookup context5 $ U $ UTypeVar "x" of
     Just (CTypeVar (U (UTypeVar "x")) KNat) -> True
     _ -> False
+
+--dropContextToMarker :: Context -> Context
+dropContextToMarker_test1 :: Test
+dropContextToMarker_test1 () =
+  case dropContextToMarker context5 of
+    [] -> True
+    _ -> False
+
+dropContextToMarker_test2 :: Test
+dropContextToMarker_test2 () =
+  case dropContextToMarker context2 of
+    [CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+dropContextToMarker_test3 :: Test
+dropContextToMarker_test3 () =
+  case dropContextToMarker context1 of
+    [CUTypeVarEq (UTypeVar "k") MUnit, CMarker, CVar "r" (TEVar (ETypeVar "z")) NotPrincipal,
+     CTypeVar (E (ETypeVar "a")) KStar, CETypeVar (ETypeVar "b") KNat (MSucc MZero)] -> True
+    _ -> False
+
+dropContextToMarker_test4 :: Test
+dropContextToMarker_test4 () =
+  case dropContextToMarker . dropContextToMarker $ context1 of
+    [CVar "r" (TEVar (ETypeVar "z")) NotPrincipal, CTypeVar (E (ETypeVar "a")) KStar, CETypeVar (ETypeVar "b") KNat (MSucc MZero)] -> True
+    _ -> False
+
+dropContextToMarker_test5 :: Test
+dropContextToMarker_test5 () =
+  case dropContextToMarker . dropContextToMarker . dropContextToMarker $ context1 of
+    [] -> True
+    _ -> False
+
 
 --uVarToEVarInMonotype :: UTypeVar -> ETypeVar -> Monotype -> Monotype
 uVarToEVarInMonotype_test1 :: Test
@@ -1451,6 +1484,11 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("uVarToEVarInMonotype_test4", uVarToEVarInMonotype_test4),
          ("uVarToEVarInMonotype_test5", uVarToEVarInMonotype_test5),
          ("uVarToEVarInMonotype_test6", uVarToEVarInMonotype_test6),
+         ("dropContextToMarker_test1", dropContextToMarker_test1),
+         ("dropContextToMarker_test2", dropContextToMarker_test2),
+         ("dropContextToMarker_test3", dropContextToMarker_test3),
+         ("dropContextToMarker_test4", dropContextToMarker_test4),
+         ("dropContextToMarker_test5", dropContextToMarker_test5),
          ("uVarToEVarInProp_test1", uVarToEVarInProp_test1),
          ("uVarToEVarInProp_test2", uVarToEVarInProp_test2),
          ("uVarToEVarInProp_test3", uVarToEVarInProp_test3),

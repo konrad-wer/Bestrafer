@@ -86,7 +86,7 @@ data ContextEntry
   | CVar Var Type Principality
   | CETypeVar ETypeVar Kind Monotype
   | CUTypeVarEq UTypeVar Monotype
-  | CMarker Proposition
+  | CMarker
   deriving (Show, Eq)
 
 type Context = [ContextEntry]

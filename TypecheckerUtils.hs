@@ -128,6 +128,11 @@ eTypeVarContextReplace (entry @  (CTypeVar (E (ETypeVar b)) k) : ct) (ETypeVar a
 eTypeVarContextReplace (entry : ct) a sigma extraEntries p = (:) entry <$> eTypeVarContextReplace ct a sigma extraEntries p
 eTypeVarContextReplace [] a _ _ p = Left $ UndeclaredETypeVarError p a
 
+dropContextToMarker :: Context -> Context
+dropContextToMarker [] = []
+dropContextToMarker (CMarker : c) = c
+dropContextToMarker (_ : c) = dropContextToMarker c
+
 --Substitute universal var for existential var in type-----------
 
 uVarToEVarInType :: UTypeVar -> ETypeVar -> Type -> Type

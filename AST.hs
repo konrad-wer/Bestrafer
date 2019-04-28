@@ -61,8 +61,8 @@ data Type
   | TProduct Type Type
   | TUVar UTypeVar
   | TEVar ETypeVar
-  | TUniversal Var Kind Type
-  | TExistential Var Kind Type
+  | TUniversal UTypeVar Kind Type
+  | TExistential UTypeVar Kind Type
   | TImp Proposition Type
   | TAnd Type Proposition
   | TVec Monotype Type

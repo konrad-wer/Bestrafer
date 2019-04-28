@@ -63,7 +63,7 @@ freeExistentialVariables (TProduct t1 t2) = Set.union (freeExistentialVariables 
 freeExistentialVariables (TUVar _) = Set.empty
 freeExistentialVariables (TEVar x) = Set.singleton x
 freeExistentialVariables (TUniversal _ _ t) = freeExistentialVariables t
-freeExistentialVariables (TExistential x _ t) = Set.delete (ETypeVar x) $ freeExistentialVariables t
+freeExistentialVariables (TExistential x _ t) = Set.delete (ETypeVar $ uTypeVarName x) $ freeExistentialVariables t
 freeExistentialVariables (TImp p t) = Set.union (freeExistentialVariablesOfProp p) (freeExistentialVariables t)
 freeExistentialVariables (TAnd t p) = Set.union (freeExistentialVariables t) (freeExistentialVariablesOfProp p)
 freeExistentialVariables (TVec n t) = Set.union (freeExistentialVariablesOfMonotype n) (freeExistentialVariables t)
@@ -97,33 +97,35 @@ uTypeVarEqContextLookup (entry @ (CUTypeVarEq b _) : c) a
 uTypeVarEqContextLookup (CTypeVar (U b) _ : c) a
   | a == b = Nothing
   | otherwise = uTypeVarEqContextLookup c a
+uTypeVarEqContextLookup (CTypeVar (E b) _ : c) a
+  | uTypeVarName a == eTypeVarName b = Nothing
+  | otherwise = uTypeVarEqContextLookup c a
 uTypeVarEqContextLookup (_ : c) a = uTypeVarEqContextLookup c a
 uTypeVarEqContextLookup [] _ = Nothing
 
-eTypeVarContextLookup :: Context -> ETypeVar -> Maybe ContextEntry
-eTypeVarContextLookup (entry @ (CETypeVar b _ _) : c) a
-  | a == b = return entry
-  | otherwise = eTypeVarContextLookup c a
-eTypeVarContextLookup (entry @ (CTypeVar (E b) _) : c) a
-  | a == b = return entry
-  | otherwise = eTypeVarContextLookup c a
-eTypeVarContextLookup (_ : c) a = eTypeVarContextLookup c a
-eTypeVarContextLookup [] _ = Nothing
-
-unsolvedTypeVarContextLookup :: Context -> TypeVar -> Maybe ContextEntry
-unsolvedTypeVarContextLookup (entry @ (CTypeVar b _) : c) a
-  | a == b = return entry
-  | otherwise = unsolvedTypeVarContextLookup c a
-unsolvedTypeVarContextLookup (_ : c) a = unsolvedTypeVarContextLookup c a
-unsolvedTypeVarContextLookup [] _ = Nothing
+typeVarContextLookup :: Context -> Var -> Maybe ContextEntry
+typeVarContextLookup (entry @ (CETypeVar e _ _) : c) a
+  | a == eTypeVarName e = return entry
+  | otherwise = typeVarContextLookup c a
+typeVarContextLookup (entry @ (CTypeVar (E e) _) : c) a
+  | a == eTypeVarName e = return entry
+  | otherwise = typeVarContextLookup c a
+typeVarContextLookup (entry @ (CTypeVar (U u) _) : c) a
+  | a == uTypeVarName u = return entry
+  | otherwise = typeVarContextLookup c a
+typeVarContextLookup (_ : c) a = typeVarContextLookup c a
+typeVarContextLookup [] _ = Nothing
 
 eTypeVarContextReplace :: Context -> ETypeVar -> Monotype -> [ContextEntry] -> p -> Either (Error p) Context
-eTypeVarContextReplace c @ (entry @ (CETypeVar (ETypeVar b) _ tau) : ct) (ETypeVar a) sigma extraEntries p
+eTypeVarContextReplace c @ (entry @ (CETypeVar b _ tau) : ct) a sigma extraEntries p
   | a == b && tau == sigma = return c
   | a == b && tau /= sigma = Left $ ETypeVarMismatchError p tau sigma
-  | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) sigma extraEntries p
-eTypeVarContextReplace (entry @  (CTypeVar (E (ETypeVar b)) k) : ct) (ETypeVar a) sigma extraEntries p
-  | a == b = return $ CETypeVar (ETypeVar a) k sigma : extraEntries ++ ct
+  | otherwise = (:) entry <$> eTypeVarContextReplace ct a sigma extraEntries p
+eTypeVarContextReplace (entry @  (CTypeVar (E b) k) : ct) a sigma extraEntries p
+  | a == b = return $ CETypeVar a k sigma : extraEntries ++ ct
+  | otherwise = (:) entry <$> eTypeVarContextReplace ct a sigma extraEntries p
+eTypeVarContextReplace (entry @  (CTypeVar (U (UTypeVar b)) _) : ct) (ETypeVar a) sigma extraEntries p
+  | a == b = Left $ UndeclaredETypeVarError p (ETypeVar a)
   | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) sigma extraEntries p
 eTypeVarContextReplace (entry : ct) a sigma extraEntries p = (:) entry <$> eTypeVarContextReplace ct a sigma extraEntries p
 eTypeVarContextReplace [] a _ _ p = Left $ UndeclaredETypeVarError p a
@@ -133,41 +135,45 @@ dropContextToMarker [] = []
 dropContextToMarker (CMarker : c) = c
 dropContextToMarker (_ : c) = dropContextToMarker c
 
---Substitute universal var for existential var in type-----------
+--Substitute universal type var for type var in type-----------
 
-uVarToEVarInType :: UTypeVar -> ETypeVar -> Type -> Type
-uVarToEVarInType _ _ TUnit = TUnit
-uVarToEVarInType u e (TArrow t1 t2) = TArrow (uVarToEVarInType u e t1) (uVarToEVarInType u e t2)
-uVarToEVarInType u e (TCoproduct t1 t2) = TCoproduct (uVarToEVarInType u e t1) (uVarToEVarInType u e t2)
-uVarToEVarInType u e (TProduct t1 t2) = TProduct (uVarToEVarInType u e t1) (uVarToEVarInType u e t2)
-uVarToEVarInType u e (TUVar a)
-  | u == a = TEVar e
+substituteUVarInType :: UTypeVar -> TypeVar -> Type -> Type
+substituteUVarInType _ _ TUnit = TUnit
+substituteUVarInType u x (TArrow t1 t2) = TArrow (substituteUVarInType u x t1) (substituteUVarInType u x t2)
+substituteUVarInType u x (TCoproduct t1 t2) = TCoproduct (substituteUVarInType u x t1) (substituteUVarInType u x t2)
+substituteUVarInType u x (TProduct t1 t2) = TProduct (substituteUVarInType u x t1) (substituteUVarInType u x t2)
+substituteUVarInType u x (TUVar a)
+  | u == a =  case x of
+    E e -> TEVar e
+    U u' -> TUVar u'
   | otherwise = TUVar a
-uVarToEVarInType _ _ (TEVar a) = TEVar a
-uVarToEVarInType u e t @ (TUniversal a k t1)
-  | uTypeVarName u /= a = TUniversal a k $ uVarToEVarInType u e t1
+substituteUVarInType _ _ (TEVar a) = TEVar a
+substituteUVarInType u x t @ (TUniversal a k t1)
+  | u /= a = TUniversal a k $ substituteUVarInType u x t1
   | otherwise = t
-uVarToEVarInType u e t @ (TExistential a k t1)
-  | uTypeVarName u /= a = TExistential a k $ uVarToEVarInType u e t1
+substituteUVarInType u x t @ (TExistential a k t1)
+  | u /= a = TExistential a k $ substituteUVarInType u x t1
   | otherwise = t
-uVarToEVarInType u e (TImp p t) = TImp (uVarToEVarInProp u e p) (uVarToEVarInType u e t)
-uVarToEVarInType u e (TAnd t p) = TAnd (uVarToEVarInType u e t) (uVarToEVarInProp u e p)
-uVarToEVarInType u e (TVec n t) = TVec (uVarToEVarInMonotype u e n) (uVarToEVarInType u e t)
+substituteUVarInType u x (TImp p t) = TImp (substituteUVarInProp u x p) (substituteUVarInType u x t)
+substituteUVarInType u x (TAnd t p) = TAnd (substituteUVarInType u x t) (substituteUVarInProp u x p)
+substituteUVarInType u x (TVec n t) = TVec (substituteUVarInMonotype u x n) (substituteUVarInType u x t)
 
-uVarToEVarInProp :: UTypeVar -> ETypeVar -> Proposition -> Proposition
-uVarToEVarInProp u e (m1, m2) = (uVarToEVarInMonotype u e m1, uVarToEVarInMonotype u e m2)
+substituteUVarInProp :: UTypeVar -> TypeVar -> Proposition -> Proposition
+substituteUVarInProp u x (m1, m2) = (substituteUVarInMonotype u x m1, substituteUVarInMonotype u x m2)
 
-uVarToEVarInMonotype :: UTypeVar -> ETypeVar -> Monotype -> Monotype
-uVarToEVarInMonotype _ _ MUnit = MUnit
-uVarToEVarInMonotype _ _ MZero = MZero
-uVarToEVarInMonotype u e (MSucc n) = MSucc $ uVarToEVarInMonotype u e n
-uVarToEVarInMonotype u e (MArrow m1 m2) = MArrow (uVarToEVarInMonotype u e m1) (uVarToEVarInMonotype u e m2)
-uVarToEVarInMonotype u e (MCoproduct m1 m2) = MCoproduct (uVarToEVarInMonotype u e m1) (uVarToEVarInMonotype u e m2)
-uVarToEVarInMonotype u e (MProduct m1 m2) = MProduct (uVarToEVarInMonotype u e m1) (uVarToEVarInMonotype u e m2)
-uVarToEVarInMonotype u e (MUVar a)
-  | u == a = MEVar e
+substituteUVarInMonotype :: UTypeVar -> TypeVar -> Monotype -> Monotype
+substituteUVarInMonotype _ _ MUnit = MUnit
+substituteUVarInMonotype _ _ MZero = MZero
+substituteUVarInMonotype u x (MSucc n) = MSucc $ substituteUVarInMonotype u x n
+substituteUVarInMonotype u x (MArrow m1 m2) = MArrow (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
+substituteUVarInMonotype u x (MCoproduct m1 m2) = MCoproduct (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
+substituteUVarInMonotype u x (MProduct m1 m2) = MProduct (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
+substituteUVarInMonotype u x (MUVar a)
+  | u == a = case x of
+    E e -> MEVar e
+    U u' -> MUVar u'
   | otherwise = MUVar a
-uVarToEVarInMonotype _ _ (MEVar a) = MEVar a
+substituteUVarInMonotype _ _ (MEVar a) = MEVar a
 
 --Monotype to type------------------------------------------------
 
@@ -194,15 +200,14 @@ applyContextToType c (TCoproduct t1 t2) p = TCoproduct <$> applyContextToType c 
 applyContextToType c (TProduct t1 t2) p = TProduct <$> applyContextToType c t1 p <*> applyContextToType c t2 p
 applyContextToType c (TVec n t) p = TVec <$> applyContextToMonotype c n p <*> applyContextToType c t p
 applyContextToType c (TEVar e) p =
-  case eTypeVarContextLookup c e of
+  case typeVarContextLookup c $ eTypeVarName e of
     Just (CETypeVar _ KStar tau) -> applyContextToMonotype c tau p >>= flip monotypeToType p
-    Just (CTypeVar _ KStar) -> return $ TEVar e
+    Just (CTypeVar (E _) KStar) -> return $ TEVar e
     Just (CETypeVar _ KNat _) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
-    Just (CTypeVar _ KNat) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
-    Nothing -> Left $ UndeclaredETypeVarError p e
-    _ -> Left $ InternalCompilerError p "eTypeVarContextLookup"
-applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType (CTypeVar (U $ UTypeVar a) k : c) t p --TODO przemyśleć / zapytać
-applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType (CTypeVar (E $ ETypeVar a) k : c) t p
+    Just (CTypeVar (E _) KNat) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
+    _ -> Left $ UndeclaredETypeVarError p e
+applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType (CTypeVar (U a) k : c) t p --TODO przemyśleć / zapytać
+applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType (CTypeVar (U a) k : c) t p
 applyContextToType _ TUnit _ = return TUnit
 
 applyContextToMonotype :: Context -> Monotype -> p -> Either (Error p) Monotype
@@ -214,9 +219,9 @@ applyContextToMonotype c (MArrow m1 m2) p = MArrow <$> applyContextToMonotype c 
 applyContextToMonotype c (MCoproduct m1 m2) p = MCoproduct <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
 applyContextToMonotype c (MProduct m1 m2) p = MProduct <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
 applyContextToMonotype c (MEVar e) p =
-  case eTypeVarContextLookup c e of
+  case typeVarContextLookup c $ eTypeVarName e of
     Just (CETypeVar _ _ tau) -> applyContextToMonotype c tau p
-    Just (CTypeVar _ _) -> return $ MEVar e
+    Just (CTypeVar (E _) _) -> return $ MEVar e
     _ -> Left $ UndeclaredETypeVarError p e
 applyContextToMonotype _ MUnit _ = return MUnit
 applyContextToMonotype _ MZero _ = return MZero

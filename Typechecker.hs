@@ -134,7 +134,7 @@ equivalentType c (TUVar a) (TUVar b) p
   | otherwise = lift $ Left (TypesNotEquivalentError p (TUVar a) (TUVar b))
 
 equivalentMonotype :: Context -> Monotype -> Monotype -> p -> StateT Integer (Either (Error p)) Context
-equivalentMonotype = undefined //TODO zmienić na checking equations
+equivalentMonotype = undefined --TODO zmienić na checking equations
 
 equivalentProp :: Context -> Proposition -> Proposition -> p -> Either (Error p) Context
 equivalentProp = undefined

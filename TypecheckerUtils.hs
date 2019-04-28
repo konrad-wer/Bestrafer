@@ -13,6 +13,7 @@ data Error p
   | MonotypeHasWrongKindError p Monotype Kind Kind
   | MonotypeIsNotTypeError p Monotype
   | TypeFormednessPrcFEVError p [ETypeVar]
+  | TypesNotEquivalentError p Type Type
   deriving (Show, Eq)
 
 --polarity utils------------------------------------------

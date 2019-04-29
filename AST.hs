@@ -2,7 +2,7 @@ module AST where
 
 type Var = String
 
---Source Syntax-------------------------------------
+--Source Syntax-----------------------------------------------------------------
 
 data ArithmBinOp
   = BinOpPlus
@@ -46,7 +46,7 @@ data Pattern p
 
 type Branch p = ([Pattern p], Expr p)
 
---Types Syntax------------------------------------
+--Types Syntax------------------------------------------------------------------
 
 newtype UTypeVar = UTypeVar {uTypeVarName :: Var} deriving (Show, Eq)
 newtype ETypeVar = ETypeVar {eTypeVarName :: Var} deriving (Show, Eq, Ord)

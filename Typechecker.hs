@@ -89,21 +89,34 @@ subtype c t1 pol t2 p
   | neg pol && (nonneg . polarity $ t1) && (pos . polarity $ t2) = subtype c t1 Positive t2 p
   | otherwise = undefined
 
-equivalentTypeBinary :: Context -> Type -> Type -> Type -> Type -> p -> StateT Integer (Either (Error p)) Context
+equivalentTypeBinary ::
+  Context
+  -> Type -> Type
+  -> Type -> Type -> p
+  -> StateT Integer (Either (Error p)) Context
 equivalentTypeBinary c a1 a2 b1 b2 p = do
   c2 <- equivalentType c a1 b1 p
   a2' <- lift $ applyContextToType c2 a2 p
   b2' <- lift $ applyContextToType c2 b2 p
   equivalentType c2 a2' b2' p
 
-equivalentPropositionalType :: Context -> Proposition -> Proposition -> Type -> Type -> p -> StateT Integer (Either (Error p)) Context
+equivalentPropositionalType ::
+  Context
+ -> Proposition -> Proposition
+ -> Type -> Type -> p
+ -> StateT Integer (Either (Error p)) Context
 equivalentPropositionalType c q1 q2 a b p = do
   c2 <- lift $ equivalentProp c q1 q2 p
   a' <- lift $ applyContextToType c2 a p
   b' <- lift $ applyContextToType c2 b p
   equivalentType c2 a' b' p
 
-equivalentQuantifierType :: Context -> UTypeVar -> Type -> UTypeVar -> Type -> Kind -> p -> StateT Integer (Either (Error p)) Context
+equivalentQuantifierType ::
+  Context
+  -> UTypeVar -> Type
+  -> UTypeVar -> Type
+  -> Kind -> p
+  -> StateT Integer (Either (Error p)) Context
 equivalentQuantifierType c x1 t1 x2 t2 k p = do
   u <- UTypeVar . ("#" ++) . show <$> get
   modify (+ 1)
@@ -118,7 +131,7 @@ equivalentType c (TArrow a1 a2) (TArrow b1 b2) p = equivalentTypeBinary c a1 a2 
 equivalentType c (TCoproduct a1 a2) (TCoproduct b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
 equivalentType c (TProduct a1 a2) (TProduct b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
 equivalentType c (TVec n1 t1) (TVec n2 t2) p = do
-  c2 <- equivalentMonotype c n1 n2 p
+  c2 <- checkEquation c n1 n2 KNat p
   t1'<- lift $ applyContextToType c2 t1 p
   t2'<- lift $ applyContextToType c2 t2 p
   equivalentType c2 t1' t2' p
@@ -133,12 +146,31 @@ equivalentType c (TExistential x1 k1 t1) (TExistential x2 k2 t2) p
 equivalentType c (TUVar a) (TUVar b) p
   | a == b = return c
   | otherwise = lift $ Left (TypesNotEquivalentError p (TUVar a) (TUVar b))
+equivalentType  c t1 @ (TEVar a) t2 p
+  | t1 == t2 = return c
+  | otherwise = do
+      m <- lift $ typeToMonotype t2 p
+      if eTypeVarName a `Set.member` freeVariablesOfMonotype m then
+        lift $ Left (TypesNotEquivalentError p t1 t2)
+      else
+        lift $ instantiateEVar c a m KStar p
+equivalentType c t1 (TEVar b) p = do
+  m <- lift $ typeToMonotype t1 p
+  if eTypeVarName b `Set.member` freeVariablesOfMonotype m then
+    lift $ Left (TypesNotEquivalentError p t1 $ TEVar b)
+  else
+    lift $ instantiateEVar c b m KStar p
+equivalentType _ t1 t2 p = lift $ Left (TypesNotEquivalentError p t1 t2)
 
-equivalentMonotype :: Context -> Monotype -> Monotype -> p -> StateT Integer (Either (Error p)) Context
-equivalentMonotype = undefined --TODO zmienić na checking equations
 
 equivalentProp :: Context -> Proposition -> Proposition -> p -> Either (Error p) Context
 equivalentProp = undefined
+
+instantiateEVar :: Context -> ETypeVar -> Monotype -> Kind -> p -> Either (Error p) Context
+instantiateEVar = undefined
+
+checkEquation :: Context -> Monotype -> Monotype -> Kind -> p -> StateT Integer (Either (Error p)) Context
+checkEquation = undefined
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr c (EUnit _) TUnit _ = return c

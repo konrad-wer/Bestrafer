@@ -106,6 +106,7 @@ equivalentPropositionalType c q1 q2 a b p = do
 equivalentQuantifierType :: Context -> UTypeVar -> Type -> UTypeVar -> Type -> Kind -> p -> StateT Integer (Either (Error p)) Context
 equivalentQuantifierType c x1 t1 x2 t2 k p = do
   u <- UTypeVar . ("#" ++) . show <$> get
+  modify (+ 1)
   let t1' = substituteUVarInType x1 (U u) t1
   let t2' = substituteUVarInType x2 (U u) t2
   c2 <- equivalentType (CTypeVar (U u) k : CMarker : c) t1' t2' p
@@ -138,8 +139,6 @@ equivalentMonotype = undefined --TODO zmienić na checking equations
 
 equivalentProp :: Context -> Proposition -> Proposition -> p -> Either (Error p) Context
 equivalentProp = undefined
-
-
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr c (EUnit _) TUnit _ = return c

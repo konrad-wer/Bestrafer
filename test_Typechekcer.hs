@@ -137,6 +137,37 @@ freeExistentialVariables_test7 =
     [] -> True
     _ -> False
 
+--freeVariablesOfMonotype :: Monotype -> Set.Set Var
+freeVariablesOfMonotype_test1 :: Test
+freeVariablesOfMonotype_test1 =
+   case Set.toList . freeVariablesOfMonotype $ MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "y")) of
+     ["x", "y"] -> True
+     _ -> False
+
+freeVariablesOfMonotype_test2 :: Test
+freeVariablesOfMonotype_test2 =
+  case Set.toList . freeVariablesOfMonotype $ MArrow (MProduct MUnit MUnit) (MCoproduct MUnit MUnit) of
+    [] -> True
+    _ -> False
+
+freeVariablesOfMonotype_test3 :: Test
+freeVariablesOfMonotype_test3 =
+  case Set.toList . freeVariablesOfMonotype $ MSucc (MSucc MZero) of
+    [] -> True
+    _ -> False
+
+freeVariablesOfMonotype_test4 :: Test
+freeVariablesOfMonotype_test4 =
+  case Set.toList . freeVariablesOfMonotype $ MSucc (MSucc $ MEVar $ ETypeVar "Konrad") of
+    ["Konrad"] -> True
+    _ -> False
+
+freeVariablesOfMonotype_test5 :: Test
+freeVariablesOfMonotype_test5 =
+  case Set.toList . freeVariablesOfMonotype $ MSucc (MSucc $ MUVar $ UTypeVar "Jakub") of
+    ["Jakub"] -> True
+    _ -> False
+
 --varContextLookup :: Context -> Expr p -> Either (Error p) ContextEntry
 varContextLookup_test1 :: Test
 varContextLookup_test1 =
@@ -713,6 +744,43 @@ monotypeToType_test3 :: Test
 monotypeToType_test3 =
   case monotypeToType (MArrow (MProduct MUnit $ MSucc MZero) (MCoproduct (MUVar $ UTypeVar "x") (MEVar $ ETypeVar "y"))) () of
     Left (MonotypeIsNotTypeError () (MSucc MZero)) -> True
+    _ -> False
+
+--typeToMonotype :: Type -> p -> Either (Error p) Monotype
+typeToMonotype_test1 :: Test
+typeToMonotype_test1 =
+  case typeToMonotype (TArrow (TProduct TUnit TUnit) (TCoproduct (TUVar (UTypeVar "x")) (TEVar (ETypeVar "y")))) () of
+    Right (MArrow (MProduct MUnit MUnit) (MCoproduct (MUVar (UTypeVar "x")) (MEVar (ETypeVar "y")))) -> True
+    _ -> False
+
+typeToMonotype_test2 :: Test
+typeToMonotype_test2 =
+  case typeToMonotype (TProduct (TUniversal (UTypeVar "x") KStar TUnit) TUnit)() of
+    Left (TypeIsNotMonotypeError () (TUniversal (UTypeVar "x") KStar TUnit)) -> True
+    _ -> False
+
+typeToMonotype_test3 :: Test
+typeToMonotype_test3 =
+  case typeToMonotype (TCoproduct TUnit (TExistential (UTypeVar "x") KStar (TVec MZero TUnit))) () of
+    Left (TypeIsNotMonotypeError () (TExistential (UTypeVar "x") KStar (TVec MZero TUnit))) -> True
+    _ -> False
+
+typeToMonotype_test4 :: Test
+typeToMonotype_test4 =
+  case typeToMonotype (TImp (MZero, MUnit) TUnit) () of
+    Left (TypeIsNotMonotypeError ()  (TImp (MZero, MUnit) TUnit)) -> True
+    _ -> False
+
+typeToMonotype_test5 :: Test
+typeToMonotype_test5 =
+  case typeToMonotype (TAnd TUnit (MUnit, MUnit)) () of
+    Left (TypeIsNotMonotypeError () (TAnd TUnit (MUnit, MUnit))) -> True
+    _ -> False
+
+typeToMonotype_test6 :: Test
+typeToMonotype_test6 =
+  case typeToMonotype (TVec (MSucc MZero) (TProduct TUnit TUnit)) () of
+    Left (TypeIsNotMonotypeError () (TVec (MSucc MZero) (TProduct TUnit TUnit))) -> True
     _ -> False
 
 --applyContextToMonotype :: Context -> Monotype -> Monotype
@@ -1594,6 +1662,11 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("freeExistentialVariables_test5", freeExistentialVariables_test5),
          ("freeExistentialVariables_test6", freeExistentialVariables_test6),
          ("freeExistentialVariables_test7", freeExistentialVariables_test7),
+         ("freeVariablesOfMonotype_test1", freeVariablesOfMonotype_test1),
+         ("freeVariablesOfMonotype_test2", freeVariablesOfMonotype_test2),
+         ("freeVariablesOfMonotype_test3", freeVariablesOfMonotype_test3),
+         ("freeVariablesOfMonotype_test4", freeVariablesOfMonotype_test4),
+         ("freeVariablesOfMonotype_test5", freeVariablesOfMonotype_test5),
          ("varContextLookup_test1", varContextLookup_test1),
          ("varContextLookup_test2", varContextLookup_test2),
          ("varContextLookup_test3", varContextLookup_test3),
@@ -1688,6 +1761,12 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("monotypeToType_test1", monotypeToType_test1),
          ("monotypeToType_test2", monotypeToType_test2),
          ("monotypeToType_test3", monotypeToType_test3),
+         ("typeToMonotype_test1", typeToMonotype_test1),
+         ("typeToMonotype_test2", typeToMonotype_test2),
+         ("typeToMonotype_test3", typeToMonotype_test3),
+         ("typeToMonotype_test4", typeToMonotype_test4),
+         ("typeToMonotype_test5", typeToMonotype_test5),
+         ("typeToMonotype_test6", typeToMonotype_test6),
          ("applyContextToMonotype_test1", applyContextToMonotype_test1),
          ("applyContextToMonotype_test2", applyContextToMonotype_test2),
          ("applyContextToMonotype_test3", applyContextToMonotype_test3),

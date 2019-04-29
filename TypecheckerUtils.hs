@@ -12,11 +12,12 @@ data Error p
   | TypeHasWrongKindError p Type Kind Kind
   | MonotypeHasWrongKindError p Monotype Kind Kind
   | MonotypeIsNotTypeError p Monotype
+  | TypeIsNotMonotypeError p Type
   | TypeFormednessPrcFEVError p [ETypeVar]
   | TypesNotEquivalentError p Type Type
   deriving (Show, Eq)
 
---polarity utils------------------------------------------
+--polarity utils----------------------------------------------------------------
 
 polarity :: Type -> Polarity
 polarity TUniversal {} = Negative
@@ -54,7 +55,7 @@ headedByExistential :: Type -> Bool
 headedByExistential TExistential {} = True
 headedByExistential _ = False
 
---Free existential variables-----------------------------------
+--Free variables computing utils -----------------------------------------------
 
 freeExistentialVariables :: Type -> Set.Set ETypeVar
 freeExistentialVariables TUnit = Set.empty
@@ -82,7 +83,17 @@ freeExistentialVariablesOfMonotype (MProduct m1 m2) = Set.union (freeExistential
 freeExistentialVariablesOfMonotype (MUVar _) = Set.empty
 freeExistentialVariablesOfMonotype (MEVar x) = Set.singleton x
 
---Context utils----------------------------------------------
+freeVariablesOfMonotype :: Monotype -> Set.Set Var
+freeVariablesOfMonotype MUnit = Set.empty
+freeVariablesOfMonotype MZero = Set.empty
+freeVariablesOfMonotype (MSucc n) = freeVariablesOfMonotype n
+freeVariablesOfMonotype (MArrow m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
+freeVariablesOfMonotype (MCoproduct m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
+freeVariablesOfMonotype (MProduct m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
+freeVariablesOfMonotype (MUVar x) = Set.singleton $ uTypeVarName x
+freeVariablesOfMonotype (MEVar x) = Set.singleton $ eTypeVarName x
+
+--Context utils-----------------------------------------------------------------
 
 varContextLookup :: Context -> Var -> p -> Either (Error p) ContextEntry
 varContextLookup  (entry @ (CVar y _ _): c) x p
@@ -136,7 +147,7 @@ dropContextToMarker [] = []
 dropContextToMarker (CMarker : c) = c
 dropContextToMarker (_ : c) = dropContextToMarker c
 
---Substitute universal type var for type var in type-----------
+--Substitute universal type var for type var in type----------------------------
 
 substituteUVarInType :: UTypeVar -> TypeVar -> Type -> Type
 substituteUVarInType _ _ TUnit = TUnit
@@ -176,7 +187,7 @@ substituteUVarInMonotype u x (MUVar a)
   | otherwise = MUVar a
 substituteUVarInMonotype _ _ (MEVar a) = MEVar a
 
---Monotype to type------------------------------------------------
+--Monotype to type and type to monotype-----------------------------------------
 
 monotypeToType :: Monotype -> p -> Either (Error p) Type
 monotypeToType MUnit _ = return TUnit
@@ -187,7 +198,16 @@ monotypeToType (MEVar x) _ = return $ TEVar x
 monotypeToType (MUVar x) _ = return $ TUVar x
 monotypeToType n p = Left $ MonotypeIsNotTypeError p n
 
---Context application----------------------------------------------
+typeToMonotype :: Type -> p -> Either (Error p) Monotype
+typeToMonotype TUnit _ = return MUnit
+typeToMonotype (TUVar a) _ = return $ MUVar a
+typeToMonotype (TEVar a) _ = return $ MEVar a
+typeToMonotype (TArrow t1 t2) p = MArrow <$> typeToMonotype t1 p <*> typeToMonotype t2 p
+typeToMonotype (TCoproduct t1 t2) p = MCoproduct <$> typeToMonotype t1 p <*> typeToMonotype t2 p
+typeToMonotype (TProduct t1 t2) p = MProduct <$> typeToMonotype t1 p <*> typeToMonotype t2 p
+typeToMonotype t p = Left $ TypeIsNotMonotypeError p t
+
+--Context application-----------------------------------------------------------
 
 applyContextToType :: Context -> Type -> p-> Either (Error p) Type
 applyContextToType c (TUVar u) p =

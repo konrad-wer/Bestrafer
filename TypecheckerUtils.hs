@@ -6,7 +6,8 @@ import qualified Data.Set as Set
 data Error p
   = UndeclaredVariableError p Var
   | InternalCompilerError p String
-  | ETypeVarMismatchError p Monotype Monotype
+  | ETypeVarTypeMismatchError p ETypeVar Monotype Monotype
+  | ETypeVarKindMismatchError p ETypeVar Kind Kind
   | UndeclaredETypeVarError p ETypeVar
   | UndeclaredUTypeVarError p UTypeVar
   | TypeHasWrongKindError p Type Kind Kind
@@ -15,7 +16,14 @@ data Error p
   | TypeIsNotMonotypeError p Type
   | TypeFormednessPrcFEVError p [ETypeVar]
   | TypesNotEquivalentError p Type Type
+  | ETypeVarAlreadySolvedError p ETypeVar Monotype Monotype
+  | CouldNotInstantiateEVarError p ETypeVar Monotype
   deriving (Show, Eq)
+
+--simple utils------------------------------------------------------------------
+
+generateSubETypeVars :: ETypeVar -> (ETypeVar, ETypeVar)
+generateSubETypeVars a = (ETypeVar $ eTypeVarName a ++ "-1", ETypeVar $ eTypeVarName a ++ "-2")
 
 --polarity utils----------------------------------------------------------------
 
@@ -128,24 +136,55 @@ typeVarContextLookup (entry @ (CTypeVar (U u) _) : c) a
 typeVarContextLookup (_ : c) a = typeVarContextLookup c a
 typeVarContextLookup [] _ = Nothing
 
-eTypeVarContextReplace :: Context -> ETypeVar -> Monotype -> [ContextEntry] -> p -> Either (Error p) Context
-eTypeVarContextReplace c @ (entry @ (CETypeVar b _ tau) : ct) a sigma extraEntries p
-  | a == b && tau == sigma = return c
-  | a == b && tau /= sigma = Left $ ETypeVarMismatchError p tau sigma
-  | otherwise = (:) entry <$> eTypeVarContextReplace ct a sigma extraEntries p
-eTypeVarContextReplace (entry @  (CTypeVar (E b) k) : ct) a sigma extraEntries p
-  | a == b = return $ CETypeVar a k sigma : extraEntries ++ ct
-  | otherwise = (:) entry <$> eTypeVarContextReplace ct a sigma extraEntries p
-eTypeVarContextReplace (entry @  (CTypeVar (U (UTypeVar b)) _) : ct) (ETypeVar a) sigma extraEntries p
+eTypeVarContextReplace :: Context -> ETypeVar -> Kind -> Monotype -> [ContextEntry] -> p -> Either (Error p) Context
+eTypeVarContextReplace c @ (entry @ (CETypeVar b k2 tau) : ct) a k1 sigma extraEntries p
+  | a == b && k1 == k2 && tau == sigma = return c
+  | a == b && k1 /= k2 = Left $ ETypeVarKindMismatchError p a k2 k1
+  | a == b && tau /= sigma = Left $ ETypeVarTypeMismatchError p a tau sigma
+  | otherwise = (:) entry <$> eTypeVarContextReplace ct a k1 sigma extraEntries p
+eTypeVarContextReplace (entry @  (CTypeVar (E b) k2) : ct) a k1 sigma extraEntries p
+  | a == b && k1 == k2 = return $ CETypeVar a k1 sigma : extraEntries ++ ct
+  | a == b && k1 /= k2 = Left $ ETypeVarKindMismatchError p a k2 k1
+  | otherwise = (:) entry <$> eTypeVarContextReplace ct a k1 sigma extraEntries p
+eTypeVarContextReplace (entry @  (CTypeVar (U (UTypeVar b)) _) : ct) (ETypeVar a) k sigma extraEntries p
   | a == b = Left $ UndeclaredETypeVarError p (ETypeVar a)
-  | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) sigma extraEntries p
-eTypeVarContextReplace (entry : ct) a sigma extraEntries p = (:) entry <$> eTypeVarContextReplace ct a sigma extraEntries p
-eTypeVarContextReplace [] a _ _ p = Left $ UndeclaredETypeVarError p a
+  | otherwise = (:) entry <$> eTypeVarContextReplace ct (ETypeVar a) k sigma extraEntries p
+eTypeVarContextReplace (entry : ct) a k sigma extraEntries p = (:) entry <$> eTypeVarContextReplace ct a k sigma extraEntries p
+eTypeVarContextReplace [] a _ _ _ p = Left $ UndeclaredETypeVarError p a
 
 dropContextToMarker :: Context -> Context
 dropContextToMarker [] = []
 dropContextToMarker (CMarker : c) = c
 dropContextToMarker (_ : c) = dropContextToMarker c
+
+dropContextToETypeVar :: ETypeVar -> Context -> p -> Either (Error p) Context
+dropContextToETypeVar x [] p = Left $ UndeclaredETypeVarError p x
+dropContextToETypeVar x (CETypeVar y _ _  : c) p
+  | x == y = return c
+  | otherwise = dropContextToETypeVar x c p
+dropContextToETypeVar x (CTypeVar (E y) _  : c) p
+  | x == y = return c
+  | otherwise = dropContextToETypeVar x c p
+dropContextToETypeVar x (CTypeVar (U y) _  : c) p
+  | eTypeVarName x == uTypeVarName y = Left $ UndeclaredETypeVarError p x
+  | otherwise = dropContextToETypeVar x c p
+dropContextToETypeVar x (_ : c) p = dropContextToETypeVar x c p
+
+takeContextToETypeVar :: ETypeVar -> Context -> p -> Either (Error p) Context
+takeContextToETypeVar x c p =
+  tc c []
+  where
+    tc [] _ = Left $ UndeclaredETypeVarError p x
+    tc (entry @ (CETypeVar y _ _) : cx) a
+      | x == y = return $ reverse a
+      | otherwise = tc cx (entry : a)
+    tc (entry @ (CTypeVar (E y) _) : cx) a
+      | x == y = return $ reverse a
+      | otherwise = tc cx (entry : a)
+    tc (entry @ (CTypeVar (U y) _) : cx) a
+      | eTypeVarName x == uTypeVarName y = Left $ UndeclaredETypeVarError p x
+      | otherwise = tc cx (entry : a)
+    tc (entry : cx) a = tc cx (entry : a)
 
 --Substitute universal type var for type var in type----------------------------
 

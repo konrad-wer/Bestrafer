@@ -131,7 +131,7 @@ equivalentType c (TArrow a1 a2) (TArrow b1 b2) p = equivalentTypeBinary c a1 a2 
 equivalentType c (TCoproduct a1 a2) (TCoproduct b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
 equivalentType c (TProduct a1 a2) (TProduct b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
 equivalentType c (TVec n1 t1) (TVec n2 t2) p = do
-  c2 <- checkEquation c n1 n2 KNat p
+  c2 <- lift $ checkEquation c n1 n2 KNat p
   t1'<- lift $ applyContextToType c2 t1 p
   t2'<- lift $ applyContextToType c2 t2 p
   equivalentType c2 t1' t2' p
@@ -163,9 +163,15 @@ equivalentType c t1 (TEVar b) p = do
 equivalentType _ t1 t2 p = lift $ Left (TypesNotEquivalentError p t1 t2)
 
 equivalentProp :: Context -> Proposition -> Proposition -> p -> Either (Error p) Context
-equivalentProp = undefined
---equivalentProp c (p1, p2) (q1, q2) p = undefined
-  --k1 <- inferMonotypeKind c m p1
+equivalentProp c (p1, p2) (q1, q2) p = do
+  k <- inferMonotypeKind c p1 p
+  checkMonotypeHasKind c p2 p k
+  checkMonotypeHasKind c q1 p k
+  checkMonotypeHasKind c q2 p k
+  c2 <- checkEquation c p1 q1 k p
+  p2' <- applyContextToMonotype c2 p2 p
+  q2' <- applyContextToMonotype c2 q2 p
+  checkEquation c2 p2' q2' k p
 
 instantiateEVarBinary ::
   Context
@@ -196,29 +202,65 @@ instantiateEVar c a (MProduct m1 m2) KStar p = do
   let (a1, a2) = generateSubETypeVars a
   c2 <- eTypeVarContextReplace c a KStar (MProduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
   instantiateEVarBinary c2 a1 a2 m1 m2 p
-instantiateEVar c a (MEVar b) k1 p = do
-  case typeVarContextLookup c (eTypeVarName a) of
-    Just (CTypeVar (E _) k) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k k1
-    Just (CETypeVar _ k _) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k k1
-    _ ->  Left $ UndeclaredETypeVarError p a
-  c2 <- takeContextToETypeVar a c p
-  replaceB <- case typeVarContextLookup c2 (eTypeVarName b) of
-    Just (CTypeVar (E _) k) -> if k == k1 then return True else Left $ ETypeVarKindMismatchError p a k k1
-    Just (CETypeVar _ k m) -> if k == k1 then Left $ ETypeVarAlreadySolvedError p b m (MEVar a) else Left $ ETypeVarKindMismatchError p a k k1
-    _ -> return False
-  if replaceB then
-    eTypeVarContextReplace c b k1 (MEVar a) [] p
-  else (do
-    c3 <- dropContextToETypeVar a c p
-    checkMonotypeHasKind c3 (MEVar b) p k1
-    eTypeVarContextReplace c a k1 (MEVar b) [] p)
+instantiateEVar c a (MEVar b) k1 p
+  | a == b = do
+      case typeVarContextLookup c (eTypeVarName a) of
+        Just (CTypeVar (E _) k) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k1 k
+        Just (CETypeVar _ k _) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k1 k
+        _ ->  Left $ UndeclaredETypeVarError p a
+      return c
+  | otherwise = do
+      case typeVarContextLookup c (eTypeVarName a) of
+        Just (CTypeVar (E _) k) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k1 k
+        Just (CETypeVar _ k _) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k1 k
+        _ ->  Left $ UndeclaredETypeVarError p a
+      c2 <- takeContextToETypeVar a c p
+      replaceB <- case typeVarContextLookup c2 (eTypeVarName b) of
+        Just (CTypeVar (E _) k) -> if k == k1 then return True else Left $ ETypeVarKindMismatchError p b k1 k
+        Just (CETypeVar _ k m) -> if k == k1 then Left $ ETypeVarAlreadySolvedError p b m (MEVar a)
+                                             else Left $ ETypeVarKindMismatchError p a k1 k
+        Nothing -> return False
+        _ ->  Left $ UndeclaredETypeVarError p b
+      if replaceB then
+        eTypeVarContextReplace c b k1 (MEVar a) [] p
+      else (do
+        c3 <- dropContextToETypeVar a c p
+        checkMonotypeHasKind c3 (MEVar b) p k1
+        eTypeVarContextReplace c a k1 (MEVar b) [] p)
 instantiateEVar c a m k p = do
   c2 <- dropContextToETypeVar a c p
   checkMonotypeHasKind c2 m p k
   eTypeVarContextReplace c a k m [] p
 
-checkEquation :: Context -> Monotype -> Monotype -> Kind -> p -> StateT Integer (Either (Error p)) Context
-checkEquation = undefined
+checkEquationBinary ::
+  Context
+  -> Monotype -> Monotype
+  -> Monotype -> Monotype
+  -> p -> Either (Error p) Context
+checkEquationBinary c m1 m2 n1 n2 p = do
+  c2 <- checkEquation c m1 n1 KStar p
+  m2' <- applyContextToMonotype c2 m2 p
+  n2' <- applyContextToMonotype c2 n2 p
+  checkEquation c2 m2' n2' KStar p
+
+checkEquation :: Context -> Monotype -> Monotype -> Kind -> p -> Either (Error p) Context
+checkEquation c MUnit MUnit KStar _ = return c
+checkEquation c MZero MZero KNat _ = return c
+checkEquation c (MUVar a) (MUVar b) k p
+  | a == b = return c
+  | otherwise = Left $ EquationFalseError p (MUVar a) (MUVar b) k
+checkEquation c (MArrow m1 m2) (MArrow n1 n2) KStar p = checkEquationBinary c m1 m2 n1 n2 p
+checkEquation c (MCoproduct m1 m2) (MCoproduct n1 n2) KStar p = checkEquationBinary c m1 m2 n1 n2 p
+checkEquation c (MProduct m1 m2) (MProduct n1 n2) KStar p = checkEquationBinary c m1 m2 n1 n2 p
+checkEquation c (MSucc n1) (MSucc n2) KNat p = checkEquation c n1 n2 KNat p
+checkEquation c m1 @ (MEVar a) m2 k p
+  | m1 == m2 = return c
+  | eTypeVarName a `Set.member` freeVariablesOfMonotype m2 = Left $ EquationFalseError p m1 m2 k
+  | otherwise = instantiateEVar c a m2 k p
+checkEquation c m1 m2 @ (MEVar b) k p
+  | eTypeVarName b `Set.member` freeVariablesOfMonotype m1 = Left $ EquationFalseError p m1 m2 k
+  | otherwise = instantiateEVar c b m1 k p
+checkEquation _ m1 m2 k p = Left $ EquationFalseError p m1 m2 k
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr c (EUnit _) TUnit _ = return c

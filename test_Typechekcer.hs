@@ -1473,6 +1473,156 @@ checkTypeWellFormednessWithPrnc_test26 =
     Left (TypeFormednessPrcFEVError () [ETypeVar "b"]) -> True
     _ -> False
 
+--instantiateEVar :: Context -> ETypeVar -> Monotype -> Kind -> p -> Either (Error p) Context
+
+instantiateEVar_test1 :: Test
+instantiateEVar_test1 =
+  case instantiateEVar context2 (ETypeVar "b") MUnit KStar () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+instantiateEVar_test2 :: Test
+instantiateEVar_test2 =
+  case instantiateEVar context2 (ETypeVar "a") MZero KNat () of
+    Right [CETypeVar (ETypeVar "a") KNat MZero, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+instantiateEVar_test3 :: Test
+instantiateEVar_test3 =
+  case instantiateEVar context2 (ETypeVar "a") (MSucc (MSucc MZero)) KNat () of
+    Right [CETypeVar (ETypeVar "a") KNat (MSucc (MEVar (ETypeVar "a-1"))), CETypeVar (ETypeVar "a-1") KNat (MSucc (MEVar (ETypeVar "a-1-1"))),
+           CETypeVar (ETypeVar "a-1-1") KNat MZero, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+instantiateEVar_test4 :: Test
+instantiateEVar_test4 =
+  case instantiateEVar context2 (ETypeVar "b") (MProduct MUnit MUnit) KStar () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MProduct (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
+           CETypeVar (ETypeVar "b-1") KStar MUnit, CETypeVar (ETypeVar "b-2") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+instantiateEVar_test5 :: Test
+instantiateEVar_test5 =
+  case instantiateEVar context2 (ETypeVar "b") (MCoproduct MUnit MUnit) KStar () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MCoproduct (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
+           CETypeVar (ETypeVar "b-1") KStar MUnit, CETypeVar (ETypeVar "b-2") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+instantiateEVar_test6 :: Test
+instantiateEVar_test6 =
+  case instantiateEVar context2 (ETypeVar "b") (MArrow MUnit MUnit) KStar () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MArrow (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
+           CETypeVar (ETypeVar "b-1") KStar MUnit, CETypeVar (ETypeVar "b-2") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+instantiateEVar_test7 :: Test
+instantiateEVar_test7 =
+  case instantiateEVar context2 (ETypeVar "b") MUnit KNat () of
+    Left (MonotypeHasWrongKindError () MUnit KNat KStar) -> True
+    _ -> False
+
+instantiateEVar_test8 :: Test
+instantiateEVar_test8 =
+  case instantiateEVar context2 (ETypeVar "a") MZero KStar () of
+    Left (MonotypeHasWrongKindError () MZero KStar KNat) -> True
+    _ -> False
+
+instantiateEVar_test9 :: Test
+instantiateEVar_test9 =
+  case instantiateEVar context2 (ETypeVar "a") (MSucc (MSucc MZero)) KStar () of
+    Left (MonotypeHasWrongKindError () (MSucc (MSucc MZero)) KStar KNat) -> True
+    _ -> False
+
+instantiateEVar_test10 :: Test
+instantiateEVar_test10 =
+  case instantiateEVar context2 (ETypeVar "b") (MProduct MUnit MUnit) KNat () of
+    Left (MonotypeHasWrongKindError () (MProduct MUnit MUnit) KNat KStar) -> True
+    _ -> False
+
+instantiateEVar_test11 :: Test
+instantiateEVar_test11 =
+  case instantiateEVar context2 (ETypeVar "b") (MCoproduct MUnit MZero) KStar () of
+    Left (MonotypeHasWrongKindError () MZero KStar KNat) -> True
+    _ -> False
+
+instantiateEVar_test12 :: Test
+instantiateEVar_test12 =
+  case instantiateEVar context2 (ETypeVar "b") (MArrow (MSucc MZero) MZero) KStar () of
+    Left (MonotypeHasWrongKindError () (MSucc MZero) KStar KNat) -> True
+    _ -> False
+
+instantiateEVar_test13 :: Test
+instantiateEVar_test13 =
+  case instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "b")) KStar () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MEVar (ETypeVar "c")), CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+instantiateEVar_test14 :: Test
+instantiateEVar_test14 =
+  case instantiateEVar context2 (ETypeVar "b") (MEVar (ETypeVar "c")) KStar () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MEVar (ETypeVar "c")), CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+instantiateEVar_test15 :: Test
+instantiateEVar_test15 =
+  case instantiateEVar context1 (ETypeVar "a") (MEVar (ETypeVar "z")) KStar () of
+    Left (ETypeVarAlreadySolvedError () (ETypeVar "z") (MProduct MUnit MUnit) (MEVar (ETypeVar "a"))) -> True
+    _ -> False
+
+instantiateEVar_test16 :: Test
+instantiateEVar_test16 =
+  case instantiateEVar context3 (ETypeVar "z") (MEVar (ETypeVar "a")) KStar () of
+    Left (ETypeVarTypeMismatchError () (ETypeVar "z") (MProduct MUnit MUnit) (MEVar (ETypeVar "a"))) -> True
+    _ -> False
+
+instantiateEVar_test17 :: Test
+instantiateEVar_test17 =
+  case instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "b")) KNat () of
+    Left (ETypeVarKindMismatchError () (ETypeVar "c") KNat KStar) -> True
+    _ -> False
+
+instantiateEVar_test18 :: Test
+instantiateEVar_test18 =
+  case instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "a")) KStar () of
+    Left (ETypeVarKindMismatchError () (ETypeVar "a") KStar KNat) -> True
+    _ -> False
+
+instantiateEVar_test19 :: Test
+instantiateEVar_test19 =
+  case instantiateEVar context3 (ETypeVar "b") (MEVar (ETypeVar "a")) KStar () of
+    Left (ETypeVarKindMismatchError () (ETypeVar "b") KStar KNat) -> True
+    _ -> False
+
+instantiateEVar_test20 :: Test
+instantiateEVar_test20 =
+  case instantiateEVar [CTypeVar (U (UTypeVar "a")) KStar, CTypeVar (E (ETypeVar "b")) KStar] (ETypeVar "b") (MEVar (ETypeVar "a")) KStar () of
+    Left (UndeclaredETypeVarError () (ETypeVar "a")) -> True
+    _ -> False
+
+instantiateEVar_test21 :: Test
+instantiateEVar_test21 =
+  case instantiateEVar context1 (ETypeVar "Konrad") MUnit KStar () of
+    Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
+    _ -> False
+
+instantiateEVar_test22 :: Test
+instantiateEVar_test22 =
+  case instantiateEVar context1 (ETypeVar "Konrad") (MEVar (ETypeVar "a")) KStar () of
+    Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
+    _ -> False
+
+instantiateEVar_test23 :: Test
+instantiateEVar_test23 =
+  case instantiateEVar context5 (ETypeVar "x") (MEVar (ETypeVar "x")) KNat () of
+    Right c -> c == context5
+    _ -> False
+
+instantiateEVar_test24 :: Test
+instantiateEVar_test24 =
+  case instantiateEVar context4 (ETypeVar "x") (MEVar (ETypeVar "x")) KStar () of
+    Left (UndeclaredETypeVarError () (ETypeVar "x")) -> True
+    _ -> False
+
 --checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr_EUnit_test1 :: Test
 checkExpr_EUnit_test1 =
@@ -1974,6 +2124,30 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("checkTypeWellFormednessWithPrnc_test24", checkTypeWellFormednessWithPrnc_test24),
          ("checkTypeWellFormednessWithPrnc_test25", checkTypeWellFormednessWithPrnc_test25),
          ("checkTypeWellFormednessWithPrnc_test26", checkTypeWellFormednessWithPrnc_test26),
+         ("instantiateEVar_test1", instantiateEVar_test1),
+         ("instantiateEVar_test2", instantiateEVar_test2),
+         ("instantiateEVar_test3", instantiateEVar_test3),
+         ("instantiateEVar_test4", instantiateEVar_test4),
+         ("instantiateEVar_test5", instantiateEVar_test5),
+         ("instantiateEVar_test6", instantiateEVar_test6),
+         ("instantiateEVar_test7", instantiateEVar_test7),
+         ("instantiateEVar_test8", instantiateEVar_test8),
+         ("instantiateEVar_test9", instantiateEVar_test9),
+         ("instantiateEVar_test10", instantiateEVar_test10),
+         ("instantiateEVar_test11", instantiateEVar_test11),
+         ("instantiateEVar_test12", instantiateEVar_test12),
+         ("instantiateEVar_test13", instantiateEVar_test13),
+         ("instantiateEVar_test14", instantiateEVar_test14),
+         ("instantiateEVar_test15", instantiateEVar_test15),
+         ("instantiateEVar_test16", instantiateEVar_test16),
+         ("instantiateEVar_test17", instantiateEVar_test17),
+         ("instantiateEVar_test18", instantiateEVar_test18),
+         ("instantiateEVar_test19", instantiateEVar_test19),
+         ("instantiateEVar_test20", instantiateEVar_test20),
+         ("instantiateEVar_test21", instantiateEVar_test21),
+         ("instantiateEVar_test22", instantiateEVar_test22),
+         ("instantiateEVar_test23", instantiateEVar_test23),
+         ("instantiateEVar_test24", instantiateEVar_test24),
          ("checkExpr_EUnit_test1", checkExpr_EUnit_test1),
          ("checkExpr_EUnit_test2", checkExpr_EUnit_test2),
          ("checkExpr_EUnit_test3", checkExpr_EUnit_test3),

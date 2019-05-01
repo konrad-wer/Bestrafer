@@ -17,7 +17,7 @@ data Error p
   | TypeFormednessPrcFEVError p [ETypeVar]
   | TypesNotEquivalentError p Type Type
   | ETypeVarAlreadySolvedError p ETypeVar Monotype Monotype
-  | CouldNotInstantiateEVarError p ETypeVar Monotype
+  | EquationFalseError p Monotype Monotype Kind
   deriving (Show, Eq)
 
 --simple utils------------------------------------------------------------------

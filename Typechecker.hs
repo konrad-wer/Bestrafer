@@ -210,10 +210,6 @@ instantiateEVar c a (MEVar b) k1 p
         _ ->  Left $ UndeclaredETypeVarError p a
       return c
   | otherwise = do
-      case typeVarContextLookup c (eTypeVarName a) of
-        Just (CTypeVar (E _) k) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k1 k
-        Just (CETypeVar _ k _) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k1 k
-        _ ->  Left $ UndeclaredETypeVarError p a
       c2 <- takeContextToETypeVar a c p
       replaceB <- case typeVarContextLookup c2 (eTypeVarName b) of
         Just (CTypeVar (E _) k) -> if k == k1 then return True else Left $ ETypeVarKindMismatchError p b k1 k

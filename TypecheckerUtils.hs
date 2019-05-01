@@ -18,6 +18,7 @@ data Error p
   | TypesNotEquivalentError p Type Type
   | ETypeVarAlreadySolvedError p ETypeVar Monotype Monotype
   | EquationFalseError p Monotype Monotype Kind
+  | NotSubtypeError p Type Type
   deriving (Show, Eq)
 
 --simple utils------------------------------------------------------------------

@@ -87,7 +87,7 @@ subtype c t1 pol t2 p
   | pos pol && (nonpos . polarity $ t1) && (neg . polarity $ t2) = subtype c t1 Negative t2 p
   | neg pol && (pos . polarity $ t1) && (nonneg . polarity $ t2) = subtype c t1 Positive t2 p
   | neg pol && (nonneg . polarity $ t1) && (pos . polarity $ t2) = subtype c t1 Positive t2 p
-  | otherwise = undefined
+  | otherwise = Left $ NotSubtypeError p t1 t2
 
 equivalentTypeBinary ::
   Context

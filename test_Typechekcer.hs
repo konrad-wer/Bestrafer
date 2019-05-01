@@ -1578,7 +1578,7 @@ instantiateEVar_test16 =
 instantiateEVar_test17 :: Test
 instantiateEVar_test17 =
   case instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "b")) KNat () of
-    Left (ETypeVarKindMismatchError () (ETypeVar "c") KNat KStar) -> True
+    Left (ETypeVarKindMismatchError () (ETypeVar "b") KNat KStar) -> True
     _ -> False
 
 instantiateEVar_test18 :: Test
@@ -1590,7 +1590,7 @@ instantiateEVar_test18 =
 instantiateEVar_test19 :: Test
 instantiateEVar_test19 =
   case instantiateEVar context3 (ETypeVar "b") (MEVar (ETypeVar "a")) KStar () of
-    Left (ETypeVarKindMismatchError () (ETypeVar "b") KStar KNat) -> True
+    Left (ETypeVarAlreadySolvedError () (ETypeVar "a") MUnit (MEVar(ETypeVar "b"))) -> True
     _ -> False
 
 instantiateEVar_test20 :: Test
@@ -1621,6 +1621,157 @@ instantiateEVar_test24 :: Test
 instantiateEVar_test24 =
   case instantiateEVar context4 (ETypeVar "x") (MEVar (ETypeVar "x")) KStar () of
     Left (UndeclaredETypeVarError () (ETypeVar "x")) -> True
+    _ -> False
+
+--checkEquation :: Context -> Monotype -> Monotype -> Kind -> p -> Either (Error p) Context
+checkEquation_test1 :: Test
+checkEquation_test1 =
+  case checkEquation context1 (MArrow (MProduct MUnit MUnit) MUnit) (MArrow (MProduct MUnit MUnit) MUnit) KStar () of
+    Right c -> context1 == c
+    _ -> False
+
+checkEquation_test2 :: Test
+checkEquation_test2 =
+  case checkEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KNat () of
+    Right c -> context1 == c
+    _ -> False
+
+checkEquation_test3 :: Test
+checkEquation_test3 =
+  case checkEquation context1 (MArrow (MProduct MUnit MUnit) MUnit) (MArrow (MCoproduct MUnit MUnit) MUnit) KStar () of
+    Left (EquationFalseError () (MProduct MUnit MUnit) (MCoproduct MUnit MUnit) KStar) -> True
+    _ -> False
+
+checkEquation_test4 :: Test
+checkEquation_test4 =
+  case checkEquation context1 (MArrow (MProduct MUnit MUnit) MUnit) (MArrow (MProduct MUnit MUnit) MUnit) KNat () of
+    Left (EquationFalseError () (MArrow (MProduct MUnit MUnit) MUnit) (MArrow (MProduct MUnit MUnit) MUnit) KNat) -> True
+    _ -> False
+
+checkEquation_test5 :: Test
+checkEquation_test5 =
+  case checkEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KStar () of
+    Left (EquationFalseError () (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KStar) -> True
+    _ -> False
+
+checkEquation_test6 :: Test
+checkEquation_test6 =
+  case checkEquation context1 (MArrow (MProduct MUnit MUnit) MUnit) (MSucc (MSucc (MSucc MZero))) KStar () of
+    Left (EquationFalseError () (MArrow (MProduct MUnit MUnit) MUnit) (MSucc (MSucc (MSucc MZero))) KStar) -> True
+    _ -> False
+
+checkEquation_test7 :: Test
+checkEquation_test7 =
+  case checkEquation context1 (MArrow (MProduct MUnit MUnit) MUnit) (MSucc (MSucc (MSucc MZero))) KNat () of
+    Left (EquationFalseError () (MArrow (MProduct MUnit MUnit) MUnit) (MSucc (MSucc (MSucc MZero))) KNat) -> True
+    _ -> False
+
+checkEquation_test8 :: Test
+checkEquation_test8 =
+  case checkEquation context1 (MSucc (MSucc MZero)) (MSucc (MSucc (MSucc MZero))) KNat () of
+    Left (EquationFalseError ()  MZero (MSucc MZero) KNat)  -> True
+    _ -> False
+
+checkEquation_test9 :: Test
+checkEquation_test9 =
+  case checkEquation context1 (MArrow (MProduct MUnit MUnit) MUnit) (MSucc (MSucc (MSucc MZero))) KStar () of
+    Left (EquationFalseError () (MArrow (MProduct MUnit MUnit) MUnit) (MSucc (MSucc (MSucc MZero))) KStar) -> True
+    _ -> False
+
+checkEquation_test10 :: Test
+checkEquation_test10 =
+  case checkEquation context1 (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) KNat () of
+    Right c -> c == context1
+    _ -> False
+
+checkEquation_test11 :: Test
+checkEquation_test11 =
+  case checkEquation context1 (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MSucc (MUVar (UTypeVar "y"))))) KNat () of
+    Left (EquationFalseError () (MUVar (UTypeVar "x")) (MUVar (UTypeVar "y")) KNat) -> True
+    _ -> False
+
+checkEquation_test12 :: Test
+checkEquation_test12 =
+  case checkEquation context1 (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MUVar (UTypeVar "x")))) KNat () of
+    Left (EquationFalseError () (MSucc (MUVar (UTypeVar "x"))) (MUVar (UTypeVar "x")) KNat) -> True
+    _ -> False
+
+checkEquation_test13 :: Test
+checkEquation_test13 =
+  case checkEquation context1 (MEVar (ETypeVar "a")) MUnit KStar () of
+    Right c -> c == context3
+    _ -> False
+
+checkEquation_test14 :: Test
+checkEquation_test14 =
+  case checkEquation context1  MUnit (MEVar (ETypeVar "a")) KStar () of
+    Right c -> c == context3
+    _ -> False
+
+checkEquation_test15 :: Test
+checkEquation_test15 =
+  case checkEquation context1 (MEVar (ETypeVar "a")) MUnit KNat () of
+    Left (MonotypeHasWrongKindError () MUnit KNat KStar) -> True
+    _ -> False
+
+checkEquation_test16 :: Test
+checkEquation_test16 =
+  case checkEquation context1  MUnit (MEVar (ETypeVar "a")) KNat () of
+    Left (MonotypeHasWrongKindError () MUnit KNat KStar) -> True
+    _ -> False
+
+checkEquation_test17 :: Test
+checkEquation_test17 =
+  case checkEquation context5 (MEVar (ETypeVar "x")) (MEVar (ETypeVar "x")) KStar () of
+    Right c -> c == context5
+    _ -> False
+
+checkEquation_test18 :: Test
+checkEquation_test18 =
+  case checkEquation context2 (MEVar (ETypeVar "x")) (MCoproduct (MEVar (ETypeVar "x")) (MEVar (ETypeVar "x"))) KStar () of
+    Left (EquationFalseError () (MEVar (ETypeVar "x")) (MCoproduct (MEVar (ETypeVar "x")) (MEVar (ETypeVar "x"))) KStar) -> True
+    _ -> False
+
+checkEquation_test19 :: Test
+checkEquation_test19 =
+  case checkEquation context2 (MEVar (ETypeVar "b")) (MCoproduct (MEVar (ETypeVar "c")) (MEVar (ETypeVar "c"))) KStar () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MCoproduct (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
+           CETypeVar (ETypeVar "b-1") KStar (MEVar (ETypeVar "c")), CETypeVar (ETypeVar "b-2") KStar (MEVar (ETypeVar "c")),
+           CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+checkEquation_test20 :: Test
+checkEquation_test20 =
+  case checkEquation context2 (MEVar (ETypeVar "b")) (MCoproduct (MEVar (ETypeVar "y")) (MEVar (ETypeVar "z"))) KStar () of
+    Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
+    _ -> False
+
+checkEquation_test21 :: Test
+checkEquation_test21 =
+  case checkEquation [CTypeVar (E (ETypeVar "k")) KNat, CTypeVar (E (ETypeVar "a")) KNat] (MEVar (ETypeVar "a")) (MSucc (MEVar (ETypeVar "k"))) KNat () of
+    Right [CETypeVar (ETypeVar "k") KNat (MEVar (ETypeVar "a-1")), CETypeVar (ETypeVar "a") KNat (MSucc (MEVar (ETypeVar "a-1"))),
+           CTypeVar (E (ETypeVar "a-1")) KNat] -> True
+    _ -> False
+
+checkEquation_test22 :: Test
+checkEquation_test22 =
+  case checkEquation [CTypeVar (E (ETypeVar "k")) KNat, CTypeVar (E (ETypeVar "a")) KNat] (MEVar (ETypeVar "a")) (MSucc (MEVar (ETypeVar "r"))) KNat () of
+    Left (UndeclaredETypeVarError () (ETypeVar "r")) -> True
+    _ -> False
+
+checkEquation_test23 :: Test
+checkEquation_test23 =
+  case checkEquation context2 (MEVar (ETypeVar "b")) (MCoproduct (MArrow (MEVar (ETypeVar "c")) MUnit) (MEVar (ETypeVar "c"))) KStar () of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MCoproduct (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
+           CETypeVar (ETypeVar "b-1") KStar (MArrow (MEVar (ETypeVar "b-1-1")) (MEVar (ETypeVar "b-1-2"))),
+           CETypeVar (ETypeVar "b-1-1") KStar (MEVar (ETypeVar "c")), CETypeVar (ETypeVar "b-1-2") KStar MUnit,
+           CETypeVar (ETypeVar "b-2") KStar (MEVar (ETypeVar "c")), CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+checkEquation_test24 :: Test
+checkEquation_test24 =
+  case checkEquation context2 (MEVar (ETypeVar "b")) (MCoproduct (MArrow (MEVar (ETypeVar "r")) MUnit) (MEVar (ETypeVar "c"))) KStar () of
+    Left (UndeclaredETypeVarError () (ETypeVar "r")) -> True
     _ -> False
 
 --checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
@@ -2148,6 +2299,30 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("instantiateEVar_test22", instantiateEVar_test22),
          ("instantiateEVar_test23", instantiateEVar_test23),
          ("instantiateEVar_test24", instantiateEVar_test24),
+         ("checkEquation_test1", checkEquation_test1),
+         ("checkEquation_test2", checkEquation_test2),
+         ("checkEquation_test3", checkEquation_test3),
+         ("checkEquation_test4", checkEquation_test4),
+         ("checkEquation_test5", checkEquation_test5),
+         ("checkEquation_test6", checkEquation_test6),
+         ("checkEquation_test7", checkEquation_test7),
+         ("checkEquation_test8", checkEquation_test8),
+         ("checkEquation_test9", checkEquation_test9),
+         ("checkEquation_test10", checkEquation_test10),
+         ("checkEquation_test11", checkEquation_test11),
+         ("checkEquation_test12", checkEquation_test12),
+         ("checkEquation_test13", checkEquation_test13),
+         ("checkEquation_test14", checkEquation_test14),
+         ("checkEquation_test15", checkEquation_test15),
+         ("checkEquation_test16", checkEquation_test16),
+         ("checkEquation_test17", checkEquation_test17),
+         ("checkEquation_test18", checkEquation_test18),
+         ("checkEquation_test19", checkEquation_test19),
+         ("checkEquation_test20", checkEquation_test20),
+         ("checkEquation_test21", checkEquation_test21),
+         ("checkEquation_test22", checkEquation_test22),
+         ("checkEquation_test23", checkEquation_test23),
+         ("checkEquation_test24", checkEquation_test24),
          ("checkExpr_EUnit_test1", checkExpr_EUnit_test1),
          ("checkExpr_EUnit_test2", checkExpr_EUnit_test2),
          ("checkExpr_EUnit_test3", checkExpr_EUnit_test3),

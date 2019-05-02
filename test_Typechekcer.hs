@@ -14,7 +14,7 @@ context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeV
             CVar "r" (TEVar $ ETypeVar "z") NotPrincipal, CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "b") KNat (MSucc MZero)]
 
 context2 :: Context
-context2 = [CTypeVar (E $ ETypeVar "a") KNat, CMarker, CTypeVar (E $ ETypeVar "b") KStar, CTypeVar (E $ ETypeVar "c") KStar]
+context2 = [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar]
 
 context3 :: Context
 context3 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
@@ -1774,6 +1774,66 @@ checkEquation_test24 =
     Left (UndeclaredETypeVarError () (ETypeVar "r")) -> True
     _ -> False
 
+--equivalentProp :: Context -> Proposition -> Proposition -> p -> Either (Error p) Context
+
+equivalentProp_test1 :: Test
+equivalentProp_test1 =
+  case equivalentProp context1 (MArrow (MProduct MUnit MUnit) MUnit, MCoproduct MUnit (MProduct MUnit MUnit))
+                               (MArrow (MProduct MUnit MUnit) MUnit, MCoproduct MUnit (MProduct MUnit MUnit)) () of
+    Right c -> c == context1
+    _ -> False
+
+equivalentProp_test2 :: Test
+equivalentProp_test2 =
+  case equivalentProp context1 (MArrow (MProduct MUnit MUnit) MUnit, MCoproduct MUnit (MProduct MUnit MUnit))
+                               (MArrow (MProduct MUnit MUnit) MUnit, MCoproduct MUnit (MArrow MUnit MUnit)) () of
+    Left (EquationFalseError () (MProduct MUnit MUnit) (MArrow MUnit MUnit) KStar) -> True
+    _ -> False
+
+equivalentProp_test3 :: Test
+equivalentProp_test3 =
+  case equivalentProp context1 (MArrow (MProduct (MCoproduct MUnit MUnit) MUnit) MUnit, MCoproduct MUnit (MProduct MUnit MUnit))
+                               (MArrow (MProduct MUnit MUnit) MUnit, MCoproduct MUnit (MArrow MUnit MUnit)) () of
+    Left (EquationFalseError () (MCoproduct MUnit MUnit) MUnit KStar) -> True
+    _ -> False
+
+equivalentProp_test4 :: Test
+equivalentProp_test4 =
+  case equivalentProp context1 (MArrow (MProduct (MCoproduct MUnit MUnit) MUnit) MUnit, MSucc MZero)
+                               (MArrow (MProduct MUnit MUnit) MUnit, MCoproduct MUnit (MArrow MUnit MUnit)) () of
+    Left (MonotypeHasWrongKindError () (MSucc MZero) KStar KNat) -> True
+    _ -> False
+
+equivalentProp_test5 :: Test
+equivalentProp_test5 =
+  case equivalentProp context1 (MZero, MSucc MZero) (MZero, MSucc MZero) () of
+    Right c -> c == context1
+    _ -> False
+
+equivalentProp_test6 :: Test
+equivalentProp_test6 =
+  case equivalentProp context1 (MZero, MSucc MZero) (MZero, MSucc (MSucc MZero)) () of
+    Left (EquationFalseError () MZero (MSucc MZero) KNat) -> True
+    _ -> False
+
+equivalentProp_test7 :: Test
+equivalentProp_test7 =
+  case equivalentProp context2 (MEVar (ETypeVar "a"),  MSucc (MSucc MZero)) (MZero, MSucc (MSucc MZero)) () of
+    Right [CETypeVar (ETypeVar "a") KNat MZero, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+equivalentProp_test8 :: Test
+equivalentProp_test8 =
+  case equivalentProp context5 (MSucc MZero, MEVar (ETypeVar "a")) (MSucc MZero, MZero) () of
+    Left (UndeclaredETypeVarError () (ETypeVar "a")) -> True
+    _ -> False
+
+equivalentProp_test9 :: Test
+equivalentProp_test9 =
+  case equivalentProp context5 (MEVar (ETypeVar "a"), MSucc (MEVar $ ETypeVar "R")) (MEVar (ETypeVar "a"), MSucc (MEVar $ ETypeVar "R")) () of
+    Left (UndeclaredETypeVarError () (ETypeVar "a")) -> True
+    _ -> False
+
 --checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr_EUnit_test1 :: Test
 checkExpr_EUnit_test1 =
@@ -2323,6 +2383,15 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("checkEquation_test22", checkEquation_test22),
          ("checkEquation_test23", checkEquation_test23),
          ("checkEquation_test24", checkEquation_test24),
+         ("equivalentProp_test1", equivalentProp_test1),
+         ("equivalentProp_test2", equivalentProp_test2),
+         ("equivalentProp_test3", equivalentProp_test3),
+         ("equivalentProp_test4", equivalentProp_test4),
+         ("equivalentProp_test5", equivalentProp_test5),
+         ("equivalentProp_test6", equivalentProp_test6),
+         ("equivalentProp_test7", equivalentProp_test7),
+         ("equivalentProp_test8", equivalentProp_test8),
+         ("equivalentProp_test9", equivalentProp_test9),
          ("checkExpr_EUnit_test1", checkExpr_EUnit_test1),
          ("checkExpr_EUnit_test2", checkExpr_EUnit_test2),
          ("checkExpr_EUnit_test3", checkExpr_EUnit_test3),

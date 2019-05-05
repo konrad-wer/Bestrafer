@@ -16,7 +16,6 @@ data Error p
   | TypeIsNotMonotypeError p Type
   | TypeFormednessPrcFEVError p [ETypeVar]
   | TypesNotEquivalentError p Type Type
-  | ETypeVarAlreadySolvedError p ETypeVar Monotype Monotype
   | EquationFalseError p Monotype Monotype Kind
   | NotSubtypeError p Type Type
   deriving (Show, Eq)

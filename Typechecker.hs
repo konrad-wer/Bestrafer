@@ -63,31 +63,40 @@ inferMonotypeKind c (MUVar x) p =
 checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
 checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotypeHasKind c m2 p
 
-subtype :: Context -> Type -> Polarity -> Type -> p -> Either (Error p) Context
+--evalStateT (subtype c t1 pol t2 p) 0
+subtype :: Context -> Type -> Polarity -> Type -> p -> StateT Integer (Either (Error p)) Context
 subtype c t1 pol t2 p
   | not (headedByUniversal t1) && not (headedByExistential t1) &&
-    not (headedByUniversal t2) && not (headedByExistential t2) = evalStateT (equivalentType c t1 t2 p) 0
+    not (headedByUniversal t2) && not (headedByExistential t2) = equivalentType c t1 t2 p
   | headedByUniversal t1 && not (headedByUniversal t2) && neg pol = do
       let (TUniversal (UTypeVar a) k t) = t1
-      c2 <- subtype (CTypeVar (E $ ETypeVar a) k : CMarker : c) (substituteUVarInType (UTypeVar a) (E $ ETypeVar a) t) Negative t2 p
+      e <- ETypeVar . ("#" ++) . show <$> get
+      modify (+ 1)
+      c2 <- subtype (CTypeVar (E e) k : CMarker : c) (substituteUVarInType (UTypeVar a) (E e) t) Negative t2 p
       return $ dropContextToMarker c2
   | headedByUniversal t2 && neg pol = do
       let (TUniversal (UTypeVar b) k t) = t2
-      c2 <- subtype (CTypeVar (U $ UTypeVar b) k : CMarker : c) t1 Negative t p
+      u <- UTypeVar . ("#" ++) . show <$> get
+      modify (+ 1)
+      c2 <- subtype (CTypeVar (U u) k : CMarker : c) t1 Negative (substituteUVarInType (UTypeVar b) (U u) t) p
       return $ dropContextToMarker c2
   | headedByExistential t1 && pos pol = do
       let (TExistential (UTypeVar a) k t) = t1
-      c2 <- subtype (CTypeVar (U $ UTypeVar a) k : CMarker : c) t Positive t2 p
+      u <- UTypeVar . ("#" ++) . show <$> get
+      modify (+ 1)
+      c2 <- subtype (CTypeVar (U u) k : CMarker : c) (substituteUVarInType (UTypeVar a) (U u) t) Positive t2 p
       return $ dropContextToMarker c2
   | not (headedByExistential t1) && headedByExistential t2 && pos pol = do
       let TExistential (UTypeVar b) k t = t2
-      c2 <- subtype (CTypeVar (E $ ETypeVar b) k : CMarker : c) t1 Positive (substituteUVarInType (UTypeVar b) (E $ ETypeVar b) t) p
+      e <- ETypeVar . ("#" ++) . show <$> get
+      modify (+ 1)
+      c2 <- subtype (CTypeVar (E e) k : CMarker : c) t1 Positive (substituteUVarInType (UTypeVar b) (E e) t) p
       return $ dropContextToMarker c2
   | pos pol && (neg . polarity $ t1) && (nonpos . polarity $ t2) = subtype c t1 Negative t2 p
   | pos pol && (nonpos . polarity $ t1) && (neg . polarity $ t2) = subtype c t1 Negative t2 p
   | neg pol && (pos . polarity $ t1) && (nonneg . polarity $ t2) = subtype c t1 Positive t2 p
   | neg pol && (nonneg . polarity $ t1) && (pos . polarity $ t2) = subtype c t1 Positive t2 p
-  | otherwise = Left $ NotSubtypeError p t1 t2
+  | otherwise = lift . Left $ NotSubtypeError p t1 t2
 
 equivalentTypeBinary ::
   Context
@@ -205,15 +214,15 @@ instantiateEVar c a (MProduct m1 m2) KStar p = do
 instantiateEVar c a (MEVar b) k1 p
   | a == b = do
       case typeVarContextLookup c (eTypeVarName a) of
-        Just (CTypeVar (E _) k) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k1 k
-        Just (CETypeVar _ k _) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k1 k
+        Just (CTypeVar (E _) k) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k k1
+        Just (CETypeVar _ k _) -> if k == k1 then return () else Left $ ETypeVarKindMismatchError p a k k1
         _ ->  Left $ UndeclaredETypeVarError p a
       return c
   | otherwise = do
       c2 <- takeContextToETypeVar a c p
       replaceB <- case typeVarContextLookup c2 (eTypeVarName b) of
-        Just (CTypeVar (E _) k) -> if k == k1 then return True else Left $ ETypeVarKindMismatchError p b k1 k
-        Just (CETypeVar _ k _)  -> if k == k1 then return True else Left $ ETypeVarKindMismatchError p a k1 k
+        Just (CTypeVar (E _) k) -> if k == k1 then return True else Left $ ETypeVarKindMismatchError p b k k1
+        Just (CETypeVar _ k _)  -> if k == k1 then return True else Left $ ETypeVarKindMismatchError p a k k1
         Nothing -> return False
         _ ->  Left $ UndeclaredETypeVarError p b
       if replaceB then

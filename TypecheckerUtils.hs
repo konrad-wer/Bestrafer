@@ -48,12 +48,12 @@ nonneg :: Polarity -> Bool
 nonneg Negative = False
 nonneg _ = True
 
-join :: Polarity -> Polarity -> Polarity
-join Positive _ = Positive
-join Negative _ = Negative
-join Neutral Positive = Positive
-join Neutral Negative = Negative
-join Neutral Neutral = Negative
+joinPolarity :: Polarity -> Polarity -> Polarity
+joinPolarity Positive _ = Positive
+joinPolarity Negative _ = Negative
+joinPolarity Neutral Positive = Positive
+joinPolarity Neutral Negative = Negative
+joinPolarity Neutral Neutral = Negative
 
 headedByUniversal :: Type -> Bool
 headedByUniversal TUniversal {} = True

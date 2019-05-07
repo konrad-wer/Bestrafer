@@ -2043,6 +2043,115 @@ equivalentType_test27 =
     Right [CETypeVar (ETypeVar "a") KStar MUnit] -> True
     _ -> False
 
+--subtype :: Context -> Type -> Polarity -> Type -> p -> StateT Integer (Either (Error p)) Context
+subtype_test1 :: Test
+subtype_test1 =
+  case flip evalStateT 0 $ subtype [CTypeVar (E (ETypeVar "x")) KStar] (TArrow (TUVar (UTypeVar "r")) (TEVar (ETypeVar "x")))
+                          (joinPolarity (polarity (TArrow (TUVar (UTypeVar "r")) (TEVar (ETypeVar "x")))) (polarity (TArrow (TUVar (UTypeVar "r")) TUnit)))
+                          (TArrow (TUVar (UTypeVar "r")) TUnit) () of
+    Right [CETypeVar (ETypeVar "x") KStar MUnit] -> True
+    _ -> False
+
+subtype_test2 :: Test
+subtype_test2 =
+  case flip evalStateT 0 $ subtype context5 (TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                          (joinPolarity (polarity $ TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) (polarity $ TProduct TUnit TUnit))
+                          (TProduct TUnit TUnit) () of
+    Right c -> c == context5
+    _ -> False
+
+subtype_test3 :: Test
+subtype_test3 =
+  case flip evalStateT 0 $ subtype context5 (TProduct TUnit TUnit)
+                          (joinPolarity  (polarity $ TProduct TUnit TUnit) (polarity $ TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x"))))
+                          (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) () of
+    Right c -> c == context5
+    _ -> False
+
+subtype_test4 :: Test
+subtype_test4 =
+  case flip evalStateT 0 $ subtype context5 (TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                          (joinPolarity (polarity $ TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                          (polarity $ TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x"))))
+                          (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) () of
+    Right c -> c == context5
+    _ -> False
+
+subtype_test5 :: Test
+subtype_test5 =
+  case flip evalStateT 0 $ subtype context5 (TUniversal (UTypeVar "x") KStar (TArrow TUnit (TUVar (UTypeVar "x"))))
+                          (joinPolarity (polarity $ TUniversal (UTypeVar "x") KStar (TArrow TUnit (TUVar (UTypeVar "x"))))
+                          (polarity $ TExistential (UTypeVar "x") KStar (TArrow (TUVar (UTypeVar "x")) TUnit)))
+                          (TExistential (UTypeVar "x") KStar (TArrow (TUVar (UTypeVar "x")) TUnit)) () of
+    Right c -> c == context5
+    _ -> False
+
+subtype_test6 :: Test
+subtype_test6 =
+  case flip evalStateT 0 $ subtype context5 (TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                          (joinPolarity (polarity $ TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                          (polarity $ TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x"))))
+                          (TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) () of
+    Right c -> c == context5
+    _ -> False
+
+subtype_test7 :: Test
+subtype_test7 =
+  case flip evalStateT 0 $ subtype context5 (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                          (joinPolarity (polarity $ TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                          (polarity $ TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x"))))
+                          (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) () of
+    Right c -> c == context5
+    _ -> False
+
+subtype_test8 :: Test
+subtype_test8 =
+  case flip evalStateT 0 $ subtype context5 (TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                           Positive (TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) () of
+    Right c -> c == context5
+    _ -> False
+
+subtype_test9 :: Test
+subtype_test9 =
+  case flip evalStateT 0 $ subtype context5 (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                           Negative (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) () of
+    Right c -> c == context5
+    _ -> False
+
+subtype_test10 :: Test
+subtype_test10 =
+  case flip evalStateT 0 $ subtype [] (TUVar (UTypeVar "y")) Positive (TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "y"))) () of
+    Right [] -> True
+    _ -> False
+
+subtype_test11 :: Test
+subtype_test11 =
+  case flip evalStateT 0 $ subtype context4 (TUVar (UTypeVar "x")) Negative (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) () of
+    Right c -> c == context4
+    _ -> False
+
+subtype_test12 :: Test
+subtype_test12 =
+  case flip evalStateT 0 $ subtype context1
+                          (TUniversal (UTypeVar "x") KStar (TUniversal (UTypeVar "y") KStar (TArrow (TUVar (UTypeVar "x")) (TUVar (UTypeVar "y")))))
+                           Negative
+                          (TExistential (UTypeVar "a") KStar (TExistential (UTypeVar "b") KStar (TArrow (TUVar (UTypeVar "b"))  (TUVar (UTypeVar "a"))))) () of
+    Right c -> c == context1
+    _ -> False
+
+subtype_test13 :: Test
+subtype_test13 =
+  case flip evalStateT 0 $ subtype [] (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x")))
+                           Positive (TUniversal (UTypeVar "x") KStar (TUVar (UTypeVar "x"))) () of
+    Left (TypesNotEquivalentError () (TUVar (UTypeVar "#0")) (TUVar (UTypeVar "#1"))) -> True
+    _ -> False
+
+subtype_test14 :: Test
+subtype_test14 =
+  case flip evalStateT 0 $ subtype [] TUnit Positive (TArrow TUnit TUnit) () of
+    Left (TypesNotEquivalentError () TUnit (TArrow TUnit TUnit)) -> True
+    _ -> False
+
 --checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
 checkExpr_EUnit_test1 :: Test
 checkExpr_EUnit_test1 =
@@ -2629,6 +2738,20 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("equivalentType_test25", equivalentType_test25),
          ("equivalentType_test26", equivalentType_test26),
          ("equivalentType_test27", equivalentType_test27),
+         ("subtype_test1", subtype_test1),
+         ("subtype_test2", subtype_test2),
+         ("subtype_test3", subtype_test3),
+         ("subtype_test4", subtype_test4),
+         ("subtype_test5", subtype_test5),
+         ("subtype_test6", subtype_test6),
+         ("subtype_test7", subtype_test7),
+         ("subtype_test8", subtype_test8),
+         ("subtype_test9", subtype_test9),
+         ("subtype_test10", subtype_test10),
+         ("subtype_test11", subtype_test11),
+         ("subtype_test12", subtype_test12),
+         ("subtype_test13", subtype_test13),
+         ("subtype_test14", subtype_test14),
          ("checkExpr_EUnit_test1", checkExpr_EUnit_test1),
          ("checkExpr_EUnit_test2", checkExpr_EUnit_test2),
          ("checkExpr_EUnit_test3", checkExpr_EUnit_test3),

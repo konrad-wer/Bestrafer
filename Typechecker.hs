@@ -16,7 +16,7 @@ checkTypeWellFormedness :: Context -> Type -> p -> Either (Error p) ()
 checkTypeWellFormedness _ TUnit _ = return ()
 checkTypeWellFormedness c (TArrow t1 t2) p = checkTypeWellFormedness c t1 p >> checkTypeWellFormedness c t2 p
 checkTypeWellFormedness c (TCoproduct t1 t2) p = checkTypeWellFormedness c t1 p >> checkTypeWellFormedness c t2 p
-checkTypeWellFormedness c (TProduct t1 t2) p = checkTypeWellFormedness c t1 p >> checkTypeWellFormedness c t2 p
+checkTypeWellFormedness c (TProduct ts _) p = foldM_ ((.)(.)(.) (flip (checkTypeWellFormedness c) p) (flip const)) () ts
 checkTypeWellFormedness c (TImp pr t) p = checkPropWellFormedness c pr p >> checkTypeWellFormedness c t p
 checkTypeWellFormedness c (TAnd t pr) p = checkTypeWellFormedness c t p >> checkPropWellFormedness c pr p
 checkTypeWellFormedness c (TUniversal x k t) p = checkTypeWellFormedness (CTypeVar (U x) k : c) t p
@@ -49,7 +49,7 @@ inferMonotypeKind _ MZero _ = return KNat
 inferMonotypeKind c (MSucc n) p = checkMonotypeHasKind c n p KNat >> return KNat
 inferMonotypeKind c (MArrow m1 m2) p = checkMonotypeHasKind c m1 p KStar >> checkMonotypeHasKind c m2 p KStar >> return KStar
 inferMonotypeKind c (MCoproduct m1 m2) p = checkMonotypeHasKind c m1 p KStar >> checkMonotypeHasKind c m2 p KStar >> return KStar
-inferMonotypeKind c (MProduct m1 m2) p = checkMonotypeHasKind c m1 p KStar >> checkMonotypeHasKind c m2 p KStar >> return KStar
+inferMonotypeKind c (MProduct ms _) p = foldM_ ((.)(.)(.) (flip (flip (checkMonotypeHasKind c) p) KStar) (flip const)) () ms >> return KStar
 inferMonotypeKind c (MEVar x) p =
   case typeVarContextLookup c $ eTypeVarName x of
     Just (CTypeVar (E _) k) -> return k
@@ -138,7 +138,17 @@ equivalentType :: Context -> Type -> Type -> p -> StateT Integer (Either (Error 
 equivalentType c TUnit TUnit _ = return c
 equivalentType c (TArrow a1 a2) (TArrow b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
 equivalentType c (TCoproduct a1 a2) (TCoproduct b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
-equivalentType c (TProduct a1 a2) (TProduct b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
+equivalentType c (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2) p =
+  if n1 /= n2 then
+    lift $ Left (TypesNotEquivalentError p (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2))
+  else do
+    c2 <- equivalentType c t1 t2 p
+    foldM aux c2 $ zip ts1 ts2
+  where
+    aux _c (tl, tr) = do
+      tl' <- lift $ applyContextToType _c tl p
+      tr' <- lift $ applyContextToType _c tr p
+      equivalentType _c tl' tr' p
 equivalentType c (TVec n1 t1) (TVec n2 t2) p = do
   c2 <- lift $ checkEquation c n1 n2 KNat p
   t1'<- lift $ applyContextToType c2 t1 p
@@ -207,10 +217,15 @@ instantiateEVar c a (MCoproduct m1 m2) KStar p = do
   let (a1, a2) = generateSubETypeVars a
   c2 <- eTypeVarContextReplace c a KStar (MCoproduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
   instantiateEVarBinary c2 a1 a2 m1 m2 p
-instantiateEVar c a (MProduct m1 m2) KStar p = do
-  let (a1, a2) = generateSubETypeVars a
-  c2 <- eTypeVarContextReplace c a KStar (MProduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
-  instantiateEVarBinary c2 a1 a2 m1 m2 p
+instantiateEVar c a (MProduct (m1 : ms) n) KStar p = do
+  let a1 : as = generateSubETypeVarsList a n
+  c2 <- eTypeVarContextReplace c a KStar (MProduct (map MEVar (a1 : as)) n) (map (flip CTypeVar KStar . E) $ a1 : as) p
+  c3 <-instantiateEVar c2 a1 m1 KStar p
+  foldM aux c3 $ zip as ms
+  where
+    aux _c  (_a, m) = do
+      m'<- applyContextToMonotype _c m p
+      instantiateEVar _c _a m' KStar p
 instantiateEVar c a (MEVar b) k1 p
   | a == b = do
       case typeVarContextLookup c (eTypeVarName a) of
@@ -255,7 +270,17 @@ checkEquation c (MUVar a) (MUVar b) k p
   | otherwise = Left $ EquationFalseError p (MUVar a) (MUVar b) k
 checkEquation c (MArrow m1 m2) (MArrow n1 n2) KStar p = checkEquationBinary c m1 m2 n1 n2 p
 checkEquation c (MCoproduct m1 m2) (MCoproduct n1 n2) KStar p = checkEquationBinary c m1 m2 n1 n2 p
-checkEquation c (MProduct m1 m2) (MProduct n1 n2) KStar p = checkEquationBinary c m1 m2 n1 n2 p
+checkEquation c (MProduct (m1 : ms1) n1) (MProduct (m2 : ms2) n2) KStar p =
+  if n1 /= n2 then
+    Left (EquationFalseError p (MProduct (m1 : ms1) n1) (MProduct (m2 : ms2) n2) KStar)
+  else do
+    c2 <- checkEquation c m1 m2 KStar p
+    foldM aux c2 $ zip ms1 ms2
+  where
+    aux _c (ml, mr) = do
+      ml' <- applyContextToMonotype _c ml p
+      mr' <- applyContextToMonotype _c mr p
+      checkEquation _c ml' mr' KStar p
 checkEquation c (MSucc n1) (MSucc n2) KNat p = checkEquation c n1 n2 KNat p
 checkEquation c m1 @ (MEVar a) m2 k p
   | m1 == m2 = return c
@@ -277,16 +302,25 @@ checkExpr c (ELambda p x e) (TEVar a) _ = do
   c2 <- eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
   c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
   return $ dropContextToMarker c3
-checkExpr c (EPair p e1 e2) (TProduct t1 t2) pr = do
-  c2 <- checkExpr c e1 t1 pr
-  t2' <- applyContextToType c2 t2 p
-  checkExpr c2 e2 t2' pr
-checkExpr c (EPair p e1 e2) (TEVar a) _ = do
-  let (a1, a2) = generateSubETypeVars a
-  c2 <- eTypeVarContextReplace c a KStar (MProduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
+checkExpr c (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2) pr =
+  if n1 /= n2 then
+    Left (TypecheckingError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2))
+  else do
+    c2 <- checkExpr c e1 t1 pr
+    foldM aux c2 $ zip es ts
+  where
+    aux _c (e, t) = do
+      t' <- applyContextToType _c t p
+      checkExpr _c e t' pr
+checkExpr c (ETuple p (e1 : es) n) (TEVar a) _ = do
+  let a1 : as = generateSubETypeVarsList a n
+  c2 <- eTypeVarContextReplace c a KStar (MProduct (map MEVar (a1 : as)) n) (map (flip CTypeVar KStar . E) $ a1 : as) p
   c3 <- checkExpr c2 e1 (TEVar a1) NotPrincipal
-  t2 <- applyContextToType c3 (TEVar a2) p
-  checkExpr c3 e2 t2 NotPrincipal
+  foldM aux c3 $ zip es $ map TEVar as
+  where
+    aux _c (e, t) = do
+      t' <- applyContextToType _c t p
+      checkExpr _c e t' NotPrincipal
 checkExpr c (EInjk _ e k) (TCoproduct t1 t2) pr = checkExpr c e ([t1, t2] !! k) pr
 checkExpr c (EInjk p e k) (TEVar a) _ = do
   let (a1, a2) = generateSubETypeVars a

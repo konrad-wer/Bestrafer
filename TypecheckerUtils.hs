@@ -18,12 +18,16 @@ data Error p
   | TypesNotEquivalentError p Type Type
   | EquationFalseError p Monotype Monotype Kind
   | NotSubtypeError p Type Type
-  deriving (Show, Eq)
+  | TypecheckingError (Expr p) Type
+  deriving (Show)
 
 --simple utils------------------------------------------------------------------
 
 generateSubETypeVars :: ETypeVar -> (ETypeVar, ETypeVar)
 generateSubETypeVars a = (ETypeVar $ eTypeVarName a ++ "-1", ETypeVar $ eTypeVarName a ++ "-2")
+
+generateSubETypeVarsList :: ETypeVar -> Int -> [ETypeVar]
+generateSubETypeVarsList a n = [ETypeVar $ eTypeVarName a ++ "-" ++ show k | k <- [1..n]]
 
 --polarity utils----------------------------------------------------------------
 
@@ -69,7 +73,7 @@ freeExistentialVariables :: Type -> Set.Set ETypeVar
 freeExistentialVariables TUnit = Set.empty
 freeExistentialVariables (TArrow t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
 freeExistentialVariables (TCoproduct t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
-freeExistentialVariables (TProduct t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
+freeExistentialVariables (TProduct ts _) = Set.unions $ map freeExistentialVariables ts
 freeExistentialVariables (TUVar _) = Set.empty
 freeExistentialVariables (TEVar x) = Set.singleton x
 freeExistentialVariables (TUniversal _ _ t) = freeExistentialVariables t
@@ -87,7 +91,7 @@ freeExistentialVariablesOfMonotype MZero = Set.empty
 freeExistentialVariablesOfMonotype (MSucc n) = freeExistentialVariablesOfMonotype n
 freeExistentialVariablesOfMonotype (MArrow m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
 freeExistentialVariablesOfMonotype (MCoproduct m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
-freeExistentialVariablesOfMonotype (MProduct m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
+freeExistentialVariablesOfMonotype (MProduct ms _) = Set.unions $ map freeExistentialVariablesOfMonotype ms
 freeExistentialVariablesOfMonotype (MUVar _) = Set.empty
 freeExistentialVariablesOfMonotype (MEVar x) = Set.singleton x
 
@@ -97,7 +101,7 @@ freeVariablesOfMonotype MZero = Set.empty
 freeVariablesOfMonotype (MSucc n) = freeVariablesOfMonotype n
 freeVariablesOfMonotype (MArrow m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
 freeVariablesOfMonotype (MCoproduct m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
-freeVariablesOfMonotype (MProduct m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
+freeVariablesOfMonotype (MProduct ms _) = Set.unions $ map freeVariablesOfMonotype ms
 freeVariablesOfMonotype (MUVar x) = Set.singleton $ uTypeVarName x
 freeVariablesOfMonotype (MEVar x) = Set.singleton $ eTypeVarName x
 
@@ -192,7 +196,7 @@ substituteUVarInType :: UTypeVar -> TypeVar -> Type -> Type
 substituteUVarInType _ _ TUnit = TUnit
 substituteUVarInType u x (TArrow t1 t2) = TArrow (substituteUVarInType u x t1) (substituteUVarInType u x t2)
 substituteUVarInType u x (TCoproduct t1 t2) = TCoproduct (substituteUVarInType u x t1) (substituteUVarInType u x t2)
-substituteUVarInType u x (TProduct t1 t2) = TProduct (substituteUVarInType u x t1) (substituteUVarInType u x t2)
+substituteUVarInType u x (TProduct ts n) = TProduct (map (substituteUVarInType u x) ts) n
 substituteUVarInType u x (TUVar a)
   | u == a =  case x of
     E e -> TEVar e
@@ -218,7 +222,7 @@ substituteUVarInMonotype _ _ MZero = MZero
 substituteUVarInMonotype u x (MSucc n) = MSucc $ substituteUVarInMonotype u x n
 substituteUVarInMonotype u x (MArrow m1 m2) = MArrow (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
 substituteUVarInMonotype u x (MCoproduct m1 m2) = MCoproduct (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
-substituteUVarInMonotype u x (MProduct m1 m2) = MProduct (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
+substituteUVarInMonotype u x (MProduct ms n) = MProduct (map (substituteUVarInMonotype u x) ms) n
 substituteUVarInMonotype u x (MUVar a)
   | u == a = case x of
     E e -> MEVar e
@@ -232,7 +236,7 @@ monotypeToType :: Monotype -> p -> Either (Error p) Type
 monotypeToType MUnit _ = return TUnit
 monotypeToType (MArrow m1 m2) p = TArrow <$> monotypeToType m1 p <*> monotypeToType m2 p
 monotypeToType (MCoproduct m1 m2) p = TCoproduct <$> monotypeToType m1 p <*> monotypeToType m2 p
-monotypeToType (MProduct m1 m2) p = TProduct <$> monotypeToType m1 p <*> monotypeToType m2 p
+monotypeToType (MProduct ms n) p = TProduct <$> mapM (`monotypeToType` p) ms <*> return n
 monotypeToType (MEVar x) _ = return $ TEVar x
 monotypeToType (MUVar x) _ = return $ TUVar x
 monotypeToType n p = Left $ MonotypeIsNotTypeError p n
@@ -243,7 +247,7 @@ typeToMonotype (TUVar a) _ = return $ MUVar a
 typeToMonotype (TEVar a) _ = return $ MEVar a
 typeToMonotype (TArrow t1 t2) p = MArrow <$> typeToMonotype t1 p <*> typeToMonotype t2 p
 typeToMonotype (TCoproduct t1 t2) p = MCoproduct <$> typeToMonotype t1 p <*> typeToMonotype t2 p
-typeToMonotype (TProduct t1 t2) p = MProduct <$> typeToMonotype t1 p <*> typeToMonotype t2 p
+typeToMonotype (TProduct ts n) p = MProduct <$> mapM (`typeToMonotype` p) ts <*> return n
 typeToMonotype t p = Left $ TypeIsNotMonotypeError p t
 
 --Context application-----------------------------------------------------------
@@ -257,7 +261,7 @@ applyContextToType c (TImp pr t) p = TImp <$> applyContextToProposition c pr p <
 applyContextToType c (TAnd t pr) p = TAnd <$> applyContextToType c t p <*> applyContextToProposition c pr p
 applyContextToType c (TArrow t1 t2) p = TArrow <$> applyContextToType c t1 p <*> applyContextToType c t2 p
 applyContextToType c (TCoproduct t1 t2) p = TCoproduct <$> applyContextToType c t1 p <*> applyContextToType c t2 p
-applyContextToType c (TProduct t1 t2) p = TProduct <$> applyContextToType c t1 p <*> applyContextToType c t2 p
+applyContextToType c (TProduct ts n) p = TProduct <$> mapM (flip (applyContextToType c) p) ts <*> return n
 applyContextToType c (TVec n t) p = TVec <$> applyContextToMonotype c n p <*> applyContextToType c t p
 applyContextToType c (TEVar e) p =
   case typeVarContextLookup c $ eTypeVarName e of
@@ -277,7 +281,7 @@ applyContextToMonotype c (MUVar u) p =
     _ -> return $ MUVar u
 applyContextToMonotype c (MArrow m1 m2) p = MArrow <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
 applyContextToMonotype c (MCoproduct m1 m2) p = MCoproduct <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
-applyContextToMonotype c (MProduct m1 m2) p = MProduct <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
+applyContextToMonotype c (MProduct ms n) p = MProduct <$> mapM (flip (applyContextToMonotype c) p) ms  <*> return n
 applyContextToMonotype c (MEVar e) p =
   case typeVarContextLookup c $ eTypeVarName e of
     Just (CETypeVar _ _ tau) -> applyContextToMonotype c tau p

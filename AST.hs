@@ -23,7 +23,7 @@ data Expr p
   | EApp          p (Expr p) (Spine p)
   | ERec          p Var (Expr p)
   | EAnnot        p (Expr p) Type
-  | EPair         p (Expr p) (Expr p)
+  | ETuple        p [Expr p] Int
   | EInjk         p (Expr p) Int
   | ECase         p (Expr p) [Branch p]
   | ENil          p
@@ -58,7 +58,7 @@ data Type
   = TUnit
   | TArrow Type Type
   | TCoproduct Type Type
-  | TProduct Type Type
+  | TProduct [Type] Int
   | TUVar UTypeVar
   | TEVar ETypeVar
   | TUniversal UTypeVar Kind Type
@@ -78,7 +78,7 @@ data Monotype
   | MEVar ETypeVar
   | MArrow Monotype Monotype
   | MCoproduct Monotype Monotype
-  | MProduct Monotype Monotype
+  | MProduct [Monotype] Int
   deriving (Show, Eq)
 
 data ContextEntry

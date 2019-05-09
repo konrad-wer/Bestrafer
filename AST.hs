@@ -28,10 +28,23 @@ data Expr p
   | ECase         p (Expr p) [Branch p]
   | ENil          p
   | ECons         p (Expr p) (Expr p)
-  | EIf           p (Expr p) (Expr p) (Expr p)
-  | EArithmBinOp  p ArithmBinOp (Expr p) (Expr p)
-  | EArithmUnOp   p ArithmUnOp (Expr p)
+  -- | EIf           p (Expr p) (Expr p) (Expr p)
+  -- | EArithmBinOp  p ArithmBinOp (Expr p) (Expr p)
+  -- | EArithmUnOp   p ArithmUnOp (Expr p)
   deriving (Show)
+
+getPos :: Expr p -> p
+getPos (EVar    p _) = p
+getPos (EUnit   p) = p
+getPos (ELambda p _ _) = p
+getPos (EApp    p _ _) = p
+getPos (ERec    p _ _) = p
+getPos (EAnnot  p _ _) = p
+getPos (ETuple  p _ _) = p
+getPos (EInjk   p _ _) = p
+getPos (ECase   p _ _) = p
+getPos (ENil    p) = p
+getPos (ECons   p _ _) = p
 
 type Spine p = [Expr p]
 

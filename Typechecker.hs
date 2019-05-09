@@ -13,7 +13,12 @@ checkTypeWellFormednessWithPrnc c t Principal p =
     vars -> Left $ TypeFormednessPrcFEVError p vars
 
 checkTypeWellFormedness :: Context -> Type -> p -> Either (Error p) ()
-checkTypeWellFormedness _ TUnit _ = return ()
+checkTypeWellFormedness _ TUnit _   = return ()
+checkTypeWellFormedness _ TBool _   = return ()
+checkTypeWellFormedness _ TInt _    = return ()
+checkTypeWellFormedness _ TFloat _  = return ()
+checkTypeWellFormedness _ TChar _   = return ()
+checkTypeWellFormedness _ TString _ = return ()
 checkTypeWellFormedness c (TArrow t1 t2) p = checkTypeWellFormedness c t1 p >> checkTypeWellFormedness c t2 p
 checkTypeWellFormedness c (TCoproduct t1 t2) p = checkTypeWellFormedness c t1 p >> checkTypeWellFormedness c t2 p
 checkTypeWellFormedness c (TProduct ts _) p = foldM_ ((.)(.)(.) (flip (checkTypeWellFormedness c) p) (flip const)) () ts
@@ -44,8 +49,13 @@ checkMonotypeHasKind c m p k1 = do
     Left $ MonotypeHasWrongKindError p m k1 k2
 
 inferMonotypeKind :: Context -> Monotype -> p -> Either (Error p) Kind
-inferMonotypeKind _ MUnit _ = return KStar
-inferMonotypeKind _ MZero _ = return KNat
+inferMonotypeKind _ MUnit _   = return KStar
+inferMonotypeKind _ MBool _   = return KStar
+inferMonotypeKind _ MInt _    = return KStar
+inferMonotypeKind _ MFloat _  = return KStar
+inferMonotypeKind _ MChar _   = return KStar
+inferMonotypeKind _ MString _ = return KStar
+inferMonotypeKind _ MZero _   = return KNat
 inferMonotypeKind c (MSucc n) p = checkMonotypeHasKind c n p KNat >> return KNat
 inferMonotypeKind c (MArrow m1 m2) p = checkMonotypeHasKind c m1 p KStar >> checkMonotypeHasKind c m2 p KStar >> return KStar
 inferMonotypeKind c (MCoproduct m1 m2) p = checkMonotypeHasKind c m1 p KStar >> checkMonotypeHasKind c m2 p KStar >> return KStar
@@ -134,7 +144,12 @@ equivalentQuantifierType c x1 t1 x2 t2 k p = do
   return $ dropContextToMarker c2
 
 equivalentType :: Context -> Type -> Type -> p -> StateT Integer (Either (Error p)) Context
-equivalentType c TUnit TUnit _ = return c
+equivalentType c TUnit   TUnit _   = return c
+equivalentType c TBool   TBool _   = return c
+equivalentType c TInt    TInt _    = return c
+equivalentType c TFloat  TFloat _  = return c
+equivalentType c TChar   TChar _   = return c
+equivalentType c TString TString _ = return c
 equivalentType c (TArrow a1 a2) (TArrow b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
 equivalentType c (TCoproduct a1 a2) (TCoproduct b1 b2) p = equivalentTypeBinary c a1 a2 b1 b2 p
 equivalentType c (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2) p =
@@ -202,8 +217,13 @@ instantiateEVarBinary c a1 a2 m1 m2 p = do
   instantiateEVar c2 a2 m2' KStar p
 
 instantiateEVar :: Context -> ETypeVar -> Monotype -> Kind -> p -> Either (Error p) Context
-instantiateEVar c a MZero KNat p = eTypeVarContextReplace c a KNat MZero [] p
-instantiateEVar c a MUnit KStar p = eTypeVarContextReplace c a KStar MUnit [] p
+instantiateEVar c a MZero   KNat p  = eTypeVarContextReplace c a KNat  MZero   [] p
+instantiateEVar c a MUnit   KStar p = eTypeVarContextReplace c a KStar MUnit   [] p
+instantiateEVar c a MBool   KStar p = eTypeVarContextReplace c a KStar MBool   [] p
+instantiateEVar c a MInt    KStar p = eTypeVarContextReplace c a KStar MInt    [] p
+instantiateEVar c a MFloat  KStar p = eTypeVarContextReplace c a KStar MFloat  [] p
+instantiateEVar c a MChar   KStar p = eTypeVarContextReplace c a KStar MChar   [] p
+instantiateEVar c a MString KStar p = eTypeVarContextReplace c a KStar MString [] p
 instantiateEVar c a (MSucc n) KNat p = do
   let a1 = ETypeVar $ eTypeVarName a ++ "-1"
   c2 <- eTypeVarContextReplace c a KNat (MSucc $ MEVar a1) [CTypeVar (E a1) KNat] p
@@ -262,8 +282,13 @@ checkEquationBinary c m1 m2 n1 n2 p = do
   checkEquation c2 m2' n2' KStar p
 
 checkEquation :: Context -> Monotype -> Monotype -> Kind -> p -> Either (Error p) Context
-checkEquation c MUnit MUnit KStar _ = return c
-checkEquation c MZero MZero KNat _ = return c
+checkEquation c MUnit   MUnit   KStar _ = return c
+checkEquation c MBool   MBool   KStar _ = return c
+checkEquation c MInt    MInt    KStar _ = return c
+checkEquation c MFloat  MFloat  KStar _ = return c
+checkEquation c MChar   MChar   KStar _ = return c
+checkEquation c MString MString KStar _ = return c
+checkEquation c MZero   MZero   KNat _  = return c
 checkEquation c (MUVar a) (MUVar b) k p
   | a == b = return c
   | otherwise = Left $ EquationFalseError p (MUVar a) (MUVar b) k
@@ -291,8 +316,18 @@ checkEquation c m1 m2 @ (MEVar b) k p
 checkEquation _ m1 m2 k p = Left $ EquationFalseError p m1 m2 k
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
-checkExpr c (EUnit _) TUnit _ = return c
-checkExpr c (EUnit p) (TEVar a) _ = eTypeVarContextReplace c a KStar MUnit [] p
+checkExpr c (EUnit _)     TUnit _   = return c
+checkExpr c (EBool _ _)   TBool _   = return c
+checkExpr c (EInt _ _)    TInt _    = return c
+checkExpr c (EFloat _ _)  TFloat _  = return c
+checkExpr c (EChar _ _)   TChar _   = return c
+checkExpr c (EString _ _) TString _ = return c
+checkExpr c (EUnit p)     (TEVar a) _ = eTypeVarContextReplace c a KStar MUnit   [] p
+checkExpr c (EBool p _)   (TEVar a) _ = eTypeVarContextReplace c a KStar MBool   [] p
+checkExpr c (EInt p _)    (TEVar a) _ = eTypeVarContextReplace c a KStar MInt    [] p
+checkExpr c (EFloat p _)  (TEVar a) _ = eTypeVarContextReplace c a KStar MFloat  [] p
+checkExpr c (EChar p _)   (TEVar a) _ = eTypeVarContextReplace c a KStar MChar   [] p
+checkExpr c (EString p _) (TEVar a) _ = eTypeVarContextReplace c a KStar MString [] p
 checkExpr c (ELambda _ x e) (TArrow t1 t2) pr = do
   c2 <- checkExpr (CVar x t1 pr : CMarker : c) e t2 pr
   return $ dropContextToMarker c2
@@ -328,7 +363,6 @@ checkExpr c (EInjk p e k) (TEVar a) _ = do
 checkExpr c e t _ = do
   (t2, _, c2) <- inferExpr c e
   evalStateT (subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t $ getPos e) 0
-
 
 inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
 inferExpr c (EVar p x) = do

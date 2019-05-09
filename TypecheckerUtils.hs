@@ -70,7 +70,12 @@ headedByExistential _ = False
 --Free variables computing utils -----------------------------------------------
 
 freeExistentialVariables :: Type -> Set.Set ETypeVar
-freeExistentialVariables TUnit = Set.empty
+freeExistentialVariables TUnit   = Set.empty
+freeExistentialVariables TBool   = Set.empty
+freeExistentialVariables TInt    = Set.empty
+freeExistentialVariables TFloat  = Set.empty
+freeExistentialVariables TChar   = Set.empty
+freeExistentialVariables TString = Set.empty
 freeExistentialVariables (TArrow t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
 freeExistentialVariables (TCoproduct t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
 freeExistentialVariables (TProduct ts _) = Set.unions $ map freeExistentialVariables ts
@@ -86,8 +91,13 @@ freeExistentialVariablesOfProp :: Proposition -> Set.Set ETypeVar
 freeExistentialVariablesOfProp (m1, m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
 
 freeExistentialVariablesOfMonotype :: Monotype -> Set.Set ETypeVar
-freeExistentialVariablesOfMonotype MUnit = Set.empty
-freeExistentialVariablesOfMonotype MZero = Set.empty
+freeExistentialVariablesOfMonotype MUnit   = Set.empty
+freeExistentialVariablesOfMonotype MBool   = Set.empty
+freeExistentialVariablesOfMonotype MInt    = Set.empty
+freeExistentialVariablesOfMonotype MFloat  = Set.empty
+freeExistentialVariablesOfMonotype MChar   = Set.empty
+freeExistentialVariablesOfMonotype MString = Set.empty
+freeExistentialVariablesOfMonotype MZero   = Set.empty
 freeExistentialVariablesOfMonotype (MSucc n) = freeExistentialVariablesOfMonotype n
 freeExistentialVariablesOfMonotype (MArrow m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
 freeExistentialVariablesOfMonotype (MCoproduct m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
@@ -96,8 +106,13 @@ freeExistentialVariablesOfMonotype (MUVar _) = Set.empty
 freeExistentialVariablesOfMonotype (MEVar x) = Set.singleton x
 
 freeVariablesOfMonotype :: Monotype -> Set.Set Var
-freeVariablesOfMonotype MUnit = Set.empty
-freeVariablesOfMonotype MZero = Set.empty
+freeVariablesOfMonotype MUnit   = Set.empty
+freeVariablesOfMonotype MBool   = Set.empty
+freeVariablesOfMonotype MInt    = Set.empty
+freeVariablesOfMonotype MFloat  = Set.empty
+freeVariablesOfMonotype MChar   = Set.empty
+freeVariablesOfMonotype MString = Set.empty
+freeVariablesOfMonotype MZero   = Set.empty
 freeVariablesOfMonotype (MSucc n) = freeVariablesOfMonotype n
 freeVariablesOfMonotype (MArrow m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
 freeVariablesOfMonotype (MCoproduct m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
@@ -193,7 +208,12 @@ takeContextToETypeVar x c p =
 --Substitute universal type var for type var in type----------------------------
 
 substituteUVarInType :: UTypeVar -> TypeVar -> Type -> Type
-substituteUVarInType _ _ TUnit = TUnit
+substituteUVarInType _ _ TUnit   = TUnit
+substituteUVarInType _ _ TBool   = TBool
+substituteUVarInType _ _ TInt    = TInt
+substituteUVarInType _ _ TFloat  = TFloat
+substituteUVarInType _ _ TChar   = TChar
+substituteUVarInType _ _ TString = TString
 substituteUVarInType u x (TArrow t1 t2) = TArrow (substituteUVarInType u x t1) (substituteUVarInType u x t2)
 substituteUVarInType u x (TCoproduct t1 t2) = TCoproduct (substituteUVarInType u x t1) (substituteUVarInType u x t2)
 substituteUVarInType u x (TProduct ts n) = TProduct (map (substituteUVarInType u x) ts) n
@@ -217,8 +237,13 @@ substituteUVarInProp :: UTypeVar -> TypeVar -> Proposition -> Proposition
 substituteUVarInProp u x (m1, m2) = (substituteUVarInMonotype u x m1, substituteUVarInMonotype u x m2)
 
 substituteUVarInMonotype :: UTypeVar -> TypeVar -> Monotype -> Monotype
-substituteUVarInMonotype _ _ MUnit = MUnit
-substituteUVarInMonotype _ _ MZero = MZero
+substituteUVarInMonotype _ _ MUnit   = MUnit
+substituteUVarInMonotype _ _ MBool   = MBool
+substituteUVarInMonotype _ _ MInt    = MInt
+substituteUVarInMonotype _ _ MFloat  = MFloat
+substituteUVarInMonotype _ _ MChar   = MChar
+substituteUVarInMonotype _ _ MString = MString
+substituteUVarInMonotype _ _ MZero   = MZero
 substituteUVarInMonotype u x (MSucc n) = MSucc $ substituteUVarInMonotype u x n
 substituteUVarInMonotype u x (MArrow m1 m2) = MArrow (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
 substituteUVarInMonotype u x (MCoproduct m1 m2) = MCoproduct (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
@@ -233,7 +258,12 @@ substituteUVarInMonotype _ _ (MEVar a) = MEVar a
 --Monotype to type and type to monotype-----------------------------------------
 
 monotypeToType :: Monotype -> p -> Either (Error p) Type
-monotypeToType MUnit _ = return TUnit
+monotypeToType MUnit _   = return TUnit
+monotypeToType MBool _   = return TBool
+monotypeToType MInt _    = return TInt
+monotypeToType MFloat _  = return TFloat
+monotypeToType MChar _   = return TChar
+monotypeToType MString _ = return TString
 monotypeToType (MArrow m1 m2) p = TArrow <$> monotypeToType m1 p <*> monotypeToType m2 p
 monotypeToType (MCoproduct m1 m2) p = TCoproduct <$> monotypeToType m1 p <*> monotypeToType m2 p
 monotypeToType (MProduct ms n) p = TProduct <$> mapM (`monotypeToType` p) ms <*> return n
@@ -242,7 +272,12 @@ monotypeToType (MUVar x) _ = return $ TUVar x
 monotypeToType n p = Left $ MonotypeIsNotTypeError p n
 
 typeToMonotype :: Type -> p -> Either (Error p) Monotype
-typeToMonotype TUnit _ = return MUnit
+typeToMonotype TUnit _   = return MUnit
+typeToMonotype TBool _   = return MBool
+typeToMonotype TInt _    = return MInt
+typeToMonotype TFloat _  = return MFloat
+typeToMonotype TChar _   = return MChar
+typeToMonotype TString _ = return MString
 typeToMonotype (TUVar a) _ = return $ MUVar a
 typeToMonotype (TEVar a) _ = return $ MEVar a
 typeToMonotype (TArrow t1 t2) p = MArrow <$> typeToMonotype t1 p <*> typeToMonotype t2 p
@@ -272,7 +307,12 @@ applyContextToType c (TEVar e) p =
     _ -> Left $ UndeclaredETypeVarError p e
 applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType (CTypeVar (U a) k : c) t p --TODO przemyśleć / zapytać
 applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType (CTypeVar (U a) k : c) t p
-applyContextToType _ TUnit _ = return TUnit
+applyContextToType _ TUnit _   = return TUnit
+applyContextToType _ TBool _   = return TBool
+applyContextToType _ TInt _    = return TInt
+applyContextToType _ TFloat _  = return TFloat
+applyContextToType _ TChar _   = return TChar
+applyContextToType _ TString _ = return TString
 
 applyContextToMonotype :: Context -> Monotype -> p -> Either (Error p) Monotype
 applyContextToMonotype c (MUVar u) p =
@@ -287,8 +327,13 @@ applyContextToMonotype c (MEVar e) p =
     Just (CETypeVar _ _ tau) -> applyContextToMonotype c tau p
     Just (CTypeVar (E _) _) -> return $ MEVar e
     _ -> Left $ UndeclaredETypeVarError p e
-applyContextToMonotype _ MUnit _ = return MUnit
-applyContextToMonotype _ MZero _ = return MZero
+applyContextToMonotype _ MUnit _   = return MUnit
+applyContextToMonotype _ MBool _   = return MBool
+applyContextToMonotype _ MInt _    = return MInt
+applyContextToMonotype _ MFloat _  = return MFloat
+applyContextToMonotype _ MChar _   = return MChar
+applyContextToMonotype _ MString _ = return MString
+applyContextToMonotype _ MZero _   = return MZero
 applyContextToMonotype c (MSucc n) p = MSucc <$> applyContextToMonotype c n p
 
 applyContextToProposition :: Context -> Proposition -> p -> Either (Error p) Proposition

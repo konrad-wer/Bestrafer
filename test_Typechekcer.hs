@@ -2171,57 +2171,58 @@ subtype_test14 =
     _ -> False
 
 --checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
-checkExpr_EUnit_test1 :: Test
-checkExpr_EUnit_test1 =
-  case checkExpr context1 (EUnit ()) TUnit Principal of
+checkExpr_ESimpleType_test1 :: Test
+checkExpr_ESimpleType_test1 =
+  case checkExpr context1 (EInt () 5) TInt Principal of
     Right c -> c == context1
     _ -> False
 
-checkExpr_EUnit_test2 :: Test
-checkExpr_EUnit_test2 =
-  case checkExpr [] (EUnit ()) TUnit NotPrincipal of
+checkExpr_ESimpleType_test2 :: Test
+checkExpr_ESimpleType_test2 =
+  case checkExpr [] (EBool () True) TBool NotPrincipal of
     Right [] -> True
     _ -> False
 
-checkExpr_EUnit_test3 :: Test
-checkExpr_EUnit_test3 =
+checkExpr_ESimpleType_test3 :: Test
+checkExpr_ESimpleType_test3 =
   case checkExpr context1 (EUnit ()) (TEVar $ ETypeVar "a") Principal of
     Right c -> c == context3
     _ -> False
 
-checkExpr_EUnit_test4 :: Test
-checkExpr_EUnit_test4 =
-  case checkExpr context1 (EUnit ()) (TEVar $ ETypeVar "z") Principal of
-    Left (ETypeVarTypeMismatchError () (ETypeVar "z") (MProduct [MUnit, MUnit] 2) MUnit) -> True
+checkExpr_ESimpleType_test4 :: Test
+checkExpr_ESimpleType_test4 =
+  case checkExpr context1 (EFloat () 3.14) (TEVar $ ETypeVar "z") Principal of
+    Left (ETypeVarTypeMismatchError () (ETypeVar "z") (MProduct [MUnit, MUnit] 2) MFloat) -> True
     _ -> False
 
-checkExpr_EUnit_test5 :: Test
-checkExpr_EUnit_test5 =
+checkExpr_ESimpleType_test5 :: Test
+checkExpr_ESimpleType_test5 =
   case checkExpr context3 (EUnit ()) (TEVar $ ETypeVar "a") Principal of
     Right c -> c == context3
     _ -> False
 
-checkExpr_EUnit_test6 :: Test
-checkExpr_EUnit_test6 =
-  case checkExpr context3 (EUnit ()) (TEVar $ ETypeVar "Konrad") Principal of
+checkExpr_ESimpleType_test6 :: Test
+checkExpr_ESimpleType_test6 =
+  case checkExpr context3 (EChar () 'k') (TEVar $ ETypeVar "Konrad") Principal of
     Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
     _ -> False
 
-checkExpr_EUnit_test7 :: Test
-checkExpr_EUnit_test7 =
-  case checkExpr context3 (EUnit ()) (TEVar $ ETypeVar "a") Principal of
+checkExpr_ESimpleType_test7 :: Test
+checkExpr_ESimpleType_test7 =
+  case checkExpr context3 (EString () "Konrad") TString Principal of
     Right c -> c == context3
     _ -> False
 
 checkExpr_ETuple_test1 :: Test
 checkExpr_ETuple_test1 =
-  case checkExpr context1 (ETuple () [EUnit (), EUnit ()] 2) (TProduct [TUnit, TUnit] 2) Principal of
+  case checkExpr context1 (ETuple () [EUnit (), EBool () False] 2) (TProduct [TUnit, TBool] 2) Principal of
     Right c -> c == context1
     _ -> False
 
 checkExpr_ETuple_test2 :: Test
 checkExpr_ETuple_test2 =
-  case checkExpr context5 (ETuple () [ETuple () [EUnit (), EUnit ()] 2, EUnit ()] 2) (TProduct [TProduct [TUnit, TUnit] 2, TUnit] 2) NotPrincipal of
+  case checkExpr context5 (ETuple () [ETuple () [EInt () 44, EFloat () 3.14] 2, EChar () 'c'] 2)
+                          (TProduct [TProduct [TInt, TFloat] 2, TChar] 2) NotPrincipal of
     Right c -> c == context5
     _ -> False
 
@@ -2786,13 +2787,13 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("subtype_test12", subtype_test12),
          ("subtype_test13", subtype_test13),
          ("subtype_test14", subtype_test14),
-         ("checkExpr_EUnit_test1", checkExpr_EUnit_test1),
-         ("checkExpr_EUnit_test2", checkExpr_EUnit_test2),
-         ("checkExpr_EUnit_test3", checkExpr_EUnit_test3),
-         ("checkExpr_EUnit_test4", checkExpr_EUnit_test4),
-         ("checkExpr_EUnit_test5", checkExpr_EUnit_test5),
-         ("checkExpr_EUnit_test6", checkExpr_EUnit_test6),
-         ("checkExpr_EUnit_test7", checkExpr_EUnit_test7),
+         ("checkExpr_ESimpleType_test1", checkExpr_ESimpleType_test1),
+         ("checkExpr_ESimpleType_test2", checkExpr_ESimpleType_test2),
+         ("checkExpr_ESimpleType_test3", checkExpr_ESimpleType_test3),
+         ("checkExpr_ESimpleType_test4", checkExpr_ESimpleType_test4),
+         ("checkExpr_ESimpleType_test5", checkExpr_ESimpleType_test5),
+         ("checkExpr_ESimpleType_test6", checkExpr_ESimpleType_test6),
+         ("checkExpr_ESimpleType_test7", checkExpr_ESimpleType_test7),
          ("checkExpr_ETuple_test1", checkExpr_ETuple_test1),
          ("checkExpr_ETuple_test2", checkExpr_ETuple_test2),
          ("checkExpr_ETuple_test3", checkExpr_ETuple_test3),

@@ -1,5 +1,7 @@
 module AST where
 
+import Data.Int
+
 type Var = String
 
 --Source Syntax-----------------------------------------------------------------
@@ -19,6 +21,11 @@ data ArithmUnOp
 data Expr p
   = EVar          p Var
   | EUnit         p
+  | EBool         p Bool
+  | EInt          p Int64
+  | EFloat        p Double
+  | EChar         p Char
+  | EString       p String
   | ELambda       p Var (Expr p)
   | EApp          p (Expr p) (Spine p)
   | ERec          p Var (Expr p)
@@ -36,6 +43,11 @@ data Expr p
 getPos :: Expr p -> p
 getPos (EVar    p _) = p
 getPos (EUnit   p) = p
+getPos (EBool   p _) = p
+getPos (EInt    p _) = p
+getPos (EFloat  p _) = p
+getPos (EChar   p _) = p
+getPos (EString p _) = p
 getPos (ELambda p _ _) = p
 getPos (EApp    p _ _) = p
 getPos (ERec    p _ _) = p
@@ -69,6 +81,11 @@ data Kind = KStar | KNat deriving (Show, Eq)
 
 data Type
   = TUnit
+  | TBool
+  | TInt
+  | TFloat
+  | TChar
+  | TString
   | TArrow Type Type
   | TCoproduct Type Type
   | TProduct [Type] Int
@@ -87,6 +104,11 @@ data Monotype
   = MZero
   | MSucc Monotype
   | MUnit
+  | MBool
+  | MInt
+  | MFloat
+  | MChar
+  | MString
   | MUVar UTypeVar
   | MEVar ETypeVar
   | MArrow Monotype Monotype

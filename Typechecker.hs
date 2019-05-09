@@ -63,7 +63,6 @@ inferMonotypeKind c (MUVar x) p =
 checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
 checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotypeHasKind c m2 p
 
---evalStateT (subtype c t1 pol t2 p) 0
 subtype :: Context -> Type -> Polarity -> Type -> p -> StateT Integer (Either (Error p)) Context
 subtype c t1 pol t2 p
   | not (headedByUniversal t1) && not (headedByExistential t1) &&
@@ -326,7 +325,10 @@ checkExpr c (EInjk p e k) (TEVar a) _ = do
   let (a1, a2) = generateSubETypeVars a
   c2 <- eTypeVarContextReplace c a KStar (MCoproduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
   checkExpr c2 e ([TEVar a1, TEVar a2] !! k) NotPrincipal
-checkExpr _ _ _ _ = undefined
+checkExpr c e t _ = do
+  (t2, _, c2) <- inferExpr c e
+  evalStateT (subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t $ getPos e) 0
+
 
 inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
 inferExpr c (EVar p x) = do

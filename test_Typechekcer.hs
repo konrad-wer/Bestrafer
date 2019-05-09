@@ -2361,32 +2361,48 @@ checkExpr_ELambda_test1 =
 
 checkExpr_ELambda_test2 :: Test
 checkExpr_ELambda_test2 =
-  case checkExpr context2 (ELambda () "x" $ EVar () "x") (TArrow TUnit TUnit) NotPrincipal of
+  case checkExpr context2 (ELambda () "x" $ EVar () "x") (TArrow TUnit TUnit) Principal of
     Right c -> c == context2
     _ -> False
 
 checkExpr_ELambda_test3 :: Test
 checkExpr_ELambda_test3 =
   case checkExpr [] (ELambda () "x" (ELambda () "y" $ EVar () "x")) (TArrow TUnit (TArrow TUnit TUnit)) NotPrincipal of
-    Right c -> c == context2
+    Right [] -> True
     _ -> False
 
 checkExpr_ELambda_test4 :: Test
 checkExpr_ELambda_test4 =
-  case checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x")) (TArrow TUnit (TArrow TUnit TUnit)) NotPrincipal of
+  case checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x")) (TArrow TUnit (TArrow TUnit TUnit)) Principal of
     Right c -> c == context2
     _ -> False
 
 checkExpr_ELambda_test5 :: Test
 checkExpr_ELambda_test5 =
   case checkExpr [] (ELambda () "x" (ELambda () "x" $ EVar () "x")) (TArrow TUnit (TArrow TUnit TUnit)) NotPrincipal of
-    Right c -> c == context2
+    Right [] -> True
     _ -> False
 
 checkExpr_ELambda_test6 :: Test
 checkExpr_ELambda_test6 =
   case checkExpr context2 (ELambda () "x" (ELambda () "x" $ EVar () "x")) (TArrow TUnit (TArrow TUnit TUnit)) NotPrincipal of
     Right c -> c == context2
+    _ -> False
+
+checkExpr_ELambda_test7 :: Test
+checkExpr_ELambda_test7 =
+  case checkExpr context2 (ELambda () "x" $ EVar () "x") (TEVar $ ETypeVar "b") NotPrincipal of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MArrow (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
+           CETypeVar (ETypeVar "b-1") KStar (MEVar (ETypeVar "b-2")), CTypeVar (E (ETypeVar "b-2")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+checkExpr_ELambda_test8 :: Test
+checkExpr_ELambda_test8 =
+  case checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x")) (TEVar $ ETypeVar "b") NotPrincipal of
+    Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MArrow (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
+           CETypeVar (ETypeVar "b-1") KStar (MEVar (ETypeVar "b-2-2")),
+           CETypeVar (ETypeVar "b-2") KStar (MArrow (MEVar (ETypeVar "b-2-1")) (MEVar (ETypeVar "b-2-2"))),
+           CTypeVar (E (ETypeVar "b-2-1")) KStar, CTypeVar (E (ETypeVar "b-2-2")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 --inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
@@ -2797,12 +2813,14 @@ tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOf
          ("checkExpr_EInjk_test10", checkExpr_EInjk_test10),
          ("checkExpr_EInjk_test11", checkExpr_EInjk_test11),
          ("checkExpr_EInjk_test12", checkExpr_EInjk_test12),
-         -- ("checkExpr_ELambda_test1", checkExpr_ELambda_test1),
-         -- ("checkExpr_ELambda_test2", checkExpr_ELambda_test2),
-         -- ("checkExpr_ELambda_test3", checkExpr_ELambda_test3),
-         -- ("checkExpr_ELambda_test4", checkExpr_ELambda_test4),
-         -- ("checkExpr_ELambda_test5", checkExpr_ELambda_test5),
-         -- ("checkExpr_ELambda_test6", checkExpr_ELambda_test6),
+         ("checkExpr_ELambda_test1", checkExpr_ELambda_test1),
+         ("checkExpr_ELambda_test2", checkExpr_ELambda_test2),
+         ("checkExpr_ELambda_test3", checkExpr_ELambda_test3),
+         ("checkExpr_ELambda_test4", checkExpr_ELambda_test4),
+         ("checkExpr_ELambda_test5", checkExpr_ELambda_test5),
+         ("checkExpr_ELambda_test6", checkExpr_ELambda_test6),
+         ("checkExpr_ELambda_test7", checkExpr_ELambda_test7),
+         ("checkExpr_ELambda_test8", checkExpr_ELambda_test8),
          ("inferExpr_EVar_test1", inferExpr_EVar_test1),
          ("inferExpr_EVar_test2", inferExpr_EVar_test2),
          ("inferExpr_EVar_test3", inferExpr_EVar_test3),

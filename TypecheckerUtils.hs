@@ -1,7 +1,10 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module TypecheckerUtils where
 
 import AST
 import qualified Data.Set as Set
+import Control.Lens hiding (Context)
 
 data Error p
   = UndeclaredVariableError p Var
@@ -20,6 +23,10 @@ data Error p
   | NotSubtypeError p Type Type
   | TypecheckingError (Expr p) Type
   deriving (Show)
+
+newtype TypecheckerState = TypecheckerState {_freshVarNum :: Integer}
+
+makeLenses ''TypecheckerState
 
 --simple utils------------------------------------------------------------------
 

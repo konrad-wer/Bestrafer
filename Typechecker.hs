@@ -5,6 +5,8 @@ import TypecheckerUtils
 import qualified Data.Set as Set
 import Control.Monad.State
 
+import Control.Lens hiding (Context)
+
 checkTypeWellFormednessWithPrnc :: Context -> Type -> Principality -> p -> Either (Error p) ()
 checkTypeWellFormednessWithPrnc c t NotPrincipal p = checkTypeWellFormedness c t p
 checkTypeWellFormednessWithPrnc c t Principal p =
@@ -73,32 +75,32 @@ inferMonotypeKind c (MUVar x) p =
 checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
 checkPropWellFormedness c (m1, m2) p = inferMonotypeKind c m1 p >>= checkMonotypeHasKind c m2 p
 
-subtype :: Context -> Type -> Polarity -> Type -> p -> StateT Integer (Either (Error p)) Context
+subtype :: Context -> Type -> Polarity -> Type -> p -> StateT TypecheckerState (Either (Error p)) Context
 subtype c t1 pol t2 p
   | not (headedByUniversal t1) && not (headedByExistential t1) &&
     not (headedByUniversal t2) && not (headedByExistential t2) = equivalentType c t1 t2 p
   | headedByUniversal t1 && not (headedByUniversal t2) && neg pol = do
       let (TUniversal (UTypeVar a) k t) = t1
-      e <- ETypeVar . ("#" ++) . show <$> get
-      modify (+ 1)
+      e <- ETypeVar . ("#" ++) . show . view freshVarNum <$> get
+      modify $ over freshVarNum (+ 1)
       c2 <- subtype (CTypeVar (E e) k : CMarker : c) (substituteUVarInType (UTypeVar a) (E e) t) Negative t2 p
       return $ dropContextToMarker c2
   | headedByUniversal t2 && neg pol = do
       let (TUniversal (UTypeVar b) k t) = t2
-      u <- UTypeVar . ("#" ++) . show <$> get
-      modify (+ 1)
+      u <- UTypeVar . ("#" ++) . show . view freshVarNum <$> get
+      modify $ over freshVarNum (+ 1)
       c2 <- subtype (CTypeVar (U u) k : CMarker : c) t1 Negative (substituteUVarInType (UTypeVar b) (U u) t) p
       return $ dropContextToMarker c2
   | headedByExistential t1 && pos pol = do
       let (TExistential (UTypeVar a) k t) = t1
-      u <- UTypeVar . ("#" ++) . show <$> get
-      modify (+ 1)
+      u <- UTypeVar . ("#" ++) . show . view freshVarNum <$> get
+      modify $ over freshVarNum (+ 1)
       c2 <- subtype (CTypeVar (U u) k : CMarker : c) (substituteUVarInType (UTypeVar a) (U u) t) Positive t2 p
       return $ dropContextToMarker c2
   | not (headedByExistential t1) && headedByExistential t2 && pos pol = do
       let TExistential (UTypeVar b) k t = t2
-      e <- ETypeVar . ("#" ++) . show <$> get
-      modify (+ 1)
+      e <- ETypeVar . ("#" ++) . show . view freshVarNum <$> get
+      modify $ over freshVarNum (+ 1)
       c2 <- subtype (CTypeVar (E e) k : CMarker : c) t1 Positive (substituteUVarInType (UTypeVar b) (E e) t) p
       return $ dropContextToMarker c2
   | pos pol && (neg . polarity $ t1) && (nonpos . polarity $ t2) = subtype c t1 Negative t2 p
@@ -111,7 +113,7 @@ equivalentTypeBinary ::
   Context
   -> Type -> Type
   -> Type -> Type -> p
-  -> StateT Integer (Either (Error p)) Context
+  -> StateT TypecheckerState (Either (Error p)) Context
 equivalentTypeBinary c a1 a2 b1 b2 p = do
   c2 <- equivalentType c a1 b1 p
   a2' <- lift $ applyContextToType c2 a2 p
@@ -122,7 +124,7 @@ equivalentPropositionalType ::
   Context
  -> Proposition -> Proposition
  -> Type -> Type -> p
- -> StateT Integer (Either (Error p)) Context
+ -> StateT TypecheckerState (Either (Error p)) Context
 equivalentPropositionalType c q1 q2 a b p = do
   c2 <- lift $ equivalentProp c q1 q2 p
   a' <- lift $ applyContextToType c2 a p
@@ -134,16 +136,16 @@ equivalentQuantifierType ::
   -> UTypeVar -> Type
   -> UTypeVar -> Type
   -> Kind -> p
-  -> StateT Integer (Either (Error p)) Context
+  -> StateT TypecheckerState (Either (Error p)) Context
 equivalentQuantifierType c x1 t1 x2 t2 k p = do
-  u <- UTypeVar . ("#" ++) . show <$> get
-  modify (+ 1)
+  u <- UTypeVar . ("#" ++) . show . view freshVarNum <$> get
+  modify $ over freshVarNum (+ 1)
   let t1' = substituteUVarInType x1 (U u) t1
   let t2' = substituteUVarInType x2 (U u) t2
   c2 <- equivalentType (CTypeVar (U u) k : CMarker : c) t1' t2' p
   return $ dropContextToMarker c2
 
-equivalentType :: Context -> Type -> Type -> p -> StateT Integer (Either (Error p)) Context
+equivalentType :: Context -> Type -> Type -> p -> StateT TypecheckerState (Either (Error p)) Context
 equivalentType c TUnit   TUnit _   = return c
 equivalentType c TBool   TBool _   = return c
 equivalentType c TInt    TInt _    = return c
@@ -315,63 +317,63 @@ checkEquation c m1 m2 @ (MEVar b) k p
   | otherwise = instantiateEVar c b m1 k p
 checkEquation _ m1 m2 k p = Left $ EquationFalseError p m1 m2 k
 
-checkExpr :: Context -> Expr p -> Type -> Principality -> Either (Error p) Context
+checkExpr :: Context -> Expr p -> Type -> Principality -> StateT TypecheckerState (Either (Error p)) Context
 checkExpr c (EUnit _)     TUnit _   = return c
 checkExpr c (EBool _ _)   TBool _   = return c
 checkExpr c (EInt _ _)    TInt _    = return c
 checkExpr c (EFloat _ _)  TFloat _  = return c
 checkExpr c (EChar _ _)   TChar _   = return c
 checkExpr c (EString _ _) TString _ = return c
-checkExpr c (EUnit p)     (TEVar a) _ = eTypeVarContextReplace c a KStar MUnit   [] p
-checkExpr c (EBool p _)   (TEVar a) _ = eTypeVarContextReplace c a KStar MBool   [] p
-checkExpr c (EInt p _)    (TEVar a) _ = eTypeVarContextReplace c a KStar MInt    [] p
-checkExpr c (EFloat p _)  (TEVar a) _ = eTypeVarContextReplace c a KStar MFloat  [] p
-checkExpr c (EChar p _)   (TEVar a) _ = eTypeVarContextReplace c a KStar MChar   [] p
-checkExpr c (EString p _) (TEVar a) _ = eTypeVarContextReplace c a KStar MString [] p
+checkExpr c (EUnit p)     (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MUnit   [] p
+checkExpr c (EBool p _)   (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MBool   [] p
+checkExpr c (EInt p _)    (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MInt    [] p
+checkExpr c (EFloat p _)  (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MFloat  [] p
+checkExpr c (EChar p _)   (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MChar   [] p
+checkExpr c (EString p _) (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MString [] p
 checkExpr c (ELambda _ x e) (TArrow t1 t2) pr = do
   c2 <- checkExpr (CVar x t1 pr : CMarker : c) e t2 pr
   return $ dropContextToMarker c2
 checkExpr c (ELambda p x e) (TEVar a) _ = do
   let (a1, a2) = generateSubETypeVars a
-  c2 <- eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
+  c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
   c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
   return $ dropContextToMarker c3
 checkExpr c (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2) pr =
   if n1 /= n2 then
-    Left (TypecheckingError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2))
+    lift $ Left (TypecheckingError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2))
   else do
     c2 <- checkExpr c e1 t1 pr
     foldM aux c2 $ zip es ts
   where
     aux _c (e, t) = do
-      t' <- applyContextToType _c t p
+      t' <- lift $ applyContextToType _c t p
       checkExpr _c e t' pr
 checkExpr c (ETuple p (e1 : es) n) (TEVar a) _ = do
   let a1 : as = generateSubETypeVarsList a n
-  c2 <- eTypeVarContextReplace c a KStar (MProduct (map MEVar (a1 : as)) n) (map (flip CTypeVar KStar . E) $ a1 : as) p
+  c2 <- lift $ eTypeVarContextReplace c a KStar (MProduct (map MEVar (a1 : as)) n) (map (flip CTypeVar KStar . E) $ a1 : as) p
   c3 <- checkExpr c2 e1 (TEVar a1) NotPrincipal
   foldM aux c3 $ zip es $ map TEVar as
   where
     aux _c (e, t) = do
-      t' <- applyContextToType _c t p
+      t' <- lift $ applyContextToType _c t p
       checkExpr _c e t' NotPrincipal
 checkExpr c (EInjk _ e k) (TCoproduct t1 t2) pr = checkExpr c e ([t1, t2] !! k) pr
 checkExpr c (EInjk p e k) (TEVar a) _ = do
   let (a1, a2) = generateSubETypeVars a
-  c2 <- eTypeVarContextReplace c a KStar (MCoproduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
+  c2 <- lift $ eTypeVarContextReplace c a KStar (MCoproduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
   checkExpr c2 e ([TEVar a1, TEVar a2] !! k) NotPrincipal
 checkExpr c e t _ = do
   (t2, _, c2) <- inferExpr c e
-  evalStateT (subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t $ getPos e) 0
+  subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t $ getPos e
 
-inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
+inferExpr :: Context -> Expr p -> StateT TypecheckerState (Either (Error p)) (Type, Principality, Context)
 inferExpr c (EVar p x) = do
-  (CVar _ t pr) <- varContextLookup c x p
-  t2 <- applyContextToType c t p
+  (CVar _ t pr) <- lift $ varContextLookup c x p
+  t2 <- lift $ applyContextToType c t p
   return (t2, pr, c)
 inferExpr c (EAnnot p e t) = do
-  checkTypeWellFormednessWithPrnc c t Principal p
-  t2 <- applyContextToType c t p
+  lift $ checkTypeWellFormednessWithPrnc c t Principal p
+  t2 <- lift $ applyContextToType c t p
   c2 <- checkExpr c e t2 Principal
   return (t2, Principal, c2)
 inferExpr _ _ = undefined

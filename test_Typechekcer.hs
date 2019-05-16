@@ -35,6 +35,49 @@ context5 = [CUTypeVarEq (UTypeVar "x") MZero, CETypeVar (ETypeVar "x") KNat (MSu
             CVar "x" (TUVar $ UTypeVar "x") Principal, CTypeVar (E $ ETypeVar "x") KStar, CETypeVar (ETypeVar "x") KStar $ MProduct [MUnit, MUnit] 2,
             CTypeVar (U $ UTypeVar "x") KNat, CTypeVar (E $ ETypeVar "x") KStar, CTypeVar (U $ UTypeVar "x") KStar]
 
+
+--typeFromTemplate :: [GADTParameter] -> p -> TypeTemplate -> Either (Error p) Type
+
+typeFromTemplate_test1 :: Test
+typeFromTemplate_test1 =
+  case typeFromTemplate [ParameterType TUnit, ParameterMonotype $ MArrow MBool MInt] ()
+                        (TTArrow (TTProduct [TTUnit, TTBool, TTInt, TTFloat, TTChar, TTString] 6) (TTCoproduct (TTParam 0) (TTParam 1))) of
+    Right (TArrow (TProduct [TUnit, TBool, TInt, TFloat, TChar, TString] 6) (TCoproduct TUnit (TArrow TBool TInt))) -> True
+    _ -> False
+
+typeFromTemplate_test2 :: Test
+typeFromTemplate_test2 =
+  case typeFromTemplate [ParameterType TUnit, ParameterMonotype $ MSucc MZero] ()
+                        (TTArrow (TTProduct [TTUnit, TTBool, TTInt, TTFloat, TTChar, TTString] 6) (TTCoproduct (TTParam 0) (TTParam 1))) of
+    Left (MonotypeIsNotTypeError () (MSucc MZero)) -> True
+    _ -> False
+
+typeFromTemplate_test3 :: Test
+typeFromTemplate_test3 =
+  case typeFromTemplate [ParameterMonotype $ MSucc MZero] () (TTVec (MTParam 0) TTUnit) of
+    Right (TVec (MSucc MZero) TUnit) -> True
+    _ -> False
+
+typeFromTemplate_test4 :: Test
+typeFromTemplate_test4 =
+  case typeFromTemplate [ParameterType $ TImp (MEVar (ETypeVar"A"), MZero) TUnit] () (TTVec (MTParam 0) TTUnit) of
+    Left (TypeIsNotMonotypeError () (TImp (MEVar (ETypeVar"A"), MZero) TUnit)) -> True
+    _ -> False
+
+typeFromTemplate_test5 :: Test
+typeFromTemplate_test5 =
+  case typeFromTemplate [ParameterType TFloat] ()
+       (TTUniversal (UTypeVar "x") KStar (TTImp (MTUVar (UTypeVar "x"), MTProduct [MTInt, MTCoproduct MTUnit MTBool, MTFloat] 3) (TTParam 0))) of
+    Right (TUniversal (UTypeVar "x") KStar (TImp (MUVar (UTypeVar "x"),  MProduct [MInt, MCoproduct MUnit MBool, MFloat] 3) TFloat)) -> True
+    _ -> False
+
+typeFromTemplate_test6 :: Test
+typeFromTemplate_test6 =
+  case typeFromTemplate [ParameterMonotype (MSucc (MSucc (MSucc MZero)))] ()
+       (TTExistential (UTypeVar "x") KNat (TTAnd (TTVec (MTParam 0) TTInt) (MTUVar (UTypeVar "x"), MTSucc MTZero))) of
+    Right (TExistential (UTypeVar "x") KNat (TAnd (TVec (MSucc (MSucc (MSucc MZero))) TInt) (MUVar (UTypeVar "x"), MSucc MZero))) -> True
+    _ -> False
+
 --freeExistentialVariablesOfMonotype :: Monotype -> Set.Set ETypeVar
 freeExistentialVariablesOfMonotype_test1 :: Test
 freeExistentialVariablesOfMonotype_test1 =
@@ -2466,7 +2509,13 @@ inferExpr_EVar_test8 =
     _ -> False
 
 tests :: [(TestName, Test)]
-tests = [("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOfMonotype_test1),
+tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
+         ("typeFromTemplate_test2", typeFromTemplate_test2),
+         ("typeFromTemplate_test3", typeFromTemplate_test3),
+         ("typeFromTemplate_test4", typeFromTemplate_test4),
+         ("typeFromTemplate_test5", typeFromTemplate_test5),
+         ("typeFromTemplate_test6", typeFromTemplate_test6),
+         ("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOfMonotype_test1),
          ("freeExistentialVariablesOfMonotype_test2", freeExistentialVariablesOfMonotype_test2),
          ("freeExistentialVariablesOfMonotype_test3", freeExistentialVariablesOfMonotype_test3),
          ("freeExistentialVariablesOfMonotype_test4", freeExistentialVariablesOfMonotype_test4),

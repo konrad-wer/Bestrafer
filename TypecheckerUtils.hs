@@ -74,6 +74,55 @@ headedByExistential :: Type -> Bool
 headedByExistential TExistential {} = True
 headedByExistential _ = False
 
+--TemplateUtils-----------------------------------------------------------------
+
+typeFromTemplate :: [GADTParameter] -> p -> TypeTemplate -> Either (Error p) Type
+typeFromTemplate _ _ TTUnit   = return TUnit
+typeFromTemplate _ _ TTBool   = return TBool
+typeFromTemplate _ _ TTInt    = return TInt
+typeFromTemplate _ _ TTFloat  = return TFloat
+typeFromTemplate _ _ TTChar   = return TChar
+typeFromTemplate _ _ TTString = return TString
+typeFromTemplate prms p (TTArrow tt1 tt2)     = TArrow     <$> typeFromTemplate prms p tt1 <*> typeFromTemplate prms p tt2
+typeFromTemplate prms p (TTCoproduct tt1 tt2) = TCoproduct <$> typeFromTemplate prms p tt1 <*> typeFromTemplate prms p tt2
+typeFromTemplate prms p (TTProduct tts n)     = TProduct   <$> mapM (typeFromTemplate prms p) tts <*> return n
+typeFromTemplate _ _    (TTUVar u) = return $ TUVar u
+typeFromTemplate _ _    (TTEVar e) = return $ TEVar e
+typeFromTemplate prms p (TTUniversal u k tt)   = TUniversal u k    <$> typeFromTemplate prms p tt
+typeFromTemplate prms p (TTExistential u k tt) = TExistential u k  <$> typeFromTemplate prms p tt
+typeFromTemplate prms p (TTImp pt tt) = TImp <$> propositionFromTemplate prms p pt <*> typeFromTemplate prms p tt
+typeFromTemplate prms p (TTAnd tt pt) = TAnd <$> typeFromTemplate prms p tt <*> propositionFromTemplate prms p pt
+typeFromTemplate prms p (TTVec nt tt) = TVec <$> monotypeFromTemplate prms p nt <*> typeFromTemplate prms p tt
+typeFromTemplate prms p (TTParam i) =
+  case prms !! i of
+    ParameterType t -> return t
+    ParameterMonotype m -> monotypeToType m p
+
+propositionFromTemplate :: [GADTParameter] -> p -> PropositionTemplate -> Either (Error p) Proposition
+propositionFromTemplate prms p (pt1, pt2) = do
+  p1 <- monotypeFromTemplate prms p pt1
+  p2 <- monotypeFromTemplate prms p pt2
+  return (p1, p2)
+
+monotypeFromTemplate :: [GADTParameter] -> p -> MonotypeTemplate -> Either (Error p) Monotype
+monotypeFromTemplate _ _ MTUnit     = return MUnit
+monotypeFromTemplate _ _ MTBool     = return MBool
+monotypeFromTemplate _ _ MTInt      = return MInt
+monotypeFromTemplate _ _ MTFloat    = return MFloat
+monotypeFromTemplate _ _ MTChar     = return MChar
+monotypeFromTemplate _ _ MTString   = return MString
+monotypeFromTemplate _ _ MTZero     = return MZero
+monotypeFromTemplate _ _ (MTUVar u) = return $ MUVar u
+monotypeFromTemplate _ _ (MTEVar e) = return $ MEVar e
+monotypeFromTemplate prms p (MTSucc n) = MSucc <$> monotypeFromTemplate prms p n
+monotypeFromTemplate prms p (MTArrow tt1 tt2)     = MArrow     <$> monotypeFromTemplate prms p tt1 <*> monotypeFromTemplate prms p tt2
+monotypeFromTemplate prms p (MTCoproduct tt1 tt2) = MCoproduct <$> monotypeFromTemplate prms p tt1 <*> monotypeFromTemplate prms p tt2
+monotypeFromTemplate prms p (MTProduct tts n)     = MProduct   <$> mapM (monotypeFromTemplate prms p) tts <*> return n
+monotypeFromTemplate prms p (MTParam i) =
+  case prms !! i of
+    ParameterType t -> typeToMonotype t p
+    ParameterMonotype m -> return m
+
 --Free variables computing utils -----------------------------------------------
 
 freeExistentialVariables :: Type -> Set.Set ETypeVar

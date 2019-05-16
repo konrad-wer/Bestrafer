@@ -79,6 +79,10 @@ data TypeVar = U UTypeVar | E ETypeVar deriving (Show, Eq)
 
 data Kind = KStar | KNat deriving (Show, Eq)
 
+data GADTParameter
+  = ParameterType Type
+  | ParameterMonotype Monotype
+
 data Type
   = TUnit
   | TBool
@@ -98,7 +102,28 @@ data Type
   | TVec Monotype Type
   deriving (Show, Eq)
 
+data TypeTemplate
+  = TTUnit
+  | TTBool
+  | TTInt
+  | TTFloat
+  | TTChar
+  | TTString
+  | TTArrow TypeTemplate TypeTemplate
+  | TTCoproduct TypeTemplate TypeTemplate
+  | TTProduct [TypeTemplate] Int
+  | TTUVar UTypeVar
+  | TTEVar ETypeVar
+  | TTUniversal UTypeVar Kind TypeTemplate
+  | TTExistential UTypeVar Kind TypeTemplate
+  | TTImp PropositionTemplate TypeTemplate
+  | TTAnd TypeTemplate PropositionTemplate
+  | TTVec MonotypeTemplate TypeTemplate
+  | TTParam Int
+
 type Proposition = (Monotype, Monotype)
+
+type PropositionTemplate = (MonotypeTemplate, MonotypeTemplate)
 
 data Monotype
   = MZero
@@ -114,6 +139,23 @@ data Monotype
   | MArrow Monotype Monotype
   | MCoproduct Monotype Monotype
   | MProduct [Monotype] Int
+  deriving (Show, Eq)
+
+data MonotypeTemplate
+  = MTZero
+  | MTSucc MonotypeTemplate
+  | MTUnit
+  | MTBool
+  | MTInt
+  | MTFloat
+  | MTChar
+  | MTString
+  | MTUVar UTypeVar
+  | MTEVar ETypeVar
+  | MTArrow MonotypeTemplate MonotypeTemplate
+  | MTCoproduct MonotypeTemplate MonotypeTemplate
+  | MTProduct [MonotypeTemplate] Int
+  | MTParam Int
   deriving (Show, Eq)
 
 data ContextEntry

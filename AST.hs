@@ -31,7 +31,7 @@ data Expr p
   | ERec          p Var (Expr p)
   | EAnnot        p (Expr p) Type
   | ETuple        p [Expr p] Int
-  | EInjk         p (Expr p) Int
+  -- | EInjk         p (Expr p) Int
   | ECase         p (Expr p) [Branch p]
   | ENil          p
   | ECons         p (Expr p) (Expr p)
@@ -53,7 +53,7 @@ getPos (EApp    p _ _) = p
 getPos (ERec    p _ _) = p
 getPos (EAnnot  p _ _) = p
 getPos (ETuple  p _ _) = p
-getPos (EInjk   p _ _) = p
+-- getPos (EInjk   p _ _) = p
 getPos (ECase   p _ _) = p
 getPos (ENil    p) = p
 getPos (ECons   p _ _) = p
@@ -82,6 +82,12 @@ data Kind = KStar | KNat deriving (Show, Eq)
 data GADTParameter
   = ParameterType Type
   | ParameterMonotype Monotype
+  deriving (Show, Eq)
+
+data GADTParameterTemplate
+  = ParameterTypeT TypeTemplate
+  | ParameterMonotypeT MonotypeTemplate
+  deriving (Show, Eq)
 
 data Type
   = TUnit
@@ -91,7 +97,7 @@ data Type
   | TChar
   | TString
   | TArrow Type Type
-  | TCoproduct Type Type
+  | TGADT String [GADTParameter]
   | TProduct [Type] Int
   | TUVar UTypeVar
   | TEVar ETypeVar
@@ -110,7 +116,7 @@ data TypeTemplate
   | TTChar
   | TTString
   | TTArrow TypeTemplate TypeTemplate
-  | TTCoproduct TypeTemplate TypeTemplate
+  | TTGADT String [GADTParameterTemplate]
   | TTProduct [TypeTemplate] Int
   | TTUVar UTypeVar
   | TTEVar ETypeVar
@@ -120,6 +126,7 @@ data TypeTemplate
   | TTAnd TypeTemplate PropositionTemplate
   | TTVec MonotypeTemplate TypeTemplate
   | TTParam Int
+  deriving (Show, Eq)
 
 type Proposition = (Monotype, Monotype)
 
@@ -137,7 +144,7 @@ data Monotype
   | MUVar UTypeVar
   | MEVar ETypeVar
   | MArrow Monotype Monotype
-  | MCoproduct Monotype Monotype
+  | MGADT String [Monotype]
   | MProduct [Monotype] Int
   deriving (Show, Eq)
 
@@ -153,7 +160,7 @@ data MonotypeTemplate
   | MTUVar UTypeVar
   | MTEVar ETypeVar
   | MTArrow MonotypeTemplate MonotypeTemplate
-  | MTCoproduct MonotypeTemplate MonotypeTemplate
+  | MTGADT String [MonotypeTemplate]
   | MTProduct [MonotypeTemplate] Int
   | MTParam Int
   deriving (Show, Eq)

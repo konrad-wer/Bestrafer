@@ -22,6 +22,7 @@ data Error p
   | EquationFalseError p Monotype Monotype Kind
   | NotSubtypeError p Type Type
   | TypecheckingError (Expr p) Type
+  | InjIndexOutOfBoundError (Expr p) Type
   deriving (Show)
 
 newtype TypecheckerState = TypecheckerState {_freshVarNum :: Integer}
@@ -76,6 +77,10 @@ headedByExistential _ = False
 
 --TemplateUtils-----------------------------------------------------------------
 
+typeFromGADTParameterTemplate :: [GADTParameter] -> p -> GADTParameterTemplate -> Either (Error p) GADTParameter
+typeFromGADTParameterTemplate prms p (ParameterTypeT tt)     = ParameterType     <$> typeFromTemplate prms p tt
+typeFromGADTParameterTemplate prms p (ParameterMonotypeT mt) = ParameterMonotype <$> monotypeFromTemplate prms p mt
+
 typeFromTemplate :: [GADTParameter] -> p -> TypeTemplate -> Either (Error p) Type
 typeFromTemplate _ _ TTUnit   = return TUnit
 typeFromTemplate _ _ TTBool   = return TBool
@@ -83,9 +88,9 @@ typeFromTemplate _ _ TTInt    = return TInt
 typeFromTemplate _ _ TTFloat  = return TFloat
 typeFromTemplate _ _ TTChar   = return TChar
 typeFromTemplate _ _ TTString = return TString
-typeFromTemplate prms p (TTArrow tt1 tt2)     = TArrow     <$> typeFromTemplate prms p tt1 <*> typeFromTemplate prms p tt2
-typeFromTemplate prms p (TTCoproduct tt1 tt2) = TCoproduct <$> typeFromTemplate prms p tt1 <*> typeFromTemplate prms p tt2
-typeFromTemplate prms p (TTProduct tts n)     = TProduct   <$> mapM (typeFromTemplate prms p) tts <*> return n
+typeFromTemplate prms p (TTArrow tt1 tt2) = TArrow   <$> typeFromTemplate prms p tt1 <*> typeFromTemplate prms p tt2
+typeFromTemplate prms p (TTGADT n tts)    = TGADT n  <$> mapM (typeFromGADTParameterTemplate prms p) tts
+typeFromTemplate prms p (TTProduct tts n) = TProduct <$> mapM (typeFromTemplate prms p) tts <*> return n
 typeFromTemplate _ _    (TTUVar u) = return $ TUVar u
 typeFromTemplate _ _    (TTEVar e) = return $ TEVar e
 typeFromTemplate prms p (TTUniversal u k tt)   = TUniversal u k    <$> typeFromTemplate prms p tt
@@ -114,16 +119,20 @@ monotypeFromTemplate _ _ MTString   = return MString
 monotypeFromTemplate _ _ MTZero     = return MZero
 monotypeFromTemplate _ _ (MTUVar u) = return $ MUVar u
 monotypeFromTemplate _ _ (MTEVar e) = return $ MEVar e
-monotypeFromTemplate prms p (MTSucc n) = MSucc <$> monotypeFromTemplate prms p n
-monotypeFromTemplate prms p (MTArrow tt1 tt2)     = MArrow     <$> monotypeFromTemplate prms p tt1 <*> monotypeFromTemplate prms p tt2
-monotypeFromTemplate prms p (MTCoproduct tt1 tt2) = MCoproduct <$> monotypeFromTemplate prms p tt1 <*> monotypeFromTemplate prms p tt2
-monotypeFromTemplate prms p (MTProduct tts n)     = MProduct   <$> mapM (monotypeFromTemplate prms p) tts <*> return n
+monotypeFromTemplate prms p (MTSucc n)        = MSucc    <$> monotypeFromTemplate prms p n
+monotypeFromTemplate prms p (MTArrow tt1 tt2) = MArrow   <$> monotypeFromTemplate prms p tt1 <*> monotypeFromTemplate prms p tt2
+monotypeFromTemplate prms p (MTGADT n tts)    = MGADT n  <$> mapM (monotypeFromTemplate prms p) tts
+monotypeFromTemplate prms p (MTProduct tts n) = MProduct <$> mapM (monotypeFromTemplate prms p) tts <*> return n
 monotypeFromTemplate prms p (MTParam i) =
   case prms !! i of
     ParameterType t -> typeToMonotype t p
     ParameterMonotype m -> return m
 
 --Free variables computing utils -----------------------------------------------
+
+freeExistentialVariablesOfGADTParameter :: GADTParameter -> Set.Set ETypeVar
+freeExistentialVariablesOfGADTParameter (ParameterType t)     = freeExistentialVariables t
+freeExistentialVariablesOfGADTParameter (ParameterMonotype m) = freeExistentialVariablesOfMonotype m
 
 freeExistentialVariables :: Type -> Set.Set ETypeVar
 freeExistentialVariables TUnit   = Set.empty
@@ -132,8 +141,8 @@ freeExistentialVariables TInt    = Set.empty
 freeExistentialVariables TFloat  = Set.empty
 freeExistentialVariables TChar   = Set.empty
 freeExistentialVariables TString = Set.empty
-freeExistentialVariables (TArrow t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
-freeExistentialVariables (TCoproduct t1 t2) = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
+freeExistentialVariables (TArrow t1 t2)  = Set.union (freeExistentialVariables t1) (freeExistentialVariables t2)
+freeExistentialVariables (TGADT _ ts)    = Set.unions $ map freeExistentialVariablesOfGADTParameter ts
 freeExistentialVariables (TProduct ts _) = Set.unions $ map freeExistentialVariables ts
 freeExistentialVariables (TUVar _) = Set.empty
 freeExistentialVariables (TEVar x) = Set.singleton x
@@ -155,8 +164,8 @@ freeExistentialVariablesOfMonotype MChar   = Set.empty
 freeExistentialVariablesOfMonotype MString = Set.empty
 freeExistentialVariablesOfMonotype MZero   = Set.empty
 freeExistentialVariablesOfMonotype (MSucc n) = freeExistentialVariablesOfMonotype n
-freeExistentialVariablesOfMonotype (MArrow m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
-freeExistentialVariablesOfMonotype (MCoproduct m1 m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
+freeExistentialVariablesOfMonotype (MArrow m1 m2)  = Set.union  (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
+freeExistentialVariablesOfMonotype (MGADT _ ms)    = Set.unions $ map freeExistentialVariablesOfMonotype ms
 freeExistentialVariablesOfMonotype (MProduct ms _) = Set.unions $ map freeExistentialVariablesOfMonotype ms
 freeExistentialVariablesOfMonotype (MUVar _) = Set.empty
 freeExistentialVariablesOfMonotype (MEVar x) = Set.singleton x
@@ -170,8 +179,8 @@ freeVariablesOfMonotype MChar   = Set.empty
 freeVariablesOfMonotype MString = Set.empty
 freeVariablesOfMonotype MZero   = Set.empty
 freeVariablesOfMonotype (MSucc n) = freeVariablesOfMonotype n
-freeVariablesOfMonotype (MArrow m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
-freeVariablesOfMonotype (MCoproduct m1 m2) = Set.union (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
+freeVariablesOfMonotype (MArrow m1 m2)  = Set.union  (freeVariablesOfMonotype m1) (freeVariablesOfMonotype m2)
+freeVariablesOfMonotype (MGADT _ ms)    = Set.unions $ map freeVariablesOfMonotype ms
 freeVariablesOfMonotype (MProduct ms _) = Set.unions $ map freeVariablesOfMonotype ms
 freeVariablesOfMonotype (MUVar x) = Set.singleton $ uTypeVarName x
 freeVariablesOfMonotype (MEVar x) = Set.singleton $ eTypeVarName x
@@ -263,6 +272,10 @@ takeContextToETypeVar x c p =
 
 --Substitute universal type var for type var in type----------------------------
 
+substituteUVarInGADTParameter ::  UTypeVar -> TypeVar -> GADTParameter -> GADTParameter
+substituteUVarInGADTParameter u x (ParameterType t)     = ParameterType     $ substituteUVarInType u x t
+substituteUVarInGADTParameter u x (ParameterMonotype m) = ParameterMonotype $ substituteUVarInMonotype u x m
+
 substituteUVarInType :: UTypeVar -> TypeVar -> Type -> Type
 substituteUVarInType _ _ TUnit   = TUnit
 substituteUVarInType _ _ TBool   = TBool
@@ -270,8 +283,8 @@ substituteUVarInType _ _ TInt    = TInt
 substituteUVarInType _ _ TFloat  = TFloat
 substituteUVarInType _ _ TChar   = TChar
 substituteUVarInType _ _ TString = TString
-substituteUVarInType u x (TArrow t1 t2) = TArrow (substituteUVarInType u x t1) (substituteUVarInType u x t2)
-substituteUVarInType u x (TCoproduct t1 t2) = TCoproduct (substituteUVarInType u x t1) (substituteUVarInType u x t2)
+substituteUVarInType u x (TArrow t1 t2)  = TArrow   (substituteUVarInType u x t1) (substituteUVarInType u x t2)
+substituteUVarInType u x (TGADT n ts)    = TGADT n  (map (substituteUVarInGADTParameter u x) ts)
 substituteUVarInType u x (TProduct ts n) = TProduct (map (substituteUVarInType u x) ts) n
 substituteUVarInType u x (TUVar a)
   | u == a =  case x of
@@ -301,8 +314,8 @@ substituteUVarInMonotype _ _ MChar   = MChar
 substituteUVarInMonotype _ _ MString = MString
 substituteUVarInMonotype _ _ MZero   = MZero
 substituteUVarInMonotype u x (MSucc n) = MSucc $ substituteUVarInMonotype u x n
-substituteUVarInMonotype u x (MArrow m1 m2) = MArrow (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
-substituteUVarInMonotype u x (MCoproduct m1 m2) = MCoproduct (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
+substituteUVarInMonotype u x (MArrow m1 m2)  = MArrow   (substituteUVarInMonotype u x m1) (substituteUVarInMonotype u x m2)
+substituteUVarInMonotype u x (MGADT n ms)    = MGADT n  (map (substituteUVarInMonotype u x) ms)
 substituteUVarInMonotype u x (MProduct ms n) = MProduct (map (substituteUVarInMonotype u x) ms) n
 substituteUVarInMonotype u x (MUVar a)
   | u == a = case x of
@@ -320,12 +333,16 @@ monotypeToType MInt _    = return TInt
 monotypeToType MFloat _  = return TFloat
 monotypeToType MChar _   = return TChar
 monotypeToType MString _ = return TString
-monotypeToType (MArrow m1 m2) p = TArrow <$> monotypeToType m1 p <*> monotypeToType m2 p
-monotypeToType (MCoproduct m1 m2) p = TCoproduct <$> monotypeToType m1 p <*> monotypeToType m2 p
+monotypeToType (MArrow m1 m2) p  = TArrow   <$> monotypeToType m1 p <*> monotypeToType m2 p
+monotypeToType (MGADT n ms) _    = return $ TGADT n $ map ParameterMonotype ms
 monotypeToType (MProduct ms n) p = TProduct <$> mapM (`monotypeToType` p) ms <*> return n
 monotypeToType (MEVar x) _ = return $ TEVar x
 monotypeToType (MUVar x) _ = return $ TUVar x
 monotypeToType n p = Left $ MonotypeIsNotTypeError p n
+
+gADTParameterToMonotype :: GADTParameter -> p -> Either (Error p) Monotype
+gADTParameterToMonotype (ParameterType t) p     = typeToMonotype t p
+gADTParameterToMonotype (ParameterMonotype m) _ = return m
 
 typeToMonotype :: Type -> p -> Either (Error p) Monotype
 typeToMonotype TUnit _   = return MUnit
@@ -336,22 +353,26 @@ typeToMonotype TChar _   = return MChar
 typeToMonotype TString _ = return MString
 typeToMonotype (TUVar a) _ = return $ MUVar a
 typeToMonotype (TEVar a) _ = return $ MEVar a
-typeToMonotype (TArrow t1 t2) p = MArrow <$> typeToMonotype t1 p <*> typeToMonotype t2 p
-typeToMonotype (TCoproduct t1 t2) p = MCoproduct <$> typeToMonotype t1 p <*> typeToMonotype t2 p
+typeToMonotype (TArrow t1 t2)  p = MArrow   <$> typeToMonotype t1 p <*> typeToMonotype t2 p
+typeToMonotype (TGADT n ts)    p = MGADT n  <$> mapM (`gADTParameterToMonotype` p) ts
 typeToMonotype (TProduct ts n) p = MProduct <$> mapM (`typeToMonotype` p) ts <*> return n
 typeToMonotype t p = Left $ TypeIsNotMonotypeError p t
 
 --Context application-----------------------------------------------------------
 
-applyContextToType :: Context -> Type -> p-> Either (Error p) Type
+applyContextToGADTParameter :: Context -> GADTParameter -> p -> Either (Error p) GADTParameter
+applyContextToGADTParameter c (ParameterType t)     p = ParameterType <$> applyContextToType c t p
+applyContextToGADTParameter c (ParameterMonotype m) p = ParameterMonotype <$> applyContextToMonotype c m p
+
+applyContextToType :: Context -> Type -> p -> Either (Error p) Type
 applyContextToType c (TUVar u) p =
   case uTypeVarEqContextLookup c u of
     Just (CUTypeVarEq _ tau) -> applyContextToMonotype c tau p >>= flip monotypeToType p
     _ -> return $ TUVar u
 applyContextToType c (TImp pr t) p = TImp <$> applyContextToProposition c pr p <*> applyContextToType c t p
 applyContextToType c (TAnd t pr) p = TAnd <$> applyContextToType c t p <*> applyContextToProposition c pr p
-applyContextToType c (TArrow t1 t2) p = TArrow <$> applyContextToType c t1 p <*> applyContextToType c t2 p
-applyContextToType c (TCoproduct t1 t2) p = TCoproduct <$> applyContextToType c t1 p <*> applyContextToType c t2 p
+applyContextToType c (TArrow t1 t2)  p = TArrow   <$> applyContextToType c t1 p <*> applyContextToType c t2 p
+applyContextToType c (TGADT n ts)    p = TGADT n  <$> mapM (flip (applyContextToGADTParameter c) p) ts
 applyContextToType c (TProduct ts n) p = TProduct <$> mapM (flip (applyContextToType c) p) ts <*> return n
 applyContextToType c (TVec n t) p = TVec <$> applyContextToMonotype c n p <*> applyContextToType c t p
 applyContextToType c (TEVar e) p =
@@ -375,8 +396,8 @@ applyContextToMonotype c (MUVar u) p =
   case uTypeVarEqContextLookup c u of
     Just (CUTypeVarEq _ tau) -> applyContextToMonotype c tau p
     _ -> return $ MUVar u
-applyContextToMonotype c (MArrow m1 m2) p = MArrow <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
-applyContextToMonotype c (MCoproduct m1 m2) p = MCoproduct <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
+applyContextToMonotype c (MArrow m1 m2)  p = MArrow   <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
+applyContextToMonotype c (MGADT n ms)    p = MGADT n  <$> mapM (flip (applyContextToMonotype c) p) ms
 applyContextToMonotype c (MProduct ms n) p = MProduct <$> mapM (flip (applyContextToMonotype c) p) ms  <*> return n
 applyContextToMonotype c (MEVar e) p =
   case typeVarContextLookup c $ eTypeVarName e of

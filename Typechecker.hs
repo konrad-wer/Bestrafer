@@ -338,6 +338,42 @@ checkEquation c m1 m2 @ (MEVar b) k p
   | otherwise = instantiateEVar c b m1 k p
 checkEquation _ m1 m2 k p = Left $ EquationFalseError p m1 m2 k
 
+checkPropTrue :: Context -> Proposition -> p ->  Either (Error p) Context
+checkPropTrue c (m1, m2) p = do
+  k <- inferMonotypeKind c m1 p
+  checkEquation c m1 m2 k p
+
+inferSpine ::
+  Context -> Spine p -> Type -> Principality
+  -> StateT TypecheckerState (Either (Error p)) (Type, Principality, Context)
+inferSpine c [] t pr = return (t, pr, c)
+inferSpine c (e : s) (TArrow t1 t2) pr = do
+  c2 <- checkExpr c e t1 pr
+  t2' <- lift $ applyContextToType c2 t2 $ getPos e
+  inferSpine c2 s t2' pr
+inferSpine c (e : s) (TImp q t) pr = do
+  c2 <- lift $ checkPropTrue c q $ getPos e
+  t' <- lift $ applyContextToType c2 t $ getPos e
+  inferSpine c2 (e : s) t' pr
+inferSpine c s @ (_ : _) (TUniversal u k t) _ = do
+  let e = ETypeVar $ uTypeVarName u
+  inferSpine (CTypeVar (E e) k : c) s (substituteUVarInType u (E e) t) NotPrincipal
+inferSpine c (e : s) (TEVar a) NotPrincipal = do
+  let (a1, a2) = generateSubETypeVars a
+  c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] $ getPos e
+  inferSpine c2 (e : s) (TArrow (TEVar a1) (TEVar a2)) NotPrincipal
+inferSpine _ (e : _) t _ = lift $ Left $ SpineInferenceError (getPos e) t
+
+inferSpineRecoverPrnc ::
+  Context -> Spine p -> Type -> Principality
+  -> StateT TypecheckerState (Either (Error p)) (Type, Principality, Context)
+inferSpineRecoverPrnc c s t pr = do
+  (t2, pr2, c2) <- inferSpine c s t pr
+  if pr == Principal && pr2 == NotPrincipal && null (freeExistentialVariables t2) then
+    return (t2, Principal, c2)
+  else
+    return (t2, pr2, c2)
+
 checkExpr :: Context -> Expr p -> Type -> Principality -> StateT TypecheckerState (Either (Error p)) Context
 checkExpr c (EUnit _)     TUnit _   = return c
 checkExpr c (EBool _ _)   TBool _   = return c
@@ -397,4 +433,7 @@ inferExpr c (EAnnot p e t) = do
   t2 <- lift $ applyContextToType c t p
   c2 <- checkExpr c e t2 Principal
   return (t2, Principal, c2)
+inferExpr c (ESpine _ e s) = do
+  (t, pr, c2) <- inferExpr c e
+  inferSpineRecoverPrnc c2 s t pr
 inferExpr _ _ = undefined

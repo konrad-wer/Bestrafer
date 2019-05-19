@@ -27,7 +27,7 @@ data Expr p
   | EChar         p Char
   | EString       p String
   | ELambda       p Var (Expr p)
-  | EApp          p (Expr p) (Spine p)
+  | ESpine        p (Expr p) (Spine p)
   | ERec          p Var (Expr p)
   | EAnnot        p (Expr p) Type
   | ETuple        p [Expr p] Int
@@ -49,7 +49,7 @@ getPos (EFloat  p _) = p
 getPos (EChar   p _) = p
 getPos (EString p _) = p
 getPos (ELambda p _ _) = p
-getPos (EApp    p _ _) = p
+getPos (ESpine  p _ _) = p
 getPos (ERec    p _ _) = p
 getPos (EAnnot  p _ _) = p
 getPos (ETuple  p _ _) = p

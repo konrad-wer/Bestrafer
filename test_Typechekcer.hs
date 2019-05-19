@@ -2272,25 +2272,25 @@ checkExpr_ESimpleType_test2 =
 
 checkExpr_ESimpleType_test3 :: Test
 checkExpr_ESimpleType_test3 =
-  case flip evalStateT startState $ checkExpr context1 (EUnit ()) (TEVar $ ETypeVar "a") Principal of
+  case flip evalStateT startState $ checkExpr context1 (EUnit ()) (TEVar $ ETypeVar "a") NotPrincipal of
     Right c -> c == context3
     _ -> False
 
 checkExpr_ESimpleType_test4 :: Test
 checkExpr_ESimpleType_test4 =
-  case flip evalStateT startState $ checkExpr context1 (EFloat () 3.14) (TEVar $ ETypeVar "z") Principal of
+  case flip evalStateT startState $ checkExpr context1 (EFloat () 3.14) (TEVar $ ETypeVar "z") NotPrincipal of
     Left (ETypeVarTypeMismatchError () (ETypeVar "z") (MProduct [MUnit, MUnit] 2) MFloat) -> True
     _ -> False
 
 checkExpr_ESimpleType_test5 :: Test
 checkExpr_ESimpleType_test5 =
-  case flip evalStateT startState $ checkExpr context3 (EUnit ()) (TEVar $ ETypeVar "a") Principal of
+  case flip evalStateT startState $ checkExpr context3 (EUnit ()) (TEVar $ ETypeVar "a") NotPrincipal of
     Right c -> c == context3
     _ -> False
 
 checkExpr_ESimpleType_test6 :: Test
 checkExpr_ESimpleType_test6 =
-  case flip evalStateT startState $ checkExpr context3 (EChar () 'k') (TEVar $ ETypeVar "Konrad") Principal of
+  case flip evalStateT startState $ checkExpr context3 (EChar () 'k') (TEVar $ ETypeVar "Konrad") NotPrincipal of
     Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
     _ -> False
 
@@ -2316,7 +2316,7 @@ checkExpr_ETuple_test2 =
 checkExpr_ETuple_test3 :: Test
 checkExpr_ETuple_test3 =
   case flip evalStateT startState $ checkExpr
-            [CTypeVar (E $ ETypeVar "x") KStar] (ETuple () [ETuple () [EUnit (), EUnit ()] 2, EUnit ()] 2) (TEVar $ ETypeVar "x") Principal of
+            [CTypeVar (E $ ETypeVar "x") KStar] (ETuple () [ETuple () [EUnit (), EUnit ()] 2, EUnit ()] 2) (TEVar $ ETypeVar "x") NotPrincipal of
     Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct [MEVar (ETypeVar "x-1"), MEVar (ETypeVar "x-2")] 2),
                      CETypeVar (ETypeVar "x-1") KStar (MProduct [MEVar (ETypeVar "x-1-1"), MEVar (ETypeVar "x-1-2")] 2),
                      CETypeVar (ETypeVar "x-1-1") KStar MUnit, CETypeVar (ETypeVar "x-1-2") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
@@ -2332,14 +2332,14 @@ checkExpr_ETuple_test5 :: Test
 checkExpr_ETuple_test5 =
   case flip evalStateT startState $ checkExpr [CETypeVar (ETypeVar "x") KStar (MProduct [MEVar (ETypeVar "x-1"), MEVar (ETypeVar "x-2")] 2),
                   CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
-                 (ETuple () [EUnit (), EUnit ()] 2) (TEVar $ ETypeVar "x") Principal of
+                 (ETuple () [EUnit (), EUnit ()] 2) (TEVar $ ETypeVar "x") NotPrincipal of
     Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct [MEVar (ETypeVar "x-1"), MEVar (ETypeVar "x-2")] 2),
                      CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
     _ -> False
 
 checkExpr_ETuple_test6 :: Test
 checkExpr_ETuple_test6 =
-  case flip evalStateT startState $ checkExpr context1 (ETuple () [EUnit (), EUnit ()] 2) (TEVar $ ETypeVar "zz") Principal of
+  case flip evalStateT startState $ checkExpr context1 (ETuple () [EUnit (), EUnit ()] 2) (TEVar $ ETypeVar "zz") NotPrincipal of
     Left (UndeclaredETypeVarError () (ETypeVar "zz")) -> True
     _ -> False
 
@@ -2353,7 +2353,7 @@ checkExpr_ETuple_test7 =
 checkExpr_ETuple_test8 :: Test
 checkExpr_ETuple_test8 =
   case flip evalStateT startState $ checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (ETuple () [ETuple () [EUnit (), EUnit ()] 2,
-                  ETuple () [EUnit (), EUnit ()] 2] 2) (TProduct [TEVar $ ETypeVar "x", TEVar $ ETypeVar "x"] 2) Principal of
+                  ETuple () [EUnit (), EUnit ()] 2] 2) (TProduct [TEVar $ ETypeVar "x", TEVar $ ETypeVar "x"] 2) NotPrincipal of
     Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct [MEVar (ETypeVar "x-1"), MEVar (ETypeVar "x-2")] 2),
                      CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
     _ -> False

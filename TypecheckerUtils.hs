@@ -24,6 +24,7 @@ data Error p
   | TypecheckingError (Expr p) Type
   | InjIndexOutOfBoundError (Expr p) Type
   | SpineInferenceError p Type
+  |TypeInferenceError (Expr p)
   deriving (Show)
 
 newtype TypecheckerState = TypecheckerState {_freshVarNum :: Integer}

@@ -381,16 +381,16 @@ checkExpr c (EInt _ _)    TInt _    = return c
 checkExpr c (EFloat _ _)  TFloat _  = return c
 checkExpr c (EChar _ _)   TChar _   = return c
 checkExpr c (EString _ _) TString _ = return c
-checkExpr c (EUnit p)     (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MUnit   [] p
-checkExpr c (EBool p _)   (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MBool   [] p
-checkExpr c (EInt p _)    (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MInt    [] p
-checkExpr c (EFloat p _)  (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MFloat  [] p
-checkExpr c (EChar p _)   (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MChar   [] p
-checkExpr c (EString p _) (TEVar a) _ = lift $ eTypeVarContextReplace c a KStar MString [] p
+checkExpr c (EUnit p)     (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MUnit   [] p
+checkExpr c (EBool p _)   (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MBool   [] p
+checkExpr c (EInt p _)    (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MInt    [] p
+checkExpr c (EFloat p _)  (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MFloat  [] p
+checkExpr c (EChar p _)   (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MChar   [] p
+checkExpr c (EString p _) (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MString [] p
 checkExpr c (ELambda _ x e) (TArrow t1 t2) pr = do
   c2 <- checkExpr (CVar x t1 pr : CMarker : c) e t2 pr
   return $ dropContextToMarker c2
-checkExpr c (ELambda p x e) (TEVar a) _ = do
+checkExpr c (ELambda p x e) (TEVar a) NotPrincipal = do
   let (a1, a2) = generateSubETypeVars a
   c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
   c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
@@ -405,7 +405,7 @@ checkExpr c (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2) pr =
     aux _c (e, t) = do
       t' <- lift $ applyContextToType _c t p
       checkExpr _c e t' pr
-checkExpr c (ETuple p (e1 : es) n) (TEVar a) _ = do
+checkExpr c (ETuple p (e1 : es) n) (TEVar a) NotPrincipal = do
   let a1 : as = generateSubETypeVarsList a n
   c2 <- lift $ eTypeVarContextReplace c a KStar (MProduct (map MEVar (a1 : as)) n) (map (flip CTypeVar KStar . E) $ a1 : as) p
   c3 <- checkExpr c2 e1 (TEVar a1) NotPrincipal
@@ -436,4 +436,4 @@ inferExpr c (EAnnot p e t) = do
 inferExpr c (ESpine _ e s) = do
   (t, pr, c2) <- inferExpr c e
   inferSpineRecoverPrnc c2 s t pr
-inferExpr _ _ = undefined
+inferExpr _ e = lift $ Left $ TypeInferenceError e

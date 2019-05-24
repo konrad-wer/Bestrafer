@@ -27,7 +27,7 @@ data Error p
   | TypeInferenceError (Expr p)
   deriving (Show)
 
-newtype TypecheckerState = TypecheckerState {_freshVarNum :: Integer}
+data TypecheckerState = TypecheckerState {_freshVarNum :: Integer, _constrContext :: ConstructorsContext}
 
 makeLenses ''TypecheckerState
 

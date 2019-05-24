@@ -1,6 +1,7 @@
 module AST where
 
 import Data.Int
+import qualified Data.Map as Map
 
 type Var = String
 
@@ -31,7 +32,7 @@ data Expr p
   | ERec          p Var (Expr p)
   | EAnnot        p (Expr p) Type
   | ETuple        p [Expr p] Int
-  -- | EInjk         p (Expr p) Int
+  | EConstr       p String [Expr p]
   | ECase         p (Expr p) [Branch p]
   | ENil          p
   | ECons         p (Expr p) (Expr p)
@@ -53,7 +54,7 @@ getPos (ESpine  p _ _) = p
 getPos (ERec    p _ _) = p
 getPos (EAnnot  p _ _) = p
 getPos (ETuple  p _ _) = p
--- getPos (EInjk   p _ _) = p
+getPos (EConstr p _ _) = p
 getPos (ECase   p _ _) = p
 getPos (ENil    p) = p
 getPos (ECons   p _ _) = p
@@ -172,6 +173,14 @@ data ContextEntry
   | CUTypeVarEq UTypeVar Monotype
   | CMarker
   deriving (Show, Eq)
+
+data Constructor = Constructor { constrTypeName :: String,
+                                 constrUVars :: [UTypeVar],
+                                 constrProps :: [PropositionTemplate],
+                                 constrArgs :: [TypeTemplate]
+                               } deriving (Show)
+
+type ConstructorsContext = Map.Map String Constructor
 
 type Context = [ContextEntry]
 

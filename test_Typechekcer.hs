@@ -2257,6 +2257,101 @@ subtype_test14 =
     Left (TypesNotEquivalentError () TUnit (TArrow TUnit TUnit)) -> True
     _ -> False
 
+--inferSpine ::
+--  Context -> Spine p -> Type -> Principality
+--  -> StateT TypecheckerState (Either (Error p)) (Type, Principality, Context)
+inferSpine_test1 :: Test
+inferSpine_test1 =
+  case flip evalStateT startState $ inferSpine [] [] TInt Principal of
+    Right (TInt, Principal, []) -> True
+    _ -> False
+
+inferSpine_test2 :: Test
+inferSpine_test2 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True] (TArrow TBool TInt) Principal of
+    Right (TInt, Principal, []) -> True
+    _ -> False
+
+inferSpine_test3 :: Test
+inferSpine_test3 =
+  case flip evalStateT startState $ inferSpine [] [EString () "KW"] (TArrow TBool TInt) Principal of
+    Left (TypeInferenceError (EString () "KW")) -> True
+    _ -> False
+
+inferSpine_test4 :: Test
+inferSpine_test4 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k'] (TArrow TBool (TArrow TChar TString)) NotPrincipal of
+    Right (TString, NotPrincipal, []) -> True
+    _ -> False
+
+inferSpine_test5 :: Test
+inferSpine_test5 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, EBool () False] (TArrow TBool (TArrow TChar TString)) NotPrincipal of
+    Left (TypeInferenceError (EBool () False)) -> True
+    _ -> False
+
+inferSpine_test6 :: Test
+inferSpine_test6 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
+                                    (TUniversal (UTypeVar "a") KStar (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString))) NotPrincipal of
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar MChar]) -> True
+    _ -> False
+
+inferSpine_test7 :: Test
+inferSpine_test7 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, ETuple () [EChar  () 'k', EInt () 2] 2]
+                                    (TUniversal (UTypeVar "a") KStar (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString))) NotPrincipal of
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar (MProduct [MEVar (ETypeVar "a-1"), MEVar (ETypeVar "a-2")] 2),
+                                   CETypeVar (ETypeVar "a-1") KStar MChar, CETypeVar (ETypeVar "a-2") KStar MInt]) -> True
+    _ -> False
+
+inferSpine_test8 :: Test
+inferSpine_test8 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
+                                    (TUniversal (UTypeVar "a") KStar (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString))) Principal of
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar MChar]) -> True
+    _ -> False
+
+inferSpine_test9 :: Test
+inferSpine_test9 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, ETuple () [EChar  () 'k', EInt () 2] 2]
+                                    (TUniversal (UTypeVar "a") KStar (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString))) Principal of
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar (MProduct [MEVar (ETypeVar "a-1"), MEVar (ETypeVar "a-2")] 2),
+                                   CETypeVar (ETypeVar "a-1") KStar MChar, CETypeVar (ETypeVar "a-2") KStar MInt]) -> True
+    _ -> False
+
+inferSpine_test10 :: Test
+inferSpine_test10 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
+                                    (TUniversal (UTypeVar "a") KStar (TImp (MUVar (UTypeVar "a"), MChar)
+                                    (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString)))) NotPrincipal of
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar MChar]) -> True
+    _ -> False
+
+inferSpine_test11 :: Test
+inferSpine_test11 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
+                                    (TUniversal (UTypeVar "a") KStar (TImp (MUVar (UTypeVar "a"), MInt)
+                                    (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString)))) NotPrincipal of
+    Left (TypeInferenceError (EChar () 'k')) -> True
+    _ -> False
+
+inferSpine_test12 :: Test
+inferSpine_test12 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
+                                    (TUniversal (UTypeVar "a") KStar (TImp (MUVar (UTypeVar "a"), MChar)
+                                    (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString)))) Principal of
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar MChar]) -> True
+    _ -> False
+
+inferSpine_test13 :: Test
+inferSpine_test13 =
+  case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
+                                    (TUniversal (UTypeVar "a") KStar (TImp (MUVar (UTypeVar "a"), MInt)
+                                    (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString)))) Principal of
+    Left (TypeInferenceError (EChar () 'k')) -> True
+    _ -> False
+
 --checkExpr :: Context -> Expr p -> Type -> Principality -> StateT sTypecheckerState (Either (Error p)) Context
 checkExpr_ESimpleType_test1 :: Test
 checkExpr_ESimpleType_test1 =
@@ -2801,6 +2896,19 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("subtype_test12", subtype_test12),
          ("subtype_test13", subtype_test13),
          ("subtype_test14", subtype_test14),
+         ("inferSpine_test1", inferSpine_test1),
+         ("inferSpine_test2", inferSpine_test2),
+         ("inferSpine_test3", inferSpine_test3),
+         ("inferSpine_test4", inferSpine_test4),
+         ("inferSpine_test5", inferSpine_test5),
+         ("inferSpine_test6", inferSpine_test6),
+         ("inferSpine_test7", inferSpine_test7),
+         ("inferSpine_test8", inferSpine_test8),
+         ("inferSpine_test9", inferSpine_test9),
+         ("inferSpine_test10", inferSpine_test10),
+         ("inferSpine_test11", inferSpine_test11),
+         ("inferSpine_test12", inferSpine_test12),
+         ("inferSpine_test13", inferSpine_test13),
          ("checkExpr_ESimpleType_test1", checkExpr_ESimpleType_test1),
          ("checkExpr_ESimpleType_test2", checkExpr_ESimpleType_test2),
          ("checkExpr_ESimpleType_test3", checkExpr_ESimpleType_test3),

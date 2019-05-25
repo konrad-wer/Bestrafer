@@ -272,6 +272,22 @@ takeContextToETypeVar x c p =
       | otherwise = tc cx (entry : a)
     tc (entry : cx) a = tc cx (entry : a)
 
+takeContextToUTypeVar :: UTypeVar -> Context -> p -> Either (Error p) Context
+takeContextToUTypeVar x c p =
+  tc c []
+  where
+    tc [] _ = Left $ UndeclaredUTypeVarError p x
+    tc (entry @ (CTypeVar (U y) _) : cx) a
+      | x == y = return $ reverse a
+      | otherwise = tc cx (entry : a)
+    tc (entry @ (CETypeVar y _ _) : cx) a
+      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x
+      | otherwise = tc cx (entry : a)
+    tc (entry @ (CTypeVar (E y) _) : cx) a
+      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x
+      | otherwise = tc cx (entry : a)
+    tc (entry : cx) a = tc cx (entry : a)
+
 --Substitute universal type var for type var in type----------------------------
 
 substituteUVarInGADTParameter ::  UTypeVar -> TypeVar -> GADTParameter -> GADTParameter

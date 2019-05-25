@@ -2,6 +2,7 @@ import AST
 import Typechecker
 import TypecheckerUtils
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Control.Monad.State
 
 type Test = Bool
@@ -10,7 +11,7 @@ type TestName = String
 --TODO tests that not typecheck
 
 startState :: TypecheckerState
-startState = TypecheckerState {_freshVarNum = 0}
+startState = TypecheckerState {_freshVarNum = 0, _constrContext = Map.empty}
 
 context1 :: Context
 context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
@@ -598,6 +599,37 @@ takeContextToETypeVar_test5 =
     Right [CVar "x" TUnit Principal, CTypeVar (U (UTypeVar "y")) KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
            CETypeVar (ETypeVar "z") KStar (MProduct [MUnit, MUnit] 2), CMarker, CUTypeVarEq (UTypeVar "k") MUnit, CMarker,
            CVar "r" (TEVar (ETypeVar "z")) NotPrincipal, CTypeVar (E (ETypeVar "a")) KStar] -> True
+    _ -> False
+
+--takeContextToUTypeVar :: UTypeVar -> Context -> p -> Either (Error p) Context
+takeContextToUTypeVar_test1 :: Test
+takeContextToUTypeVar_test1 =
+  case takeContextToUTypeVar (UTypeVar "y") context1 () of
+    Right [CVar "x" TUnit Principal] -> True
+    _ -> False
+
+takeContextToUTypeVar_test2 :: Test
+takeContextToUTypeVar_test2 =
+  case takeContextToUTypeVar (UTypeVar "y") context2 () of
+    Left (UndeclaredUTypeVarError () (UTypeVar "y")) -> True
+    _ -> False
+
+takeContextToUTypeVar_test3 :: Test
+takeContextToUTypeVar_test3 =
+  case takeContextToUTypeVar (UTypeVar "b") context2 () of
+    Left (UndeclaredUTypeVarError () (UTypeVar "b")) -> True
+    _ -> False
+
+takeContextToUTypeVar_test4 :: Test
+takeContextToUTypeVar_test4 =
+  case takeContextToUTypeVar (UTypeVar "a") [CTypeVar (U (UTypeVar "a")) KStar] () of
+    Right [] -> True
+    _ -> False
+
+takeContextToUTypeVar_test5 :: Test
+takeContextToUTypeVar_test5 =
+  case takeContextToUTypeVar (UTypeVar "x") context4 () of
+    Right [CVar "zz" (TEVar (ETypeVar "r"))  NotPrincipal, CVar "x" TUnit NotPrincipal] -> True
     _ -> False
 
 --substituteUVarInMonotype :: UTypeVar -> ETypeVar -> Monotype -> Monotype
@@ -2644,6 +2676,11 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("takeContextToETypeVar_test3", takeContextToETypeVar_test3),
          ("takeContextToETypeVar_test4", takeContextToETypeVar_test4),
          ("takeContextToETypeVar_test5", takeContextToETypeVar_test5),
+         ("takeContextToUTypeVar_test1", takeContextToUTypeVar_test1),
+         ("takeContextToUTypeVar_test2", takeContextToUTypeVar_test2),
+         ("takeContextToUTypeVar_test3", takeContextToUTypeVar_test3),
+         ("takeContextToUTypeVar_test4", takeContextToUTypeVar_test4),
+         ("takeContextToUTypeVar_test5", takeContextToUTypeVar_test5),
          ("substituteUVarInMonotype_test1", substituteUVarInMonotype_test1),
          ("substituteUVarInMonotype_test2", substituteUVarInMonotype_test2),
          ("substituteUVarInMonotype_test3", substituteUVarInMonotype_test3),

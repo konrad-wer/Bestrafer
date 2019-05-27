@@ -25,6 +25,8 @@ data Error p
   | InjIndexOutOfBoundError (Expr p) Type
   | SpineInferenceError p Type
   | TypeInferenceError (Expr p)
+  | EquationAlreadyExistsError p UTypeVar Monotype Monotype
+  | EliminateEquationError p Monotype Monotype Kind
   deriving (Show)
 
 data TypecheckerState = TypecheckerState {_freshVarNum :: Integer, _constrContext :: ConstructorsContext}

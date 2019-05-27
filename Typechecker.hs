@@ -4,6 +4,7 @@ import AST
 import TypecheckerUtils
 import qualified Data.Set as Set
 import Control.Monad.State
+import Control.Monad.Trans.Maybe
 
 import Control.Lens hiding (Context)
 
@@ -342,6 +343,88 @@ checkPropTrue :: Context -> Proposition -> p ->  Either (Error p) Context
 checkPropTrue c (m1, m2) p = do
   k <- inferMonotypeKind c m1 p
   checkEquation c m1 m2 k p
+
+headConstructorClash :: Monotype -> Monotype -> Bool
+headConstructorClash MZero (MSucc _) = True
+headConstructorClash (MSucc _) MZero = True
+headConstructorClash MZero _ = False
+headConstructorClash _ MZero = False
+headConstructorClash (MSucc _) _ = False
+headConstructorClash _ (MSucc _) = False
+headConstructorClash MUnit           MUnit           = False
+headConstructorClash MBool           MBool           = False
+headConstructorClash MInt            MInt            = False
+headConstructorClash MFloat          MFloat          = False
+headConstructorClash MChar           MChar           = False
+headConstructorClash MString         MString         = False
+headConstructorClash (MUVar _)       _               = False
+headConstructorClash _               (MUVar _)       = False
+headConstructorClash (MEVar _)       _               = False
+headConstructorClash _               (MEVar _)       = False
+headConstructorClash (MArrow _ _)    (MArrow _ _)    = False
+headConstructorClash (MGADT n1 _)    (MGADT n2 _)    = n1 /= n2
+headConstructorClash (MProduct _ n1) (MProduct _ n2) = n1 /= n2
+headConstructorClash _ _ = True
+
+eliminateEquationNAry :: Context -> [Monotype] -> [Monotype] -> [Kind] -> p -> MaybeT (Either (Error p)) Context
+eliminateEquationNAry c [] [] [] _ = return c
+eliminateEquationNAry c (m1 : ms1) (m2 : ms2) (k1 : ks) p = do
+  c2 <- eliminateEquation c m1 m2 k1 p
+  foldM aux c2 (((,,) <$> ms1) `z` ms2 `z` ks)
+  where
+    z = zipWith ($)
+    aux _c (ml, mr, k) = do
+      ml' <- lift $ applyContextToMonotype _c ml p
+      mr' <- lift $ applyContextToMonotype _c mr p
+      eliminateEquation _c ml' mr' k p
+eliminateEquationNAry _ _ _ _ p = lift $ Left $ InternalCompilerError p "eliminateEquationNAry"
+
+eliminateEquationOneUVar :: Context -> UTypeVar -> Monotype -> Kind -> p -> MaybeT (Either (Error p)) Context
+eliminateEquationOneUVar c a m _ p
+  | MUVar a /= m && uTypeVarName a `Set.member` freeVariablesOfMonotype m = fail "InFreeVars"
+  | not $ Set.member (uTypeVarName a) (freeVariablesOfMonotype m) = do
+      c2 <- lift $ takeContextToUTypeVar a c p
+      case uTypeVarEqContextLookup c2 a of
+        Nothing -> return (CUTypeVarEq a m : c)
+        Just (CUTypeVarEq _ m') -> lift $ Left $ EquationAlreadyExistsError p a m' m
+        _ -> lift $ Left $ InternalCompilerError p "eliminateEquationOneUVar"
+  | otherwise = lift $ Left $ InternalCompilerError p "eliminateEquationOneUVar"
+
+eliminateEquation :: Context -> Monotype -> Monotype -> Kind -> p -> MaybeT (Either (Error p)) Context
+eliminateEquation c MUnit   MUnit   KStar _ = return c
+eliminateEquation c MInt    MInt    KStar _ = return c
+eliminateEquation c MBool   MBool   KStar _ = return c
+eliminateEquation c MFloat  MFloat  KStar _ = return c
+eliminateEquation c MChar   MChar   KStar _ = return c
+eliminateEquation c MString MString KStar _ = return c
+eliminateEquation c MZero   MZero   KNat  _ = return c
+eliminateEquation c (MSucc n1) (MSucc n2) KNat p = eliminateEquation c n1 n2 KNat p
+eliminateEquation c (MArrow a1 a2) (MArrow b1 b2) KStar p = do
+  c2 <- eliminateEquation c a1 b1 KStar p
+  a2' <- lift $ applyContextToMonotype c2 a2 p
+  b2' <- lift $ applyContextToMonotype c2 b2 p
+  eliminateEquation c2 a2' b2' KStar p
+eliminateEquation c (MProduct ms1 n1) (MProduct ms2 n2) KStar p
+  | n1 /= n2 = fail "Head clash"
+  | otherwise = eliminateEquationNAry c ms1 ms2 (map (const KStar) ms1) p
+eliminateEquation c (MGADT n1 ms1) (MGADT n2 ms2) KStar p
+  | n1 /= n2 = fail "Head clash"
+  | otherwise = do
+    ks <- lift $ mapM (flip (inferMonotypeKind c) p) ms1
+    eliminateEquationNAry c ms1 ms2 ks p
+eliminateEquation c (MUVar a) (MUVar b) _ p
+  | a == b = return c
+  | otherwise = do
+      c2 <- lift $ takeContextToUTypeVar a c p
+      case uTypeVarEqContextLookup c2 a of
+        Nothing -> return (CUTypeVarEq a (MUVar b) : c)
+        Just (CUTypeVarEq _ m) -> lift $ Left $ EquationAlreadyExistsError p a m (MUVar b)
+        _ -> lift $ Left $ InternalCompilerError p "eliminateEquation"
+eliminateEquation c (MUVar a) m k p = eliminateEquationOneUVar c a m k p
+eliminateEquation c m (MUVar a) k p = eliminateEquationOneUVar c a m k p
+eliminateEquation _ m1 m2 k p
+  | headConstructorClash m1 m2 = fail "Head clash"
+  | otherwise = lift $ Left $ EliminateEquationError p m1 m2 k
 
 inferSpine ::
   Context -> Spine p -> Type -> Principality

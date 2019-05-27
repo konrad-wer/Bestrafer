@@ -27,6 +27,7 @@ data Error p
   | TypeInferenceError (Expr p)
   | EquationAlreadyExistsError p UTypeVar Monotype Monotype
   | EliminateEquationError p Monotype Monotype Kind
+  | ExprNotCheckedIntroductionFormError (Expr p)
   deriving (Show)
 
 data TypecheckerState = TypecheckerState {_freshVarNum :: Integer, _constrContext :: ConstructorsContext}

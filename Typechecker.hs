@@ -8,6 +8,20 @@ import Control.Monad.Trans.Maybe
 
 import Control.Lens hiding (Context)
 
+checkedIntroductionForm :: Expr p -> Either (Error p) ()
+checkedIntroductionForm EUnit {}   = return ()
+checkedIntroductionForm EBool {}   = return ()
+checkedIntroductionForm EInt {}    = return ()
+checkedIntroductionForm EFloat {}  = return ()
+checkedIntroductionForm EChar {}   = return ()
+checkedIntroductionForm EString {} = return ()
+checkedIntroductionForm ELambda {} = return ()
+checkedIntroductionForm ETuple {}  = return ()
+checkedIntroductionForm EConstr {} = return ()
+checkedIntroductionForm ENil {}    = return ()
+checkedIntroductionForm ECons {}   = return ()
+checkedIntroductionForm e = Left $ ExprNotCheckedIntroductionFormError e
+
 checkTypeWellFormednessWithPrnc :: Context -> Type -> Principality -> p -> Either (Error p) ()
 checkTypeWellFormednessWithPrnc c t NotPrincipal p = checkTypeWellFormedness c t p
 checkTypeWellFormednessWithPrnc c t Principal p =

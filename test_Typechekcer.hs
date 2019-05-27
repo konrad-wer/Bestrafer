@@ -4,6 +4,7 @@ import TypecheckerUtils
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Control.Monad.State
+import Control.Monad.Trans.Maybe
 
 type Test = Bool
 type TestName = String
@@ -2289,6 +2290,130 @@ subtype_test14 =
     Left (TypesNotEquivalentError () TUnit (TArrow TUnit TUnit)) -> True
     _ -> False
 
+--eliminateEquation :: Context -> Monotype -> Monotype -> Kind -> p -> MaybeT (Either (Error p)) Context
+eliminateEquation_test1 :: Test
+eliminateEquation_test1 =
+  case runMaybeT $ eliminateEquation [] (MProduct [MArrow (MGADT "F" [MFloat, MString]) MChar, MInt] 2)
+                                        (MProduct [MArrow (MGADT "F" [MFloat, MString]) MChar, MInt] 2) KStar () of
+    Right (Just []) -> True
+    _ -> False
+
+eliminateEquation_test2 :: Test
+eliminateEquation_test2 =
+  case runMaybeT $ eliminateEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KNat () of
+    Right (Just c) -> c == context1
+    _ -> False
+
+eliminateEquation_test3 :: Test
+eliminateEquation_test3 =
+  case runMaybeT $ eliminateEquation [] (MProduct [MArrow (MGADT "F" [MFloat, MString]) MBool, MInt] 2)
+                                        (MProduct [MArrow (MGADT "F" [MFloat, MString]) MChar, MInt] 2) KStar () of
+    Right Nothing -> True
+    _ -> False
+
+eliminateEquation_test4 :: Test
+eliminateEquation_test4 =
+  case runMaybeT $ eliminateEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc (MSucc MZero)))) KNat () of
+    Right Nothing -> True
+    _ -> False
+
+eliminateEquation_test5 :: Test
+eliminateEquation_test5 =
+  case runMaybeT $ eliminateEquation context5 (MSucc (MSucc (MSucc (MUVar $ UTypeVar "x")))) (MSucc (MSucc (MSucc (MUVar $ UTypeVar "x")))) KNat () of
+    Right (Just c) -> context5 == c
+    _ -> False
+
+eliminateEquation_test6 :: Test
+eliminateEquation_test6 =
+  case runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MSucc (MSucc (MSucc MZero))) KNat () of
+    Right (Just c) -> c == CUTypeVarEq (UTypeVar "y") (MSucc (MSucc (MSucc MZero))) : context1
+    _ -> False
+
+eliminateEquation_test7 :: Test
+eliminateEquation_test7 =
+  case runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "n") (MSucc (MSucc (MSucc MZero))) KNat () of
+    Left (UndeclaredUTypeVarError () (UTypeVar "n")) -> True
+    _ -> False
+
+eliminateEquation_test8 :: Test
+eliminateEquation_test8 =
+  case runMaybeT $ eliminateEquation context1 MString (MUVar $ UTypeVar "y")  KStar () of
+    Right (Just c) -> c == CUTypeVarEq (UTypeVar "y") MString : context1
+    _ -> False
+
+eliminateEquation_test9 :: Test
+eliminateEquation_test9 =
+  case runMaybeT $ eliminateEquation [CUTypeVarEq (UTypeVar "y") (MArrow MString MChar),
+                                      CTypeVar (U $ UTypeVar "y") KStar] (MUVar $ UTypeVar "y") MChar KStar () of
+    Left (EquationAlreadyExistsError () (UTypeVar "y") (MArrow MString MChar) MChar) -> True
+    _ -> False
+
+eliminateEquation_test10 :: Test
+eliminateEquation_test10 =
+  case runMaybeT $ eliminateEquation [CUTypeVarEq (UTypeVar "y") MString, CTypeVar (U $ UTypeVar "y") KStar] MString (MUVar $ UTypeVar "y")  KStar () of
+    Left (EquationAlreadyExistsError () (UTypeVar "y") MString MString) -> True
+    _ -> False
+
+eliminateEquation_test11 :: Test
+eliminateEquation_test11 =
+  case runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MUVar $ UTypeVar "yolo") KNat () of
+    Right (Just c) -> c == CUTypeVarEq (UTypeVar "y") (MUVar (UTypeVar "yolo")) : context1
+    _ -> False
+
+eliminateEquation_test12 :: Test
+eliminateEquation_test12 =
+  case runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MArrow MInt (MUVar $ UTypeVar "y")) KNat () of
+    Right Nothing -> True
+    _ -> False
+
+eliminateEquation_test13 :: Test
+eliminateEquation_test13 =
+  case runMaybeT $ eliminateEquation context1 MChar (MSucc MZero) KNat () of
+    Left (EliminateEquationError () MChar (MSucc MZero) KNat) -> True
+    _ -> False
+
+eliminateEquation_test14 :: Test
+eliminateEquation_test14 =
+  case runMaybeT $ eliminateEquation context1 MZero MBool KStar () of
+    Left (EliminateEquationError () MZero MBool KStar) -> True
+    _ -> False
+
+eliminateEquation_test15 :: Test
+eliminateEquation_test15 =
+  case runMaybeT $ eliminateEquation context1 MChar (MSucc MZero) KStar () of
+    Left (EliminateEquationError () MChar (MSucc MZero) KStar) -> True
+    _ -> False
+
+eliminateEquation_test16 :: Test
+eliminateEquation_test16 =
+  case runMaybeT $ eliminateEquation context1 MZero MBool KNat () of
+    Left (EliminateEquationError () MZero MBool KNat) -> True
+    _ -> False
+
+eliminateEquation_test17 :: Test
+eliminateEquation_test17 =
+  case runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "k") (MSucc MZero) KNat () of
+    Left (EliminateEquationError () (MEVar (ETypeVar "k")) (MSucc MZero) KNat) -> True
+    _ -> False
+
+eliminateEquation_test18 :: Test
+eliminateEquation_test18 =
+  case runMaybeT $ eliminateEquation context1 MBool (MEVar $ ETypeVar "o") KStar () of
+    Left (EliminateEquationError () MBool (MEVar (ETypeVar "o")) KStar) -> True
+    _ -> False
+
+eliminateEquation_test19 :: Test
+eliminateEquation_test19 =
+  case runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "n") (MEVar $ ETypeVar "r") KStar () of
+    Left (EliminateEquationError () (MEVar (ETypeVar "n")) (MEVar (ETypeVar "r")) KStar) -> True
+    _ -> False
+
+eliminateEquation_test20 :: Test
+eliminateEquation_test20 =
+  case runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "a") (MEVar $ ETypeVar "a") KNat () of
+    Left (EliminateEquationError () (MEVar (ETypeVar "a")) (MEVar (ETypeVar "a")) KNat) -> True
+    _ -> False
+
 --inferSpine ::
 --  Context -> Spine p -> Type -> Principality
 --  -> StateT TypecheckerState (Either (Error p)) (Type, Principality, Context)
@@ -2933,6 +3058,26 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("subtype_test12", subtype_test12),
          ("subtype_test13", subtype_test13),
          ("subtype_test14", subtype_test14),
+         ("eliminateEquation_test1", eliminateEquation_test1),
+         ("eliminateEquation_test2", eliminateEquation_test2),
+         ("eliminateEquation_test3", eliminateEquation_test3),
+         ("eliminateEquation_test4", eliminateEquation_test4),
+         ("eliminateEquation_test5", eliminateEquation_test5),
+         ("eliminateEquation_test6", eliminateEquation_test6),
+         ("eliminateEquation_test7", eliminateEquation_test7),
+         ("eliminateEquation_test8", eliminateEquation_test8),
+         ("eliminateEquation_test9", eliminateEquation_test9),
+         ("eliminateEquation_test10", eliminateEquation_test10),
+         ("eliminateEquation_test11", eliminateEquation_test11),
+         ("eliminateEquation_test12", eliminateEquation_test12),
+         ("eliminateEquation_test13", eliminateEquation_test13),
+         ("eliminateEquation_test14", eliminateEquation_test14),
+         ("eliminateEquation_test15", eliminateEquation_test15),
+         ("eliminateEquation_test16", eliminateEquation_test16),
+         ("eliminateEquation_test17", eliminateEquation_test17),
+         ("eliminateEquation_test18", eliminateEquation_test18),
+         ("eliminateEquation_test19", eliminateEquation_test19),
+         ("eliminateEquation_test20", eliminateEquation_test20),
          ("inferSpine_test1", inferSpine_test1),
          ("inferSpine_test2", inferSpine_test2),
          ("inferSpine_test3", inferSpine_test3),

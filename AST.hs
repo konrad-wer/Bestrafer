@@ -175,9 +175,9 @@ data ContextEntry
   deriving (Show, Eq)
 
 data Constructor = Constructor { constrTypeName :: String,
-                                 constrUVars :: [UTypeVar],
+                                 constrUVars :: [(UTypeVar, Kind)],
                                  constrProps :: [PropositionTemplate],
-                                 constrArgs :: [TypeTemplate]
+                                 constrArgsTemplates :: [TypeTemplate]
                                } deriving (Show)
 
 type ConstructorsContext = Map.Map String Constructor

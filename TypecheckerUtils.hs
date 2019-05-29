@@ -8,6 +8,8 @@ import Control.Lens hiding (Context)
 
 data Error p
   = UndeclaredVariableError p Var
+  | UndeclaredConstructorError (Expr p)
+  | MismatchedConstructorError (Expr p) String String
   | InternalCompilerError p String
   | ETypeVarTypeMismatchError p ETypeVar Monotype Monotype
   | ETypeVarKindMismatchError p ETypeVar Kind Kind
@@ -28,6 +30,7 @@ data Error p
   | EquationAlreadyExistsError p UTypeVar Monotype Monotype
   | EliminateEquationError p Monotype Monotype Kind
   | ExprNotCheckedIntroductionFormError (Expr p)
+  | ExprIsACaseError (Expr p)
   deriving (Show)
 
 data TypecheckerState = TypecheckerState {_freshVarNum :: Integer, _constrContext :: ConstructorsContext}
@@ -41,6 +44,12 @@ generateSubETypeVars a = (ETypeVar $ eTypeVarName a ++ "-1", ETypeVar $ eTypeVar
 
 generateSubETypeVarsList :: ETypeVar -> Int -> [ETypeVar]
 generateSubETypeVarsList a n = [ETypeVar $ eTypeVarName a ++ "-" ++ show k | k <- [1..n]]
+
+--exprUtils---------------------------------------------------------------------
+
+exprIsNotACase :: Expr p -> Either (Error p) ()
+exprIsNotACase e @ ECase {} = Left $ ExprIsACaseError e
+exprIsNotACase _ = return ()
 
 --polarity utils----------------------------------------------------------------
 

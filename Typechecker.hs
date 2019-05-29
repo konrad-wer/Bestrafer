@@ -1,8 +1,10 @@
+
 module Typechecker where
 
 import AST
 import TypecheckerUtils
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Control.Monad.State
 import Control.Monad.Trans.Maybe
 
@@ -358,6 +360,11 @@ checkPropTrue c (m1, m2) p = do
   k <- inferMonotypeKind c m1 p
   checkEquation c m1 m2 k p
 
+eliminatePropEquation :: Context -> Proposition -> p -> MaybeT (Either (Error p)) Context
+eliminatePropEquation c (m1, m2) p = do
+  k <- lift $ inferMonotypeKind c m1 p
+  eliminateEquation c m1 m2 k p
+
 headConstructorClash :: Monotype -> Monotype -> Bool
 headConstructorClash MZero (MSucc _) = True
 headConstructorClash (MSucc _) MZero = True
@@ -484,6 +491,26 @@ checkExpr c (EInt p _)    (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace
 checkExpr c (EFloat p _)  (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MFloat  [] p
 checkExpr c (EChar p _)   (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MChar   [] p
 checkExpr c (EString p _) (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MString [] p
+checkExpr c e (TUniversal a k t) pr = do
+  lift $ checkedIntroductionForm e
+  dropContextToMarker <$> checkExpr (CTypeVar (U a) k : CMarker : c) e t pr
+checkExpr c e (TExistential a k t) _ = do
+  lift $ checkedIntroductionForm e
+  let a' = ETypeVar $ uTypeVarName a
+  checkExpr (CTypeVar (E  a') k : c) e (substituteUVarInType a (E a') t) NotPrincipal
+checkExpr c e (TImp prop t) Principal = do
+  lift $ checkedIntroductionForm e
+  contextOrContradiction <- lift . runMaybeT $ eliminatePropEquation (CMarker : c) prop $ getPos e
+  case contextOrContradiction of
+    Nothing -> return c
+    Just c2 -> do
+      t' <- lift $ applyContextToType c2 t $ getPos e
+      dropContextToMarker <$>  checkExpr c2 e t' Principal
+checkExpr c e (TAnd t prop) pr = do
+  lift $ exprIsNotACase e
+  c2 <- lift $ checkPropTrue c prop $ getPos e
+  t' <- lift $ applyContextToType c2 t $ getPos e
+  checkExpr c2 e t' pr
 checkExpr c (ELambda _ x e) (TArrow t1 t2) pr = do
   c2 <- checkExpr (CVar x t1 pr : CMarker : c) e t2 pr
   return $ dropContextToMarker c2
@@ -511,11 +538,40 @@ checkExpr c (ETuple p (e1 : es) n) (TEVar a) NotPrincipal = do
     aux _c (e, t) = do
       t' <- lift $ applyContextToType _c t p
       checkExpr _c e t' NotPrincipal
--- checkExpr c (EInjk p e k) (TGADT n ts) pr = checkExpr c e (ts !! k) pr
--- checkExpr c (EInjk p e k) (TEVar a) _ = do
---   let (a1, a2) = generateSubETypeVars a
---   c2 <- lift $ eTypeVarContextReplace c a KStar (MCoproduct (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
---   checkExpr c2 e ([TEVar a1, TEVar a2] !! k) NotPrincipal
+checkExpr c (EConstr p constrName es) (TGADT typeName ts) pr = do
+  lookupRes <- Map.lookup constrName . view constrContext <$> get
+  case lookupRes of
+    Nothing -> lift $ Left $ UndeclaredConstructorError $ EConstr p constrName es
+    Just constr ->
+      if constrTypeName constr /= typeName then
+        lift . Left $ MismatchedConstructorError (EConstr p constrName es) (constrTypeName constr) typeName
+      else do
+        firstFreshVarNum <- view freshVarNum <$> get
+        modify $ over freshVarNum (+ (fromIntegral . length . constrUVars $ constr))
+        let evars = map (E . ETypeVar . ("#" ++) . show) [firstFreshVarNum .. firstFreshVarNum + (fromIntegral . length . constrUVars $ constr)]
+        uArgs <- lift $ mapM (typeFromTemplate ts p) $ constrArgsTemplates constr
+        uProps <- lift $ mapM (propositionFromTemplate ts p) $ constrProps constr
+        let args = map (flip (foldl (flip $ uncurry substituteUVarInType)) (zip (map fst (constrUVars constr)) evars)) uArgs
+        let props = map (flip (foldl (flip $ uncurry substituteUVarInProp)) (zip (map fst (constrUVars constr)) evars)) uProps
+        let c2 = zipWith CTypeVar evars (map snd $ constrUVars constr) ++ CMarker : c
+        c3 <- lift $ foldM auxProp c2 props
+        dropContextToMarker <$> foldM auxType c3 (zip es args)
+  where
+    auxProp _c prop = do
+      prop' <- applyContextToProposition c prop p
+      checkPropTrue _c prop' p
+    auxType _c (e, t) = do
+      t' <- lift $ applyContextToType _c t p
+      checkExpr _c e t' pr
+checkExpr c (ENil p) (TVec n _) _ = lift $ checkPropTrue c (n, MZero) p
+checkExpr c (ECons p e1 e2) (TVec n t) pr = do
+  a <- ETypeVar . ("#" ++) . show . view freshVarNum <$> get
+  modify $ over freshVarNum (+ 1)
+  c2 <- lift $ checkPropTrue (CTypeVar (E a) KNat : CMarker : c) (n, MSucc (MEVar a)) p
+  t' <- lift $ applyContextToType c2 t p
+  c3 <- checkExpr c2 e1 t' pr
+  t'' <- lift $ applyContextToType c2 (TVec (MEVar a) t) p
+  dropContextToMarker <$> checkExpr c3 e2 t'' pr
 checkExpr c e t _ = do
   (t2, _, c2) <- inferExpr c e
   subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t $ getPos e

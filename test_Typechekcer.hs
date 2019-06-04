@@ -12,7 +12,18 @@ type TestName = String
 --TODO tests that not typecheck
 
 startState :: TypecheckerState
-startState = TypecheckerState {_freshVarNum = 0, _constrContext = Map.empty}
+startState = TypecheckerState {_freshVarNum = 0,
+  _gadtArities = Map.fromList [("Terminator", 2), ("Lion", 1)],
+  _constrContext = Map.fromList
+  [("T800", Constructor "Terminator"
+    [(UTypeVar "a", KNat)]
+    [(MTInt, MTParam 1), (MTSucc (MTUVar (UTypeVar "a")), MTParam 0)]
+    [TTInt, TTVec (MTUVar (UTypeVar "a")) (TTParam 1), TTBool]),
+   ("T1000", Constructor "Terminator" [] [] [TTString, TTParam 0, TTParam 1]),
+   ("TX", Constructor "Terminator" [] [] []),
+   ("Simba", Constructor "Lion" [] [] [TTInt, TTBool]),
+   ("Mufasa", Constructor "Lion" [] [(MTParam 0, MTInt)] [TTInt, TTBool])
+  ]}
 
 context1 :: Context
 context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
@@ -1090,7 +1101,7 @@ applyContextToType_test10 :: Test
 applyContextToType_test10 =
   case applyContextToType context5 (TUniversal (UTypeVar "x") KNat
                           (TVec (MUVar $ UTypeVar "x") (TGADT "Elton" [ParameterType TUnit, ParameterType TUnit]))) () of
-    Right (TUniversal (UTypeVar "x") KNat (TVec (MUVar (UTypeVar "x")) (TGADT "Elton" [ParameterType TUnit, ParameterType TUnit]))) -> True
+    Right (TUniversal (UTypeVar "x") KNat (TVec MZero (TGADT "Elton" [ParameterType TUnit, ParameterType TUnit]))) -> True
     _ -> False
 
 applyContextToType_test11 :: Test
@@ -1112,14 +1123,14 @@ applyContextToType_test13 :: Test
 applyContextToType_test13  =
   case applyContextToType context1 (TExistential (UTypeVar "b") KNat
        (TImp (MUVar (UTypeVar "n"), MEVar (ETypeVar "b")) (TVec (MEVar (ETypeVar "b")) TUnit))) () of
-    Left (UndeclaredETypeVarError () (ETypeVar "b")) -> True
+    Right (TExistential (UTypeVar "b") KNat (TImp (MSucc (MSucc (MSucc MZero)), MSucc MZero) (TVec (MSucc MZero) TUnit))) -> True
     _ -> False
 
 applyContextToType_test14 :: Test
 applyContextToType_test14  =
   case applyContextToType context5 (TExistential (UTypeVar "x") KNat
        (TImp (MUVar (UTypeVar "x"), MUVar (UTypeVar "x")) (TVec (MUVar (UTypeVar "x")) TUnit))) () of
-    Right (TExistential (UTypeVar "x") KNat (TImp (MUVar (UTypeVar "x"), MUVar (UTypeVar "x")) (TVec (MUVar (UTypeVar "x")) TUnit))) -> True
+    Right (TExistential (UTypeVar "x") KNat (TImp (MZero, MZero) (TVec MZero TUnit))) -> True
     _ -> False
 
 applyContextToType_test15 :: Test
@@ -1132,301 +1143,319 @@ applyContextToType_test15  =
 --inferMonotypeKind :: Context -> Monotype -> p -> Either (Error p) Kind
 inferMonotypeKind_test1 :: Test
 inferMonotypeKind_test1 =
-  case inferMonotypeKind [] (MSucc $ MSucc MZero) "1, 3" of
+  case flip evalStateT startState $ inferMonotypeKind [] (MSucc $ MSucc MZero) "1, 3" of
     Right KNat -> True
     _ -> False
 
 inferMonotypeKind_test2 :: Test
 inferMonotypeKind_test2 =
-  case inferMonotypeKind [] (MSucc $ MSucc MUnit) "1, 3" of
+  case flip evalStateT startState $ inferMonotypeKind [] (MSucc $ MSucc MUnit) "1, 3" of
     Left (MonotypeHasWrongKindError "1, 3" MUnit KNat KStar) -> True
     _ -> False
 
 inferMonotypeKind_test3 :: Test
 inferMonotypeKind_test3 =
-  case inferMonotypeKind context1 (MGADT "G" [MUVar $ UTypeVar "y", MEVar $ ETypeVar "z"]) "1, 3" of
+  case flip evalStateT startState $ inferMonotypeKind context1 (MGADT "Terminator" [MUVar $ UTypeVar "y", MEVar $ ETypeVar "z"]) "1, 3" of
     Right KStar -> True
     _ -> False
 
 inferMonotypeKind_test4 :: Test
 inferMonotypeKind_test4 =
-  case inferMonotypeKind context1 (MArrow  (MEVar $ ETypeVar "b")  (MEVar $ ETypeVar "z")) "1, 3" of
+  case flip evalStateT startState $ inferMonotypeKind context1 (MArrow  (MEVar $ ETypeVar "b")  (MEVar $ ETypeVar "z")) "1, 3" of
     Left (MonotypeHasWrongKindError "1, 3" (MEVar (ETypeVar "b")) KStar KNat) -> True
     _ -> False
 
 inferMonotypeKind_test5 :: Test
 inferMonotypeKind_test5 =
-  case inferMonotypeKind context1 (MUVar $ UTypeVar "n") "1, 3" of
+  case flip evalStateT startState $ inferMonotypeKind context1 (MUVar $ UTypeVar "n") "1, 3" of
     Left (UndeclaredUTypeVarError "1, 3" (UTypeVar "n")) -> True
     _ -> False
 
 inferMonotypeKind_test6 :: Test
 inferMonotypeKind_test6 =
-  case inferMonotypeKind context1 (MEVar $ ETypeVar "Konrad") (1 :: Integer, 3 :: Integer) of
+  case flip evalStateT startState $ inferMonotypeKind context1 (MEVar $ ETypeVar "Konrad") (1 :: Integer, 3 :: Integer) of
     Left (UndeclaredETypeVarError (1, 3) (ETypeVar "Konrad")) -> True
     _ -> False
 
 inferMonotypeKind_test7 :: Test
 inferMonotypeKind_test7 =
-  case inferMonotypeKind context2 (MArrow (MProduct [MUnit, MUnit] 2) (MEVar $ ETypeVar "c")) "1, 3" of
+  case flip evalStateT startState $ inferMonotypeKind context2 (MArrow (MProduct [MUnit, MUnit] 2) (MEVar $ ETypeVar "c")) "1, 3" of
     Right KStar -> True
     _ -> False
 
 inferMonotypeKind_test8 :: Test
 inferMonotypeKind_test8 =
-  case inferMonotypeKind context2 (MGADT "F" [MProduct [MUnit, MUnit] 2, MSucc $ MSucc MZero]) ("1", "3") of
-    Right KStar -> True
+  case flip evalStateT startState $ inferMonotypeKind context2 (MGADT "Lion" [MProduct [MUnit, MUnit] 2, MSucc $ MSucc MZero]) ("1", "3") of
+    Left (MismatchedGADTArityError ("1", "3") "Lion" 1 2) -> True
     _ -> False
 
 inferMonotypeKind_test9 :: Test
 inferMonotypeKind_test9 =
-  case inferMonotypeKind context2 (MGADT "F" [MProduct [MZero, MUnit] 2, MSucc $ MSucc MZero]) ("1", "3") of
-    Left (MonotypeHasWrongKindError ("1", "3") MZero KStar KNat) -> True
+  case flip evalStateT startState $ inferMonotypeKind context2 (MGADT "F" [MProduct [MZero, MUnit] 2, MSucc $ MSucc MZero]) ("1", "3") of
+    Left (UndeclaredGADTError ("1", "3") "F") -> True
     _ -> False
 
 --checkMonotypeHasKind :: Context -> Monotype -> p -> Kind -> Either (Error p) ()
 checkMonotypeHasKind_test1 :: Test
 checkMonotypeHasKind_test1 =
-  case checkMonotypeHasKind [] (MArrow MUnit MUnit) "3.14" KStar of
+  case flip evalStateT startState $ checkMonotypeHasKind [] (MArrow MUnit MUnit) "3.14" KStar of
     Right () -> True
     _ -> False
 
 checkMonotypeHasKind_test2 :: Test
 checkMonotypeHasKind_test2 =
-  case checkMonotypeHasKind context5 (MSucc $ MSucc (MEVar $ ETypeVar "x")) () KNat of
+  case flip evalStateT startState $ checkMonotypeHasKind context5 (MSucc $ MSucc (MEVar $ ETypeVar "x")) () KNat of
     Right () -> True
     _ -> False
 
 checkMonotypeHasKind_test3 :: Test
 checkMonotypeHasKind_test3 =
-  case checkMonotypeHasKind [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero] (MSucc $ MSucc (MEVar $ ETypeVar "a")) () KNat of
+  case flip evalStateT startState $ checkMonotypeHasKind [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero]
+            (MSucc $ MSucc (MEVar $ ETypeVar "a")) () KNat of
     Left (MonotypeHasWrongKindError () (MEVar (ETypeVar "a")) KNat KStar) -> True
     _ -> False
 
 checkMonotypeHasKind_test4 :: Test
 checkMonotypeHasKind_test4 =
-  case checkMonotypeHasKind [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero] (MArrow MUnit (MEVar $ ETypeVar "a")) () KStar of
+  case flip evalStateT startState $ checkMonotypeHasKind [CTypeVar (E $ ETypeVar "a") KStar, CETypeVar (ETypeVar "a") KNat MZero]
+            (MArrow MUnit (MEVar $ ETypeVar "a")) () KStar of
     Right () -> True
     _ -> False
 
 checkMonotypeHasKind_test5 :: Test
 checkMonotypeHasKind_test5 =
-  case checkMonotypeHasKind context5 (MSucc $ MSucc (MUVar $ UTypeVar "x")) () KNat of
+  case flip evalStateT startState $ checkMonotypeHasKind context5 (MSucc $ MSucc (MUVar $ UTypeVar "x")) () KNat of
     Left (UndeclaredUTypeVarError () (UTypeVar "x")) -> True
     _ -> False
 
 checkMonotypeHasKind_test6 :: Test
 checkMonotypeHasKind_test6 =
-  case checkMonotypeHasKind context5 (MSucc $ MSucc (MUVar $ UTypeVar "xx")) () KNat of
+  case flip evalStateT startState $ checkMonotypeHasKind context5 (MSucc $ MSucc (MUVar $ UTypeVar "xx")) () KNat of
     Left (UndeclaredUTypeVarError () (UTypeVar "xx")) -> True
     _ -> False
 
 checkMonotypeHasKind_test7 :: Test
 checkMonotypeHasKind_test7 =
-  case checkMonotypeHasKind context5 (MSucc $ MSucc (MEVar $ ETypeVar "")) () KNat of
+  case flip evalStateT startState $ checkMonotypeHasKind context5 (MSucc $ MSucc (MEVar $ ETypeVar "")) () KNat of
     Left (UndeclaredETypeVarError () (ETypeVar "")) -> True
     _ -> False
 
 --checkPropWellFormedness :: Context -> Proposition -> p -> Either (Error p) ()
 checkPropWellFormedness_test1 :: Test
 checkPropWellFormedness_test1 =
-  case checkPropWellFormedness [] (MZero, MZero) (5 :: Integer) of
+  case flip evalStateT startState $ checkPropWellFormedness [] (MZero, MZero) (5 :: Integer) of
     Right () -> True
     _ -> False
 
 checkPropWellFormedness_test2 :: Test
 checkPropWellFormedness_test2 =
-  case checkPropWellFormedness [] (MZero, MSucc $ MSucc MZero) (5 :: Integer) of
+  case flip evalStateT startState $ checkPropWellFormedness [] (MZero, MSucc $ MSucc MZero) (5 :: Integer) of
     Right () -> True
     _ -> False
 
 checkPropWellFormedness_test3 :: Test
 checkPropWellFormedness_test3 =
-  case checkPropWellFormedness [] (MSucc $ MSucc MZero, MProduct [MUnit, MUnit] 2) (5 :: Integer) of
+  case flip evalStateT startState $ checkPropWellFormedness [] (MSucc $ MSucc MZero, MProduct [MUnit, MUnit] 2) (5 :: Integer) of
     Left (MonotypeHasWrongKindError 5 (MProduct [MUnit, MUnit] 2) KNat KStar) -> True
     _ -> False
 
 checkPropWellFormedness_test4 :: Test
 checkPropWellFormedness_test4 =
-  case checkPropWellFormedness [] (MSucc $ MSucc MZero, MProduct [MUnit, MSucc MZero] 2) (5 :: Integer) of
+  case flip evalStateT startState $ checkPropWellFormedness [] (MSucc $ MSucc MZero, MProduct [MUnit, MSucc MZero] 2) (5 :: Integer) of
     Left (MonotypeHasWrongKindError 5 (MSucc MZero) KStar KNat) -> True
     _ -> False
 
 checkPropWellFormedness_test5 :: Test
 checkPropWellFormedness_test5 =
-  case checkPropWellFormedness context1 (MSucc $ MSucc  (MEVar $ ETypeVar "b"), MProduct [MUnit, MSucc MZero] 2) () of
+  case flip evalStateT startState $ checkPropWellFormedness context1 (MSucc $ MSucc  (MEVar $ ETypeVar "b"), MProduct [MUnit, MSucc MZero] 2) () of
     Left (MonotypeHasWrongKindError () (MSucc MZero) KStar KNat) -> True
     _ -> False
 
 checkPropWellFormedness_test6 :: Test
 checkPropWellFormedness_test6 =
-  case checkPropWellFormedness context5 (MSucc $ MSucc  (MUVar $ UTypeVar "x"), MEVar $ ETypeVar "x") () of
+  case flip evalStateT startState $ checkPropWellFormedness context5 (MSucc $ MSucc  (MUVar $ UTypeVar "x"), MEVar $ ETypeVar "x") () of
     Left (UndeclaredUTypeVarError () (UTypeVar "x")) -> True
     _ -> False
 
 checkPropWellFormedness_test7 :: Test
 checkPropWellFormedness_test7 =
-  case checkPropWellFormedness context5 (MSucc $ MSucc  (MUVar $ UTypeVar "r"), MEVar $ ETypeVar "x") () of
+  case flip evalStateT startState $ checkPropWellFormedness context5 (MSucc $ MSucc  (MUVar $ UTypeVar "r"), MEVar $ ETypeVar "x") () of
     Left (UndeclaredUTypeVarError () (UTypeVar "r")) -> True
     _ -> False
 
 --checkTypeWellFormedness :: Context -> Type -> p -> Either (Error p) ()
 checkTypeWellFormedness_test1 :: Test
 checkTypeWellFormedness_test1 =
-  case checkTypeWellFormedness context1 (TArrow TUnit $ TGADT "F" [ParameterType TUnit, ParameterType $ TProduct [TUnit, TUnit] 2]) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context1
+            (TArrow TUnit $ TGADT "Lion" [ParameterType $ TProduct [TUnit, TUnit] 2]) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test2 :: Test
 checkTypeWellFormedness_test2 =
-  case checkTypeWellFormedness context1 (TGADT "F" [ParameterType $ TUVar $ UTypeVar "y",
+  case flip evalStateT startState $ checkTypeWellFormedness context1 (TGADT "Terminator" [ParameterType $ TUVar $ UTypeVar "y",
                                                     ParameterType $ TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "a"] 2]) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test3 :: Test
 checkTypeWellFormedness_test3 =
-  case checkTypeWellFormedness context1 (TGADT "F" [ParameterType $ TUVar $ UTypeVar "y",
+  case flip evalStateT startState $ checkTypeWellFormedness context1 (TGADT "Terminator" [ParameterType $ TUVar $ UTypeVar "y",
                                                     ParameterType $ TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2]) ((),()) of
     Left (TypeHasWrongKindError ((), ()) (TEVar (ETypeVar "b")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormedness_test4 :: Test
 checkTypeWellFormedness_test4 =
-  case checkTypeWellFormedness [] (TGADT "F" [ParameterType $ TUVar $ UTypeVar "y",
+  case flip evalStateT startState $ checkTypeWellFormedness [] (TGADT "Terminator" [ParameterType $ TUVar $ UTypeVar "y",
                                               ParameterType $ TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2]) ((),()) of
     Left (UndeclaredUTypeVarError ((), ()) (UTypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormedness_test5 :: Test
 checkTypeWellFormedness_test5 =
-  case checkTypeWellFormedness [] (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2) ((),()) of
+  case flip evalStateT startState $ checkTypeWellFormedness [] (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2) ((),()) of
     Left (UndeclaredETypeVarError ((), ()) (ETypeVar "z")) -> True
     _ -> False
 
 checkTypeWellFormedness_test6 :: Test
 checkTypeWellFormedness_test6 =
-  case checkTypeWellFormedness context5 (TUVar $ UTypeVar "x") (5 :: Integer) of
+  case flip evalStateT startState $ checkTypeWellFormedness context5 (TUVar $ UTypeVar "x") (5 :: Integer) of
     Left (UndeclaredUTypeVarError 5 (UTypeVar "x")) -> True
     _ -> False
 
 checkTypeWellFormedness_test7 :: Test
 checkTypeWellFormedness_test7 =
-  case checkTypeWellFormedness context5 (TUniversal (UTypeVar "x") KStar (TArrow (TUVar $ UTypeVar "x") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context5 (TUniversal (UTypeVar "x") KStar (TArrow (TUVar $ UTypeVar "x") TUnit)) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test8 :: Test
 checkTypeWellFormedness_test8 =
-  case checkTypeWellFormedness context5 (TUniversal (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context5
+            (TUniversal (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test9 :: Test
 checkTypeWellFormedness_test9 =
-  case checkTypeWellFormedness [] (TUniversal (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+            (TUniversal (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test10 :: Test
 checkTypeWellFormedness_test10 =
-  case checkTypeWellFormedness context1 (TExistential (UTypeVar "b") KStar (TArrow (TEVar $ ETypeVar "b") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context1
+            (TExistential (UTypeVar "b") KStar (TArrow (TEVar $ ETypeVar "b") TUnit)) () of
     Left (UndeclaredETypeVarError () (ETypeVar "b")) -> True
     _ -> False
 
 checkTypeWellFormedness_test11 :: Test
 checkTypeWellFormedness_test11 =
-  case checkTypeWellFormedness context1 (TExistential (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context1
+            (TExistential (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test12 :: Test
 checkTypeWellFormedness_test12 =
-  case checkTypeWellFormedness [] (TExistential (UTypeVar "Konrad") KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+        (TExistential (UTypeVar "Konrad") KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) () of
     Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
     _ -> False
 
 checkTypeWellFormedness_test13 :: Test
 checkTypeWellFormedness_test13 =
-  case checkTypeWellFormedness [] (TUniversal (UTypeVar "x") KStar (TArrow (TUVar $ UTypeVar "y") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+        (TUniversal (UTypeVar "x") KStar (TArrow (TUVar $ UTypeVar "y") TUnit)) () of
     Left (UndeclaredUTypeVarError () (UTypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormedness_test14 :: Test
 checkTypeWellFormedness_test14 =
-  case checkTypeWellFormedness [] (TExistential (UTypeVar "x") KStar (TArrow (TEVar $ ETypeVar "y") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+        (TExistential (UTypeVar "x") KStar (TArrow (TEVar $ ETypeVar "y") TUnit)) () of
     Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormedness_test15 :: Test
 checkTypeWellFormedness_test15 =
-  case checkTypeWellFormedness context1 (TImp (MZero, MSucc MZero) (TArrow (TEVar $ ETypeVar "z") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context1 (TImp (MZero, MSucc MZero) (TArrow (TEVar $ ETypeVar "z") TUnit)) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test16 :: Test
 checkTypeWellFormedness_test16 =
-  case checkTypeWellFormedness [] (TImp (MZero, MZero) (TArrow (TEVar $ ETypeVar "y") TUnit)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness [] (TImp (MZero, MZero) (TArrow (TEVar $ ETypeVar "y") TUnit)) () of
     Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormedness_test17 :: Test
 checkTypeWellFormedness_test17 =
-  case checkTypeWellFormedness [] (TExistential (UTypeVar "x") KStar (TImp (MZero, MSucc MZero) (TArrow (TUVar $ UTypeVar "x") TUnit))) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+            (TExistential (UTypeVar "x") KStar (TImp (MZero, MSucc MZero) (TArrow (TUVar $ UTypeVar "x") TUnit))) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test18 :: Test
 checkTypeWellFormedness_test18 =
-  case checkTypeWellFormedness [] (TExistential (UTypeVar "x") KStar (TImp (MZero, MSucc (MUVar $ UTypeVar "x")) (TArrow (TEVar $ ETypeVar "z") TUnit))) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+            (TExistential (UTypeVar "x") KStar (TImp (MZero, MSucc (MUVar $ UTypeVar "x")) (TArrow (TEVar $ ETypeVar "z") TUnit))) () of
     Left (MonotypeHasWrongKindError () (MUVar (UTypeVar "x")) KNat KStar) -> True
     _ -> False
 
 checkTypeWellFormedness_test19 :: Test
 checkTypeWellFormedness_test19 =
-  case checkTypeWellFormedness context1 (TAnd (TArrow (TEVar $ ETypeVar "z") TUnit) (MEVar $ ETypeVar "b", MSucc MZero)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context1
+            (TAnd (TArrow (TEVar $ ETypeVar "z") TUnit) (MEVar $ ETypeVar "b", MSucc MZero)) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test20 :: Test
 checkTypeWellFormedness_test20 =
-  case checkTypeWellFormedness context1 (TAnd (TArrow (TUVar $ UTypeVar "Haskell") TUnit) (MEVar $ ETypeVar "Konrad", MSucc MZero)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context1
+            (TAnd (TArrow (TUVar $ UTypeVar "Haskell") TUnit) (MEVar $ ETypeVar "Konrad", MSucc MZero)) () of
     Left (UndeclaredUTypeVarError () (UTypeVar "Haskell")) -> True
     _ -> False
 
 checkTypeWellFormedness_test21 :: Test
 checkTypeWellFormedness_test21 =
-  case checkTypeWellFormedness [] (TUniversal (UTypeVar "x") KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MUVar $ UTypeVar "x", MUnit))) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+            (TUniversal (UTypeVar "x") KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MUVar $ UTypeVar "x", MUnit))) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test22 :: Test
 checkTypeWellFormedness_test22 =
-  case checkTypeWellFormedness [] (TUniversal (UTypeVar "x") KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MEVar $ ETypeVar "x", MUnit))) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+            (TUniversal (UTypeVar "x") KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)  (MEVar $ ETypeVar "x", MUnit))) () of
     Left (UndeclaredETypeVarError () (ETypeVar "x")) -> True
     _ -> False
 
 checkTypeWellFormedness_test23 :: Test
 checkTypeWellFormedness_test23 =
-  case checkTypeWellFormedness context1 (TVec (MSucc $ MSucc (MEVar $ ETypeVar "b")) (TProduct [TUnit, TUnit] 2)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness context1 (TVec (MSucc $ MSucc (MEVar $ ETypeVar "b")) (TProduct [TUnit, TUnit] 2)) () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test24 :: Test
 checkTypeWellFormedness_test24 =
-  case checkTypeWellFormedness [] (TUniversal (UTypeVar "n") KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n")) (TProduct [TUnit, TUVar $ UTypeVar "n"] 2)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+            (TUniversal (UTypeVar "n") KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n")) (TProduct [TUnit, TUVar $ UTypeVar "n"] 2)) () of
     Left (TypeHasWrongKindError () (TUVar (UTypeVar "n")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormedness_test25 :: Test
 checkTypeWellFormedness_test25 =
-  case checkTypeWellFormedness [] (TExistential (UTypeVar "x") KStar $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "x")) (TProduct [TUnit, TUnit] 2)) () of
+  case flip evalStateT startState $ checkTypeWellFormedness []
+            (TExistential (UTypeVar "x") KStar $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "x")) (TProduct [TUnit, TUnit] 2)) () of
     Left (MonotypeHasWrongKindError () (MUVar (UTypeVar "x")) KNat KStar) -> True
     _ -> False
 
 checkTypeWellFormedness_test26 :: Test
 checkTypeWellFormedness_test26 =
-  case checkTypeWellFormedness context1 (TUniversal (UTypeVar "n") KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
+  case flip evalStateT startState $ checkTypeWellFormedness context1 (TUniversal (UTypeVar "n") KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
        (TImp (MEVar $ ETypeVar "b", MUVar $ UTypeVar "n") (TProduct [TUnit, TUnit] 2))) () of
     Right () -> True
     _ -> False
@@ -1434,165 +1463,184 @@ checkTypeWellFormedness_test26 =
 --checkTypeWellFormednessWithPrnc :: Context -> Type -> Principality -> p -> Either (Error p) ()
 checkTypeWellFormednessWithPrnc_test1 :: Test
 checkTypeWellFormednessWithPrnc_test1 =
-  case checkTypeWellFormednessWithPrnc context1 (TArrow TUnit $ TArrow TUnit (TProduct [TUnit, TUnit] 2)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TArrow TUnit $ TArrow TUnit (TProduct [TUnit, TUnit] 2)) Principal () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test2 :: Test
 checkTypeWellFormednessWithPrnc_test2 =
-  case checkTypeWellFormednessWithPrnc context1 (TArrow (TUVar $ UTypeVar "y") (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "a"] 2)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TArrow (TUVar $ UTypeVar "y") (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "a"] 2)) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "a", ETypeVar "z"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test3 :: Test
 checkTypeWellFormednessWithPrnc_test3 =
-  case checkTypeWellFormednessWithPrnc context1 (TArrow (TUVar $ UTypeVar "y")
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1 (TArrow (TUVar $ UTypeVar "y")
                                                 (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2)) Principal ((),()) of
     Left (TypeFormednessPrcFEVError ((),()) [ETypeVar "b", ETypeVar "z"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test4 :: Test
 checkTypeWellFormednessWithPrnc_test4 =
-  case checkTypeWellFormednessWithPrnc [] (TArrow (TUVar $ UTypeVar "y") (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2)) Principal ((),()) of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TArrow (TUVar $ UTypeVar "y") (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2)) Principal ((),()) of
     Left (TypeFormednessPrcFEVError ((),()) [ETypeVar "b", ETypeVar "z"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test5 :: Test
 checkTypeWellFormednessWithPrnc_test5 =
-  case checkTypeWellFormednessWithPrnc [] (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2) Principal ((),()) of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2) Principal ((),()) of
     Left (TypeFormednessPrcFEVError ((),()) [ETypeVar "b", ETypeVar "z"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test6 :: Test
 checkTypeWellFormednessWithPrnc_test6 =
-  case checkTypeWellFormednessWithPrnc context4 (TUVar $ UTypeVar "x") Principal (5 :: Integer) of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context4 (TUVar $ UTypeVar "x") Principal (5 :: Integer) of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test7 :: Test
 checkTypeWellFormednessWithPrnc_test7 =
-  case checkTypeWellFormednessWithPrnc context5 (TUniversal (UTypeVar "x") KStar (TArrow (TUVar $ UTypeVar "x") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context5
+            (TUniversal (UTypeVar "x") KStar (TArrow (TUVar $ UTypeVar "x") TUnit)) Principal () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test8 :: Test
 checkTypeWellFormednessWithPrnc_test8 =
-  case checkTypeWellFormednessWithPrnc context5 (TUniversal (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context5
+            (TUniversal (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) Principal () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test9 :: Test
 checkTypeWellFormednessWithPrnc_test9 =
-  case checkTypeWellFormednessWithPrnc [] (TUniversal (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TUniversal (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) Principal () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test10 :: Test
 checkTypeWellFormednessWithPrnc_test10 =
-  case checkTypeWellFormednessWithPrnc context1 (TExistential (UTypeVar "b") KStar (TArrow (TUVar $ UTypeVar "b") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TExistential (UTypeVar "b") KStar (TArrow (TUVar $ UTypeVar "b") TUnit)) Principal () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test11 :: Test
 checkTypeWellFormednessWithPrnc_test11 =
-  case checkTypeWellFormednessWithPrnc context1 (TExistential (UTypeVar "Konrad") KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TExistential (UTypeVar "Konrad") KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) Principal () of
     Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test12 :: Test
 checkTypeWellFormednessWithPrnc_test12 =
-  case checkTypeWellFormednessWithPrnc [] (TExistential (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TExistential (UTypeVar "Konrad") KStar (TArrow (TUVar $ UTypeVar "Konrad") TUnit)) Principal () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test13 :: Test
 checkTypeWellFormednessWithPrnc_test13 =
-  case checkTypeWellFormednessWithPrnc [] (TUniversal (UTypeVar "x") KStar (TArrow (TUVar $ UTypeVar "y") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TUniversal (UTypeVar "x") KStar (TArrow (TUVar $ UTypeVar "y") TUnit)) Principal () of
     Left (UndeclaredUTypeVarError () (UTypeVar "y")) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test14 :: Test
 checkTypeWellFormednessWithPrnc_test14 =
-  case checkTypeWellFormednessWithPrnc [] (TExistential (UTypeVar "x") KStar (TArrow (TEVar $ ETypeVar "y") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TExistential (UTypeVar "x") KStar (TArrow (TEVar $ ETypeVar "y") TUnit)) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "y"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test15 :: Test
 checkTypeWellFormednessWithPrnc_test15 =
-  case checkTypeWellFormednessWithPrnc context1 (TImp (MZero, MSucc MZero) (TArrow (TEVar $ ETypeVar "z") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TImp (MZero, MSucc MZero) (TArrow (TEVar $ ETypeVar "z") TUnit)) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "z"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test16 :: Test
 checkTypeWellFormednessWithPrnc_test16 =
-  case checkTypeWellFormednessWithPrnc [] (TImp (MZero, MZero) (TArrow (TEVar $ ETypeVar "y") TUnit)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TImp (MZero, MZero) (TArrow (TEVar $ ETypeVar "y") TUnit)) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "y"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test17 :: Test
 checkTypeWellFormednessWithPrnc_test17 =
-  case checkTypeWellFormednessWithPrnc [] (TExistential (UTypeVar "x") KStar
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc [] (TExistential (UTypeVar "x") KStar
        (TImp (MZero, MSucc MZero) (TArrow (TUVar $ UTypeVar "x") TUnit))) Principal () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test18 :: Test
 checkTypeWellFormednessWithPrnc_test18 =
-  case checkTypeWellFormednessWithPrnc [] (TExistential (UTypeVar "x") KStar (TImp (MZero, MSucc (MEVar $ ETypeVar "x"))
-       (TArrow (TEVar $ ETypeVar "z") TUnit))) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TExistential (UTypeVar "x") KStar (TImp (MZero, MSucc (MEVar $ ETypeVar "x")) (TArrow (TEVar $ ETypeVar "z") TUnit))) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "z"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test19 :: Test
 checkTypeWellFormednessWithPrnc_test19 =
-  case checkTypeWellFormednessWithPrnc context1 (TAnd (TArrow (TEVar $ ETypeVar "z") TUnit) (MEVar $ ETypeVar "b", MSucc MZero)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TAnd (TArrow (TEVar $ ETypeVar "z") TUnit) (MEVar $ ETypeVar "b", MSucc MZero)) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "b", ETypeVar "z"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test20 :: Test
 checkTypeWellFormednessWithPrnc_test20 =
-  case checkTypeWellFormednessWithPrnc context1 (TAnd (TArrow (TUVar $ UTypeVar "Haskell") TUnit) (MEVar $ ETypeVar "Konrad", MSucc MZero)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TAnd (TArrow (TUVar $ UTypeVar "Haskell") TUnit) (MEVar $ ETypeVar "Konrad", MSucc MZero)) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "Konrad"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test21 :: Test
 checkTypeWellFormednessWithPrnc_test21 =
-  case checkTypeWellFormednessWithPrnc [] (TUniversal (UTypeVar "x") KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)
-                                          (MUVar $ UTypeVar "x", MUnit))) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TUniversal (UTypeVar "x") KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit) (MUVar $ UTypeVar "x", MUnit))) Principal () of
     Right () -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test22 :: Test
 checkTypeWellFormednessWithPrnc_test22 =
-  case checkTypeWellFormednessWithPrnc [] (TUniversal (UTypeVar "x") KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit)
-                                          (MEVar $ ETypeVar "x", MUnit))) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TUniversal (UTypeVar "x") KStar (TAnd (TArrow (TUVar $ UTypeVar "x") TUnit) (MEVar $ ETypeVar "x", MUnit))) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "x"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test23 :: Test
 checkTypeWellFormednessWithPrnc_test23 =
-  case checkTypeWellFormednessWithPrnc context1 (TVec (MSucc $ MSucc (MEVar $ ETypeVar "b")) (TProduct [TUnit, TUnit] 2)) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TVec (MSucc $ MSucc (MEVar $ ETypeVar "b")) (TProduct [TUnit, TUnit] 2)) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "b"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test24 :: Test
 checkTypeWellFormednessWithPrnc_test24 =
-  case checkTypeWellFormednessWithPrnc [] (TUniversal (UTypeVar "n") KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc []
+            (TUniversal (UTypeVar "n") KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
        (TProduct [TUnit, TUVar $ UTypeVar "n"] 2)) Principal () of
     Left (TypeHasWrongKindError () (TUVar (UTypeVar "n")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test25 :: Test
 checkTypeWellFormednessWithPrnc_test25 =
-  case checkTypeWellFormednessWithPrnc [] (TExistential (UTypeVar "x") KStar $
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc [] (TExistential (UTypeVar "x") KStar $
        TVec (MSucc $ MSucc (MUVar $ UTypeVar "x")) (TProduct [TUnit, TUnit] 2)) Principal () of
     Left (MonotypeHasWrongKindError () (MUVar (UTypeVar "x")) KNat KStar) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test26 :: Test
 checkTypeWellFormednessWithPrnc_test26 =
-  case checkTypeWellFormednessWithPrnc context1 (TUniversal (UTypeVar "n") KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
-       (TImp (MEVar $ ETypeVar "b", MUVar $ UTypeVar "n") (TProduct [TUnit, TUnit] 2))) Principal () of
+  case flip evalStateT startState $ checkTypeWellFormednessWithPrnc context1
+            (TUniversal (UTypeVar "n") KNat $ TVec (MSucc $ MSucc (MUVar $ UTypeVar "n"))
+            (TImp (MEVar $ ETypeVar "b", MUVar $ UTypeVar "n") (TProduct [TUnit, TUnit] 2))) Principal () of
     Left (TypeFormednessPrcFEVError () [ETypeVar "b"]) -> True
     _ -> False
 
@@ -1600,278 +1648,290 @@ checkTypeWellFormednessWithPrnc_test26 =
 
 instantiateEVar_test1 :: Test
 instantiateEVar_test1 =
-  case instantiateEVar context2 (ETypeVar "b") MUnit KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") MUnit KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test2 :: Test
 instantiateEVar_test2 =
-  case instantiateEVar context2 (ETypeVar "a") MZero KNat () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "a") MZero KNat () of
     Right [CETypeVar (ETypeVar "a") KNat MZero, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test3 :: Test
 instantiateEVar_test3 =
-  case instantiateEVar context2 (ETypeVar "a") (MSucc (MSucc MZero)) KNat () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "a") (MSucc (MSucc MZero)) KNat () of
     Right [CETypeVar (ETypeVar "a") KNat (MSucc (MEVar (ETypeVar "a-1"))), CETypeVar (ETypeVar "a-1") KNat (MSucc (MEVar (ETypeVar "a-1-1"))),
            CETypeVar (ETypeVar "a-1-1") KNat MZero, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test4 :: Test
 instantiateEVar_test4 =
-  case instantiateEVar context2 (ETypeVar "b") (MProduct [MUnit, MUnit] 2) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") (MProduct [MUnit, MUnit] 2) KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MProduct [MEVar (ETypeVar "b-1"), MEVar (ETypeVar "b-2")] 2),
            CETypeVar (ETypeVar "b-1") KStar MUnit, CETypeVar (ETypeVar "b-2") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test5 :: Test
 instantiateEVar_test5 =
-  case instantiateEVar context2 (ETypeVar "b") (MGADT "Ko" [MUnit, MUnit]) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") (MGADT "Ko" [MUnit, MUnit]) KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MGADT "Ko" [MEVar (ETypeVar "b-1"), MEVar (ETypeVar "b-2")]),
            CETypeVar (ETypeVar "b-1") KStar MUnit, CETypeVar (ETypeVar "b-2") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test6 :: Test
 instantiateEVar_test6 =
-  case instantiateEVar context2 (ETypeVar "b") (MArrow MUnit MUnit) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") (MArrow MUnit MUnit) KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MArrow (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
            CETypeVar (ETypeVar "b-1") KStar MUnit, CETypeVar (ETypeVar "b-2") KStar MUnit, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test7 :: Test
 instantiateEVar_test7 =
-  case instantiateEVar context2 (ETypeVar "b") MUnit KNat () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") MUnit KNat () of
     Left (MonotypeHasWrongKindError () MUnit KNat KStar) -> True
     _ -> False
 
 instantiateEVar_test8 :: Test
 instantiateEVar_test8 =
-  case instantiateEVar context2 (ETypeVar "a") MZero KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "a") MZero KStar () of
     Left (MonotypeHasWrongKindError () MZero KStar KNat) -> True
     _ -> False
 
 instantiateEVar_test9 :: Test
 instantiateEVar_test9 =
-  case instantiateEVar context2 (ETypeVar "a") (MSucc (MSucc MZero)) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "a") (MSucc (MSucc MZero)) KStar () of
     Left (MonotypeHasWrongKindError () (MSucc (MSucc MZero)) KStar KNat) -> True
     _ -> False
 
 instantiateEVar_test10 :: Test
 instantiateEVar_test10 =
-  case instantiateEVar context2 (ETypeVar "b") (MProduct [MUnit, MUnit] 2) KNat () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") (MProduct [MUnit, MUnit] 2) KNat () of
     Left (MonotypeHasWrongKindError () (MProduct [MUnit, MUnit] 2) KNat KStar) -> True
     _ -> False
 
 instantiateEVar_test11 :: Test
 instantiateEVar_test11 =
-  case instantiateEVar context2 (ETypeVar "b") (MGADT "F" [MUnit, MZero]) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") (MGADT "F" [MUnit, MZero]) KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MGADT "F" [MEVar (ETypeVar "b-1"), MEVar (ETypeVar "b-2")]),
            CETypeVar (ETypeVar "b-1") KStar MUnit, CETypeVar (ETypeVar "b-2") KNat MZero, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test12 :: Test
 instantiateEVar_test12 =
-  case instantiateEVar context2 (ETypeVar "b") (MArrow (MSucc MZero) MZero) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") (MArrow (MSucc MZero) MZero) KStar () of
     Left (MonotypeHasWrongKindError () (MSucc MZero) KStar KNat) -> True
     _ -> False
 
 instantiateEVar_test13 :: Test
 instantiateEVar_test13 =
-  case instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "b")) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "b")) KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MEVar (ETypeVar "c")), CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test14 :: Test
 instantiateEVar_test14 =
-  case instantiateEVar context2 (ETypeVar "b") (MEVar (ETypeVar "c")) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") (MEVar (ETypeVar "c")) KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MEVar (ETypeVar "c")), CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 instantiateEVar_test15 :: Test
 instantiateEVar_test15 =
-  case instantiateEVar context1 (ETypeVar "a") (MEVar (ETypeVar "z")) KStar () of
+  case flip evalStateT startState $ instantiateEVar context1 (ETypeVar "a") (MEVar (ETypeVar "z")) KStar () of
     Left (ETypeVarTypeMismatchError () (ETypeVar "z") (MProduct [MUnit, MUnit] 2) (MEVar (ETypeVar "a"))) -> True
     _ -> False
 
 instantiateEVar_test16 :: Test
 instantiateEVar_test16 =
-  case instantiateEVar context3 (ETypeVar "z") (MEVar (ETypeVar "a")) KStar () of
+  case flip evalStateT startState $ instantiateEVar context3 (ETypeVar "z") (MEVar (ETypeVar "a")) KStar () of
     Left (ETypeVarTypeMismatchError () (ETypeVar "z") (MProduct [MUnit, MUnit] 2) (MEVar (ETypeVar "a"))) -> True
     _ -> False
 
 instantiateEVar_test17 :: Test
 instantiateEVar_test17 =
-  case instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "b")) KNat () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "b")) KNat () of
     Left (ETypeVarKindMismatchError () (ETypeVar "b") KStar KNat) -> True
     _ -> False
 
 instantiateEVar_test18 :: Test
 instantiateEVar_test18 =
-  case instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "a")) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "c") (MEVar (ETypeVar "a")) KStar () of
     Left (ETypeVarKindMismatchError () (ETypeVar "a") KNat KStar) -> True
     _ -> False
 
 instantiateEVar_test19 :: Test
 instantiateEVar_test19 =
-  case instantiateEVar context3 (ETypeVar "b") (MEVar (ETypeVar "a")) KStar () of
+  case flip evalStateT startState $ instantiateEVar context3 (ETypeVar "b") (MEVar (ETypeVar "a")) KStar () of
     Left (ETypeVarTypeMismatchError () (ETypeVar "a") MUnit (MEVar(ETypeVar "b"))) -> True
     _ -> False
 
 instantiateEVar_test20 :: Test
 instantiateEVar_test20 =
-  case instantiateEVar [CTypeVar (U (UTypeVar "a")) KStar, CTypeVar (E (ETypeVar "b")) KStar] (ETypeVar "b") (MEVar (ETypeVar "a")) KStar () of
+  case flip evalStateT startState $ instantiateEVar [CTypeVar (U (UTypeVar "a")) KStar, CTypeVar (E (ETypeVar "b")) KStar]
+            (ETypeVar "b") (MEVar (ETypeVar "a")) KStar () of
     Left (UndeclaredETypeVarError () (ETypeVar "a")) -> True
     _ -> False
 
 instantiateEVar_test21 :: Test
 instantiateEVar_test21 =
-  case instantiateEVar context1 (ETypeVar "Konrad") MUnit KStar () of
+  case flip evalStateT startState $ instantiateEVar context1 (ETypeVar "Konrad") MUnit KStar () of
     Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
     _ -> False
 
 instantiateEVar_test22 :: Test
 instantiateEVar_test22 =
-  case instantiateEVar context1 (ETypeVar "Konrad") (MEVar (ETypeVar "a")) KStar () of
+  case flip evalStateT startState $ instantiateEVar context1 (ETypeVar "Konrad") (MEVar (ETypeVar "a")) KStar () of
     Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
     _ -> False
 
 instantiateEVar_test23 :: Test
 instantiateEVar_test23 =
-  case instantiateEVar context5 (ETypeVar "x") (MEVar (ETypeVar "x")) KNat () of
+  case flip evalStateT startState $ instantiateEVar context5 (ETypeVar "x") (MEVar (ETypeVar "x")) KNat () of
     Right c -> c == context5
     _ -> False
 
 instantiateEVar_test24 :: Test
 instantiateEVar_test24 =
-  case instantiateEVar context4 (ETypeVar "x") (MEVar (ETypeVar "x")) KStar () of
+  case flip evalStateT startState $ instantiateEVar context4 (ETypeVar "x") (MEVar (ETypeVar "x")) KStar () of
     Left (UndeclaredETypeVarError () (ETypeVar "x")) -> True
     _ -> False
 
 instantiateEVar_test25 :: Test
 instantiateEVar_test25 =
-  case instantiateEVar [CETypeVar (ETypeVar "a") KStar (MEVar (ETypeVar "r")), CTypeVar (E (ETypeVar "r")) KStar]
+  case flip evalStateT startState $ instantiateEVar [CETypeVar (ETypeVar "a") KStar (MEVar (ETypeVar "r")), CTypeVar (E (ETypeVar "r")) KStar]
                        (ETypeVar "r") (MEVar (ETypeVar "a")) KStar () of
     Right [CETypeVar (ETypeVar "a") KStar (MEVar (ETypeVar "r")), CTypeVar (E (ETypeVar "r")) KStar] -> True
     _ -> False
 
 instantiateEVar_test26 :: Test
 instantiateEVar_test26 =
-  case instantiateEVar context2 (ETypeVar "b") (MGADT "F" [MArrow MUnit MZero, MZero]) KStar () of
+  case flip evalStateT startState $ instantiateEVar context2 (ETypeVar "b") (MGADT "F" [MArrow MUnit MZero, MZero]) KStar () of
     Left (MonotypeHasWrongKindError () MZero KStar KNat) -> True
     _ -> False
 
 --checkEquation :: Context -> Monotype -> Monotype -> Kind -> p -> Either (Error p) Context
 checkEquation_test1 :: Test
 checkEquation_test1 =
-  case checkEquation context1 (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MArrow (MProduct [MUnit, MUnit] 2) MUnit) KStar () of
+  case flip evalStateT startState $ checkEquation context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MArrow (MProduct [MUnit, MUnit] 2) MUnit) KStar () of
     Right c -> context1 == c
     _ -> False
 
 checkEquation_test2 :: Test
 checkEquation_test2 =
-  case checkEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KNat () of
+  case flip evalStateT startState $ checkEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KNat () of
     Right c -> context1 == c
     _ -> False
 
 checkEquation_test3 :: Test
 checkEquation_test3 =
-  case checkEquation context1 (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MArrow (MGADT "F" [MUnit, MUnit]) MUnit) KStar () of
+  case flip evalStateT startState $ checkEquation context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MArrow (MGADT "F" [MUnit, MUnit]) MUnit) KStar () of
     Left (EquationFalseError () (MProduct [MUnit, MUnit] 2) (MGADT "F" [MUnit, MUnit]) KStar) -> True
     _ -> False
 
 checkEquation_test4 :: Test
 checkEquation_test4 =
-  case checkEquation context1 (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MArrow (MProduct [MUnit, MUnit] 2) MUnit) KNat () of
+  case flip evalStateT startState $ checkEquation context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MArrow (MProduct [MUnit, MUnit] 2) MUnit) KNat () of
     Left (EquationFalseError () (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MArrow (MProduct [MUnit, MUnit] 2) MUnit) KNat) -> True
     _ -> False
 
 checkEquation_test5 :: Test
 checkEquation_test5 =
-  case checkEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KStar () of
+  case flip evalStateT startState $ checkEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KStar () of
     Left (EquationFalseError () (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KStar) -> True
     _ -> False
 
 checkEquation_test6 :: Test
 checkEquation_test6 =
-  case checkEquation context1 (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KStar () of
+  case flip evalStateT startState $ checkEquation context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KStar () of
     Left (EquationFalseError () (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KStar) -> True
     _ -> False
 
 checkEquation_test7 :: Test
 checkEquation_test7 =
-  case checkEquation context1 (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KNat () of
+  case flip evalStateT startState $ checkEquation context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KNat () of
     Left (EquationFalseError () (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KNat) -> True
     _ -> False
 
 checkEquation_test8 :: Test
 checkEquation_test8 =
-  case checkEquation context1 (MSucc (MSucc MZero)) (MSucc (MSucc (MSucc MZero))) KNat () of
+  case flip evalStateT startState $ checkEquation context1 (MSucc (MSucc MZero)) (MSucc (MSucc (MSucc MZero))) KNat () of
     Left (EquationFalseError ()  MZero (MSucc MZero) KNat)  -> True
     _ -> False
 
 checkEquation_test9 :: Test
 checkEquation_test9 =
-  case checkEquation context1 (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KStar () of
+  case flip evalStateT startState $ checkEquation context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KStar () of
     Left (EquationFalseError () (MArrow (MProduct [MUnit, MUnit] 2) MUnit) (MSucc (MSucc (MSucc MZero))) KStar) -> True
     _ -> False
 
 checkEquation_test10 :: Test
 checkEquation_test10 =
-  case checkEquation context1 (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) KNat () of
+  case flip evalStateT startState $ checkEquation context1
+            (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) KNat () of
     Right c -> c == context1
     _ -> False
 
 checkEquation_test11 :: Test
 checkEquation_test11 =
-  case checkEquation context1 (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MSucc (MUVar (UTypeVar "y"))))) KNat () of
+  case flip evalStateT startState $ checkEquation context1
+            (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MSucc (MUVar (UTypeVar "y"))))) KNat () of
     Left (EquationFalseError () (MUVar (UTypeVar "x")) (MUVar (UTypeVar "y")) KNat) -> True
     _ -> False
 
 checkEquation_test12 :: Test
 checkEquation_test12 =
-  case checkEquation context1 (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MUVar (UTypeVar "x")))) KNat () of
+  case flip evalStateT startState $ checkEquation context1
+            (MSucc (MSucc (MSucc (MUVar (UTypeVar "x"))))) (MSucc (MSucc (MUVar (UTypeVar "x")))) KNat () of
     Left (EquationFalseError () (MSucc (MUVar (UTypeVar "x"))) (MUVar (UTypeVar "x")) KNat) -> True
     _ -> False
 
 checkEquation_test13 :: Test
 checkEquation_test13 =
-  case checkEquation context1 (MEVar (ETypeVar "a")) MUnit KStar () of
+  case flip evalStateT startState $ checkEquation context1 (MEVar (ETypeVar "a")) MUnit KStar () of
     Right c -> c == context3
     _ -> False
 
 checkEquation_test14 :: Test
 checkEquation_test14 =
-  case checkEquation context1  MUnit (MEVar (ETypeVar "a")) KStar () of
+  case flip evalStateT startState $ checkEquation context1  MUnit (MEVar (ETypeVar "a")) KStar () of
     Right c -> c == context3
     _ -> False
 
 checkEquation_test15 :: Test
 checkEquation_test15 =
-  case checkEquation context1 (MEVar (ETypeVar "a")) MUnit KNat () of
+  case flip evalStateT startState $ checkEquation context1 (MEVar (ETypeVar "a")) MUnit KNat () of
     Left (MonotypeHasWrongKindError () MUnit KNat KStar) -> True
     _ -> False
 
 checkEquation_test16 :: Test
 checkEquation_test16 =
-  case checkEquation context1  MUnit (MEVar (ETypeVar "a")) KNat () of
+  case flip evalStateT startState $ checkEquation context1  MUnit (MEVar (ETypeVar "a")) KNat () of
     Left (MonotypeHasWrongKindError () MUnit KNat KStar) -> True
     _ -> False
 
 checkEquation_test17 :: Test
 checkEquation_test17 =
-  case checkEquation context5 (MEVar (ETypeVar "x")) (MEVar (ETypeVar "x")) KStar () of
+  case flip evalStateT startState $ checkEquation context5 (MEVar (ETypeVar "x")) (MEVar (ETypeVar "x")) KStar () of
     Right c -> c == context5
     _ -> False
 
 checkEquation_test18 :: Test
 checkEquation_test18 =
-  case checkEquation context2 (MEVar (ETypeVar "x")) (MGADT "E" [MEVar (ETypeVar "x"), MEVar (ETypeVar "x")]) KStar () of
+  case flip evalStateT startState $ checkEquation context2
+            (MEVar (ETypeVar "x")) (MGADT "E" [MEVar (ETypeVar "x"), MEVar (ETypeVar "x")]) KStar () of
     Left (EquationFalseError () (MEVar (ETypeVar "x")) (MGADT "E" [MEVar (ETypeVar "x"), MEVar (ETypeVar "x")]) KStar) -> True
     _ -> False
 
 checkEquation_test19 :: Test
 checkEquation_test19 =
-  case checkEquation context2 (MEVar (ETypeVar "b")) (MGADT "R" [MEVar (ETypeVar "c"), MEVar (ETypeVar "c")]) KStar () of
+  case flip evalStateT startState $ checkEquation context2
+            (MEVar (ETypeVar "b")) (MGADT "R" [MEVar (ETypeVar "c"), MEVar (ETypeVar "c")]) KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MGADT "R" [MEVar (ETypeVar "b-1"), MEVar (ETypeVar "b-2")]),
            CETypeVar (ETypeVar "b-1") KStar (MEVar (ETypeVar "c")), CETypeVar (ETypeVar "b-2") KStar (MEVar (ETypeVar "c")),
            CTypeVar (E (ETypeVar "c")) KStar] -> True
@@ -1879,26 +1939,30 @@ checkEquation_test19 =
 
 checkEquation_test20 :: Test
 checkEquation_test20 =
-  case checkEquation context2 (MEVar (ETypeVar "b")) (MGADT "F" [MEVar (ETypeVar "y"), MEVar (ETypeVar "z")]) KStar () of
+  case flip evalStateT startState $ checkEquation context2
+            (MEVar (ETypeVar "b")) (MGADT "F" [MEVar (ETypeVar "y"), MEVar (ETypeVar "z")]) KStar () of
     Left (UndeclaredETypeVarError () (ETypeVar "y")) -> True
     _ -> False
 
 checkEquation_test21 :: Test
 checkEquation_test21 =
-  case checkEquation [CTypeVar (E (ETypeVar "k")) KNat, CTypeVar (E (ETypeVar "a")) KNat] (MEVar (ETypeVar "a")) (MSucc (MEVar (ETypeVar "k"))) KNat () of
+  case flip evalStateT startState $ checkEquation [CTypeVar (E (ETypeVar "k")) KNat, CTypeVar (E (ETypeVar "a")) KNat]
+            (MEVar (ETypeVar "a")) (MSucc (MEVar (ETypeVar "k"))) KNat () of
     Right [CETypeVar (ETypeVar "k") KNat (MEVar (ETypeVar "a-1")), CETypeVar (ETypeVar "a") KNat (MSucc (MEVar (ETypeVar "a-1"))),
            CTypeVar (E (ETypeVar "a-1")) KNat] -> True
     _ -> False
 
 checkEquation_test22 :: Test
 checkEquation_test22 =
-  case checkEquation [CTypeVar (E (ETypeVar "k")) KNat, CTypeVar (E (ETypeVar "a")) KNat] (MEVar (ETypeVar "a")) (MSucc (MEVar (ETypeVar "r"))) KNat () of
+  case flip evalStateT startState $ checkEquation [CTypeVar (E (ETypeVar "k")) KNat, CTypeVar (E (ETypeVar "a")) KNat]
+            (MEVar (ETypeVar "a")) (MSucc (MEVar (ETypeVar "r"))) KNat () of
     Left (UndeclaredETypeVarError () (ETypeVar "r")) -> True
     _ -> False
 
 checkEquation_test23 :: Test
 checkEquation_test23 =
-  case checkEquation context2 (MEVar (ETypeVar "b")) (MGADT "F" [MArrow (MEVar (ETypeVar "c")) MUnit, MEVar (ETypeVar "c")]) KStar () of
+  case flip evalStateT startState $ checkEquation context2
+            (MEVar (ETypeVar "b")) (MGADT "F" [MArrow (MEVar (ETypeVar "c")) MUnit, MEVar (ETypeVar "c")]) KStar () of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MGADT "F" [MEVar (ETypeVar "b-1"), MEVar (ETypeVar "b-2")]),
            CETypeVar (ETypeVar "b-1") KStar (MArrow (MEVar (ETypeVar "b-1-1")) (MEVar (ETypeVar "b-1-2"))),
            CETypeVar (ETypeVar "b-1-1") KStar (MEVar (ETypeVar "c")), CETypeVar (ETypeVar "b-1-2") KStar MUnit,
@@ -1907,72 +1971,84 @@ checkEquation_test23 =
 
 checkEquation_test24 :: Test
 checkEquation_test24 =
-  case checkEquation context2 (MEVar (ETypeVar "b")) (MGADT "W" [MArrow (MEVar (ETypeVar "r")) MUnit, MEVar (ETypeVar "c")]) KStar () of
+  case flip evalStateT startState $ checkEquation context2
+            (MEVar (ETypeVar "b")) (MGADT "W" [MArrow (MEVar (ETypeVar "r")) MUnit, MEVar (ETypeVar "c")]) KStar () of
     Left (UndeclaredETypeVarError () (ETypeVar "r")) -> True
     _ -> False
 
 --equivalentProp :: Context -> Proposition -> Proposition -> p -> Either (Error p) Context
-
 equivalentProp_test1 :: Test
 equivalentProp_test1 =
-  case equivalentProp context1 (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "R" [MUnit, MProduct [MUnit, MUnit] 2])
-                               (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "R" [MUnit, MProduct [MUnit, MUnit] 2]) () of
+  case flip evalStateT startState $ equivalentProp context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2])
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2]) () of
     Right c -> c == context1
     _ -> False
 
 equivalentProp_test2 :: Test
 equivalentProp_test2 =
-  case equivalentProp context1 (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Q" [MUnit, MProduct [MUnit, MUnit] 2])
-                               (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Q" [MUnit, MArrow MUnit MUnit]) () of
+  case flip evalStateT startState $ equivalentProp context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2])
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MArrow MUnit MUnit]) () of
     Left (EquationFalseError () (MProduct [MUnit, MUnit] 2) (MArrow MUnit MUnit) KStar) -> True
     _ -> False
 
 equivalentProp_test3 :: Test
 equivalentProp_test3 =
-  case equivalentProp context1 (MArrow (MProduct [MGADT "F" [MUnit, MUnit], MUnit] 2) MUnit, MGADT "F" [MUnit, MProduct [MUnit, MUnit] 2])
-                               (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "F" [MUnit, MArrow MUnit MUnit]) () of
-    Left (EquationFalseError () (MGADT "F" [MUnit, MUnit]) MUnit KStar) -> True
+  case flip evalStateT startState $ equivalentProp context1
+            (MArrow (MProduct [MGADT "Terminator" [MUnit, MUnit], MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2])
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MArrow MUnit MUnit]) () of
+    Left (EquationFalseError () (MGADT "Terminator" [MUnit, MUnit]) MUnit KStar) -> True
     _ -> False
 
 equivalentProp_test4 :: Test
 equivalentProp_test4 =
-  case equivalentProp context1 (MArrow (MProduct [MGADT "F" [MUnit, MUnit], MUnit] 2) MUnit, MSucc MZero)
-                               (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "F" [MUnit, MArrow MUnit MUnit]) () of
+  case flip evalStateT startState $ equivalentProp context1
+            (MArrow (MProduct [MGADT "Terminator" [MUnit, MUnit], MUnit] 2) MUnit, MSucc MZero)
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MArrow MUnit MUnit]) () of
     Left (MonotypeHasWrongKindError () (MSucc MZero) KStar KNat) -> True
     _ -> False
 
 equivalentProp_test5 :: Test
 equivalentProp_test5 =
-  case equivalentProp context1 (MZero, MSucc MZero) (MZero, MSucc MZero) () of
+  case flip evalStateT startState $ equivalentProp context1 (MZero, MSucc MZero) (MZero, MSucc MZero) () of
     Right c -> c == context1
     _ -> False
 
 equivalentProp_test6 :: Test
 equivalentProp_test6 =
-  case equivalentProp context1 (MZero, MSucc MZero) (MZero, MSucc (MSucc MZero)) () of
+  case flip evalStateT startState $ equivalentProp context1 (MZero, MSucc MZero) (MZero, MSucc (MSucc MZero)) () of
     Left (EquationFalseError () MZero (MSucc MZero) KNat) -> True
     _ -> False
 
 equivalentProp_test7 :: Test
 equivalentProp_test7 =
-  case equivalentProp context2 (MEVar (ETypeVar "a"),  MSucc (MSucc MZero)) (MZero, MSucc (MSucc MZero)) () of
+  case flip evalStateT startState $ equivalentProp context2 (MEVar (ETypeVar "a"),  MSucc (MSucc MZero)) (MZero, MSucc (MSucc MZero)) () of
     Right [CETypeVar (ETypeVar "a") KNat MZero, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 equivalentProp_test8 :: Test
 equivalentProp_test8 =
-  case equivalentProp context5 (MSucc MZero, MEVar (ETypeVar "a")) (MSucc MZero, MZero) () of
+  case flip evalStateT startState $ equivalentProp context5 (MSucc MZero, MEVar (ETypeVar "a")) (MSucc MZero, MZero) () of
     Left (UndeclaredETypeVarError () (ETypeVar "a")) -> True
     _ -> False
 
 equivalentProp_test9 :: Test
 equivalentProp_test9 =
-  case equivalentProp context5 (MEVar (ETypeVar "a"), MSucc (MEVar $ ETypeVar "R")) (MEVar (ETypeVar "a"), MSucc (MEVar $ ETypeVar "R")) () of
+  case flip evalStateT startState $ equivalentProp context5
+            (MEVar (ETypeVar "a"), MSucc (MEVar $ ETypeVar "R")) (MEVar (ETypeVar "a"), MSucc (MEVar $ ETypeVar "R")) () of
     Left (UndeclaredETypeVarError () (ETypeVar "a")) -> True
     _ -> False
 
---equivalentType :: Context -> Type -> Type -> p -> StateT Integer (Either (Error p)) Context
+equivalentProp_test10 :: Test
+equivalentProp_test10 =
+  case flip evalStateT startState $ equivalentProp context1
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2])
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Lion" [MProduct [MUnit, MUnit] 2]) () of
+    Left (EquationFalseError () (MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2]) (MGADT "Lion" [MProduct [MUnit, MUnit] 2]) KStar) -> True
+    _ -> False
 
+--equivalentType :: Context -> Type -> Type -> p -> StateT Integer (Either (Error p)) Context
 equivalentType_test1 :: Test
 equivalentType_test1 =
   case flip evalStateT startState $ equivalentType context1 (TProduct [TGADT "Y" [ParameterType $ TUVar $ UTypeVar "r",
@@ -2293,124 +2369,126 @@ subtype_test14 =
 --eliminateEquation :: Context -> Monotype -> Monotype -> Kind -> p -> MaybeT (Either (Error p)) Context
 eliminateEquation_test1 :: Test
 eliminateEquation_test1 =
-  case runMaybeT $ eliminateEquation [] (MProduct [MArrow (MGADT "F" [MFloat, MString]) MChar, MInt] 2)
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation [] (MProduct [MArrow (MGADT "F" [MFloat, MString]) MChar, MInt] 2)
                                         (MProduct [MArrow (MGADT "F" [MFloat, MString]) MChar, MInt] 2) KStar () of
     Right (Just []) -> True
     _ -> False
 
 eliminateEquation_test2 :: Test
 eliminateEquation_test2 =
-  case runMaybeT $ eliminateEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc MZero))) KNat () of
     Right (Just c) -> c == context1
     _ -> False
 
 eliminateEquation_test3 :: Test
 eliminateEquation_test3 =
-  case runMaybeT $ eliminateEquation [] (MProduct [MArrow (MGADT "F" [MFloat, MString]) MBool, MInt] 2)
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation [] (MProduct [MArrow (MGADT "F" [MFloat, MString]) MBool, MInt] 2)
                                         (MProduct [MArrow (MGADT "F" [MFloat, MString]) MChar, MInt] 2) KStar () of
     Right Nothing -> True
     _ -> False
 
 eliminateEquation_test4 :: Test
 eliminateEquation_test4 =
-  case runMaybeT $ eliminateEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc (MSucc MZero)))) KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MSucc (MSucc (MSucc MZero))) (MSucc (MSucc (MSucc (MSucc MZero)))) KNat () of
     Right Nothing -> True
     _ -> False
 
 eliminateEquation_test5 :: Test
 eliminateEquation_test5 =
-  case runMaybeT $ eliminateEquation context5 (MSucc (MSucc (MSucc (MUVar $ UTypeVar "x")))) (MSucc (MSucc (MSucc (MUVar $ UTypeVar "x")))) KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context5
+            (MSucc (MSucc (MSucc (MUVar $ UTypeVar "x")))) (MSucc (MSucc (MSucc (MUVar $ UTypeVar "x")))) KNat () of
     Right (Just c) -> context5 == c
     _ -> False
 
 eliminateEquation_test6 :: Test
 eliminateEquation_test6 =
-  case runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MSucc (MSucc (MSucc MZero))) KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MSucc (MSucc (MSucc MZero))) KNat () of
     Right (Just c) -> c == CUTypeVarEq (UTypeVar "y") (MSucc (MSucc (MSucc MZero))) : context1
     _ -> False
 
 eliminateEquation_test7 :: Test
 eliminateEquation_test7 =
-  case runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "n") (MSucc (MSucc (MSucc MZero))) KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "n") (MSucc (MSucc (MSucc MZero))) KNat () of
     Left (UndeclaredUTypeVarError () (UTypeVar "n")) -> True
     _ -> False
 
 eliminateEquation_test8 :: Test
 eliminateEquation_test8 =
-  case runMaybeT $ eliminateEquation context1 MString (MUVar $ UTypeVar "y")  KStar () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 MString (MUVar $ UTypeVar "y")  KStar () of
     Right (Just c) -> c == CUTypeVarEq (UTypeVar "y") MString : context1
     _ -> False
 
 eliminateEquation_test9 :: Test
 eliminateEquation_test9 =
-  case runMaybeT $ eliminateEquation [CUTypeVarEq (UTypeVar "y") (MArrow MString MChar),
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation [CUTypeVarEq (UTypeVar "y") (MArrow MString MChar),
                                       CTypeVar (U $ UTypeVar "y") KStar] (MUVar $ UTypeVar "y") MChar KStar () of
     Left (EquationAlreadyExistsError () (UTypeVar "y") (MArrow MString MChar) MChar) -> True
     _ -> False
 
 eliminateEquation_test10 :: Test
 eliminateEquation_test10 =
-  case runMaybeT $ eliminateEquation [CUTypeVarEq (UTypeVar "y") MString, CTypeVar (U $ UTypeVar "y") KStar] MString (MUVar $ UTypeVar "y")  KStar () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation [CUTypeVarEq (UTypeVar "y") MString, CTypeVar (U $ UTypeVar "y") KStar]
+            MString (MUVar $ UTypeVar "y")  KStar () of
     Left (EquationAlreadyExistsError () (UTypeVar "y") MString MString) -> True
     _ -> False
 
 eliminateEquation_test11 :: Test
 eliminateEquation_test11 =
-  case runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MUVar $ UTypeVar "yolo") KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MUVar $ UTypeVar "yolo") KNat () of
     Right (Just c) -> c == CUTypeVarEq (UTypeVar "y") (MUVar (UTypeVar "yolo")) : context1
     _ -> False
 
 eliminateEquation_test12 :: Test
 eliminateEquation_test12 =
-  case runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MArrow MInt (MUVar $ UTypeVar "y")) KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MUVar $ UTypeVar "y") (MArrow MInt (MUVar $ UTypeVar "y")) KNat () of
     Right Nothing -> True
     _ -> False
 
 eliminateEquation_test13 :: Test
 eliminateEquation_test13 =
-  case runMaybeT $ eliminateEquation context1 MChar (MSucc MZero) KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 MChar (MSucc MZero) KNat () of
     Left (EliminateEquationError () MChar (MSucc MZero) KNat) -> True
     _ -> False
 
 eliminateEquation_test14 :: Test
 eliminateEquation_test14 =
-  case runMaybeT $ eliminateEquation context1 MZero MBool KStar () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 MZero MBool KStar () of
     Left (EliminateEquationError () MZero MBool KStar) -> True
     _ -> False
 
 eliminateEquation_test15 :: Test
 eliminateEquation_test15 =
-  case runMaybeT $ eliminateEquation context1 MChar (MSucc MZero) KStar () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 MChar (MSucc MZero) KStar () of
     Left (EliminateEquationError () MChar (MSucc MZero) KStar) -> True
     _ -> False
 
 eliminateEquation_test16 :: Test
 eliminateEquation_test16 =
-  case runMaybeT $ eliminateEquation context1 MZero MBool KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 MZero MBool KNat () of
     Left (EliminateEquationError () MZero MBool KNat) -> True
     _ -> False
 
 eliminateEquation_test17 :: Test
 eliminateEquation_test17 =
-  case runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "k") (MSucc MZero) KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "k") (MSucc MZero) KNat () of
     Left (EliminateEquationError () (MEVar (ETypeVar "k")) (MSucc MZero) KNat) -> True
     _ -> False
 
 eliminateEquation_test18 :: Test
 eliminateEquation_test18 =
-  case runMaybeT $ eliminateEquation context1 MBool (MEVar $ ETypeVar "o") KStar () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 MBool (MEVar $ ETypeVar "o") KStar () of
     Left (EliminateEquationError () MBool (MEVar (ETypeVar "o")) KStar) -> True
     _ -> False
 
 eliminateEquation_test19 :: Test
 eliminateEquation_test19 =
-  case runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "n") (MEVar $ ETypeVar "r") KStar () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "n") (MEVar $ ETypeVar "r") KStar () of
     Left (EliminateEquationError () (MEVar (ETypeVar "n")) (MEVar (ETypeVar "r")) KStar) -> True
     _ -> False
 
 eliminateEquation_test20 :: Test
 eliminateEquation_test20 =
-  case runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "a") (MEVar $ ETypeVar "a") KNat () of
+  case flip evalStateT startState $ runMaybeT $ eliminateEquation context1 (MEVar $ ETypeVar "a") (MEVar $ ETypeVar "a") KNat () of
     Left (EliminateEquationError () (MEVar (ETypeVar "a")) (MEVar (ETypeVar "a")) KNat) -> True
     _ -> False
 
@@ -2599,8 +2677,8 @@ checkExpr_ETuple_test7 :: Test
 checkExpr_ETuple_test7 =
   case flip evalStateT startState $ checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (ETuple () [ETuple () [ETuple () [EUnit (), EUnit ()] 2, EUnit ()] 2,
                   ETuple () [EUnit (), EUnit ()] 2] 2) (TProduct [TEVar $ ETypeVar "x", TEVar $ ETypeVar "x"] 2) NotPrincipal of
-    Left (ETypeVarTypeMismatchError () (ETypeVar "x-1") (MProduct [MEVar (ETypeVar "x-1-1"), MEVar(ETypeVar "x-1-2")] 2) MUnit) -> True
-    _ -> False --TODO proper error
+    Left (TypeInferenceError (EUnit ())) -> True
+    _ -> False
 
 checkExpr_ETuple_test8 :: Test
 checkExpr_ETuple_test8 =
@@ -2608,6 +2686,31 @@ checkExpr_ETuple_test8 =
                   ETuple () [EUnit (), EUnit ()] 2] 2) (TProduct [TEVar $ ETypeVar "x", TEVar $ ETypeVar "x"] 2) NotPrincipal of
     Right c -> c == [CETypeVar (ETypeVar "x") KStar (MProduct [MEVar (ETypeVar "x-1"), MEVar (ETypeVar "x-2")] 2),
                      CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+    _ -> False
+
+checkExpr_ETuple_test9 :: Test
+checkExpr_ETuple_test9 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (U $ UTypeVar "x") KStar] (ETuple () [ETuple () [EUnit (), EUnit ()] 2,
+                  ETuple () [EUnit (), EUnit ()] 2] 2)
+                  (TImp (MUVar $ UTypeVar "x", MProduct [MUnit, MUnit] 2) (TProduct [TUVar $ UTypeVar "x", TUVar $ UTypeVar "x"] 2)) Principal of
+    Right [CTypeVar (U (UTypeVar "x")) KStar] -> True
+    _ -> False
+
+checkExpr_ETuple_test10 :: Test
+checkExpr_ETuple_test10 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (U $ UTypeVar "x") KStar] (ETuple () [ETuple () [EUnit (), EUnit ()] 2,
+                  ETuple () [EUnit (), EUnit ()] 2] 2)
+                  (TImp (MSucc MZero, MZero) TBool) Principal of
+    Right [CTypeVar (U (UTypeVar "x")) KStar] -> True
+    _ -> False
+
+checkExpr_ETuple_test11 :: Test
+checkExpr_ETuple_test11 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (ETuple () [ETuple () [EUnit (), EUnit ()] 2,
+                  ETuple () [EUnit (), EUnit ()] 2] 2)
+                  (TAnd (TProduct [TEVar $ ETypeVar "x", TEVar $ ETypeVar "x"] 2) (MEVar $ ETypeVar "x", MProduct [MUnit, MUnit] 2)) Principal of
+    Right [CETypeVar (ETypeVar "x") KStar (MProduct [MEVar (ETypeVar "x-1"),MEVar (ETypeVar "x-2")] 2),
+           CETypeVar (ETypeVar "x-1") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit] -> True
     _ -> False
 
 checkExpr_ELambda_test1 :: Test
@@ -2662,6 +2765,164 @@ checkExpr_ELambda_test8 =
            CTypeVar (E (ETypeVar "b-2-1")) KStar, CTypeVar (E (ETypeVar "b-2-2")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
+checkExpr_ELambda_test9 :: Test
+checkExpr_ELambda_test9 =
+  case flip evalStateT startState $ checkExpr context2  (ELambda () "x" $ EVar () "x")
+            (TUniversal (UTypeVar "a") KStar (TArrow (TUVar (UTypeVar "a")) (TUVar (UTypeVar "a")))) NotPrincipal of
+    Right c -> c == context2
+    _ -> False
+
+checkExpr_ELambda_test10 :: Test
+checkExpr_ELambda_test10=
+  case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x"))
+            (TExistential (UTypeVar "r") KStar (TUVar $ UTypeVar "r")) NotPrincipal of
+    Right [CETypeVar (ETypeVar "r") KStar (MArrow (MEVar (ETypeVar "r-1")) (MEVar (ETypeVar "r-2"))),
+           CETypeVar (ETypeVar "r-1") KStar (MEVar (ETypeVar "r-2-2")),
+           CETypeVar (ETypeVar "r-2") KStar (MArrow (MEVar (ETypeVar "r-2-1")) (MEVar (ETypeVar "r-2-2"))),
+           CTypeVar (E (ETypeVar "r-2-1")) KStar, CTypeVar (E (ETypeVar "r-2-2")) KStar,
+           CTypeVar (E (ETypeVar "a")) KNat, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
+    _ -> False
+
+checkExpr_ELambda_test11 :: Test
+checkExpr_ELambda_test11 =
+  case flip evalStateT startState $ checkExpr context5 (ELambda () "x" $ EVar () "x")
+            (TUniversal (UTypeVar "a") KNat (TArrow (TVec (MUVar (UTypeVar "a")) TUnit) (TVec (MUVar (UTypeVar "a")) TUnit))) NotPrincipal of
+    Right c -> c == context5
+    _ -> False
+
+checkExpr_ELambda_test12 :: Test
+checkExpr_ELambda_test12 =
+  case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x"))
+            (TExistential (UTypeVar "r") KNat (TUVar $ UTypeVar "r")) NotPrincipal of
+    Left (ETypeVarKindMismatchError () (ETypeVar "r") KNat KStar) -> True
+    _ -> False
+
+checkExpr_ELambda_test13 :: Test
+checkExpr_ELambda_test13 =
+  case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "x" $ EVar () "x"))
+            (TUniversal (UTypeVar "a") KStar (TArrow (TUVar (UTypeVar "a")) (TArrow (TUVar (UTypeVar "a")) (TUVar (UTypeVar "a"))))) Principal of
+    Right c -> c == context2
+    _ -> False
+
+checkExpr_ELambda_test14 :: Test
+checkExpr_ELambda_test14 =
+  case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "x" $ EVar () "x"))
+            (TUniversal (UTypeVar "a") KStar (TArrow (TUVar (UTypeVar "a")) (TUVar (UTypeVar "a")))) NotPrincipal of
+    Left (TypeInferenceError (ELambda () "x" (EVar () "x"))) -> True
+    _ -> False
+
+checkExpr_ECons_test1 :: Test
+checkExpr_ECons_test1 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (E (ETypeVar "x")) KNat] (ECons () (EInt () 5) (ENil ()))
+            (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x"))) NotPrincipal of
+    Right [CETypeVar (ETypeVar "x") KNat MZero] -> True
+    _ -> False
+
+checkExpr_ECons_test2 :: Test
+checkExpr_ECons_test2 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (E (ETypeVar "x")) KNat]  (ECons () (EInt () 5) (ECons () (EInt () 6) (ENil ())))
+            (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x"))) Principal of
+    Left (EquationFalseError () MZero (MSucc (MEVar (ETypeVar "#1"))) KNat) -> True
+    _ -> False
+
+checkExpr_EConstr_test1 :: Test
+checkExpr_EConstr_test1 =
+  case flip evalStateT startState $ checkExpr [] (EConstr () "Simba" [EInt () 44, EBool () True])
+            (TGADT "Terminator" [ParameterType TInt, ParameterType TBool]) NotPrincipal of
+    Left (MismatchedConstructorError (EConstr () "Simba" [EInt () 44, EBool () True]) "Lion" "Terminator") -> True
+    _ -> False
+
+checkExpr_EConstr_test2 :: Test
+checkExpr_EConstr_test2 =
+  case flip evalStateT startState $ checkExpr [] (EConstr () "Simba" [EInt () 44, EBool () True])
+            (TGADT "Lion" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x")))]) NotPrincipal of
+    Right [] -> True
+    _ -> False
+
+checkExpr_EConstr_test3 :: Test
+checkExpr_EConstr_test3 =
+  case flip evalStateT startState $ checkExpr [] (EConstr () "Simba" [EInt () 44, EBool () True, EUnit ()])
+            (TGADT "Lion" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x")))]) NotPrincipal of
+    Left (MismatchedConstructorArityError (EConstr () "Simba" [EInt () 44, EBool () True, EUnit ()]) 2 3) -> True
+    _ -> False
+
+checkExpr_EConstr_test4 :: Test
+checkExpr_EConstr_test4 =
+  case flip evalStateT startState $ checkExpr context1 (EConstr () "TX" [])
+            (TGADT "Terminator" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x"))),
+            ParameterType TInt]) Principal of
+    Right c -> c == context1
+    _ -> False
+
+checkExpr_EConstr_test5 :: Test
+checkExpr_EConstr_test5 =
+  case flip evalStateT startState $ checkExpr [] (EConstr () "TX" [EInt () 44, EBool () True, EUnit ()])
+            (TGADT "Terminator" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x"))),
+            ParameterType TInt]) NotPrincipal of
+    Left (MismatchedConstructorArityError (EConstr () "TX" [EInt () 44, EBool () True, EUnit ()]) 0 3) -> True
+    _ -> False
+
+checkExpr_EConstr_test6 :: Test
+checkExpr_EConstr_test6 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (E (ETypeVar "x")) KNat]
+            (EConstr () "T1000" [EString () "Konrad", ECons () (EInt () 5) (ENil ()), EInt () 6])
+            (TGADT "Terminator" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x"))),
+            ParameterType TInt]) Principal of
+    Right [CETypeVar (ETypeVar "x") KNat MZero] -> True
+    _ -> False
+
+checkExpr_EConstr_test7 :: Test
+checkExpr_EConstr_test7 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (E (ETypeVar "x")) KNat]
+            (EConstr () "T1000" [EString () "Konrad", ECons () (EInt () 5) (ENil ()), EUnit ()])
+            (TGADT "Terminator" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x"))),
+            ParameterType TInt]) Principal of
+    Left (TypeInferenceError (EUnit ())) -> True
+    _ -> False
+
+checkExpr_EConstr_test8 :: Test
+checkExpr_EConstr_test8 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (E (ETypeVar "x")) KNat]
+            (EConstr () "T1000" [EFloat () 3.14, ECons () (EInt () 5) (ENil ()), EUnit ()])
+            (TGADT "Terminator" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TUnit) (MZero, MEVar (ETypeVar "x"))),
+            ParameterType TInt]) Principal of
+    Left (TypeInferenceError (EFloat () 3.14)) -> True
+    _ -> False
+
+checkExpr_EConstr_test9 :: Test
+checkExpr_EConstr_test9 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (E (ETypeVar "x")) KNat]
+            (EConstr () "T1000" [EString () "Konrad", ENil (), EInt () 6])
+            (TGADT "Terminator" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x"))),
+            ParameterType TInt]) Principal of
+    Left (EquationFalseError () (MSucc MZero) MZero KNat) -> True
+    _ -> False
+
+checkExpr_EConstr_test10 :: Test
+checkExpr_EConstr_test10 =
+  case flip evalStateT startState $ checkExpr [CTypeVar (E (ETypeVar "x")) KNat]
+            (EConstr () "T1000" [EString () "Konrad", ECons () (EInt () 5) (ECons () (EInt () 5) (ENil ())), EInt () 6])
+            (TGADT "Terminator" [ParameterType (TAnd (TVec (MSucc (MEVar (ETypeVar "x"))) TInt) (MZero, MEVar (ETypeVar "x"))),
+            ParameterType TInt]) Principal of
+    Left (EquationFalseError () MZero (MSucc (MEVar (ETypeVar "#1"))) KNat) -> True
+    _ -> False
+
+checkExpr_EConstr_test11 :: Test
+checkExpr_EConstr_test11 =
+  case flip evalStateT startState $ checkExpr []
+            (EConstr () "T800" [EInt () 5, ECons () (EInt () 5) (ECons () (EInt () 5) (ENil ())), EBool () True])
+            (TGADT "Terminator" [ParameterMonotype (MSucc . MSucc . MSucc $ MZero), ParameterType TInt]) Principal of
+    Right [] -> True
+    _ -> False
+
+checkExpr_EConstr_test12 :: Test
+checkExpr_EConstr_test12 =
+  case flip evalStateT startState $ checkExpr []
+            (EConstr () "T800" [EInt () 5, ECons () (EBool () True) (ECons () (EBool () True) (ENil ())), EBool () True])
+            (TGADT "Terminator" [ParameterMonotype (MSucc MZero), ParameterType TBool]) Principal of
+    Left (EquationFalseError () MInt MBool KStar) -> True
+    _ -> False
+
 --inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
 inferExpr_EVar_test1 :: Test
 inferExpr_EVar_test1 =
@@ -2711,6 +2972,89 @@ inferExpr_EVar_test8 :: Test
 inferExpr_EVar_test8 =
   case flip evalStateT startState $ inferExpr [] (EVar () "zz") of
     Left (UndeclaredVariableError () "zz") -> True
+    _ -> False
+
+inferExpr_EAnnot_test1 :: Test
+inferExpr_EAnnot_test1 =
+  case flip evalStateT startState $ inferExpr context2 (EAnnot () (ELambda () "x" $ EVar () "x")
+            (TUniversal (UTypeVar "a") KStar (TArrow (TUVar (UTypeVar "a")) (TUVar (UTypeVar "a"))))) of
+    Right (TUniversal (UTypeVar "a") KStar (TArrow (TUVar (UTypeVar "a")) (TUVar (UTypeVar "a"))), Principal, c)   -> c == context2
+    _ -> False
+
+inferExpr_EAnnot_test2 :: Test
+inferExpr_EAnnot_test2 =
+  case flip evalStateT startState $ inferExpr context2 (EAnnot () (ELambda () "x" $ EVar () "x")
+            (TUniversal (UTypeVar "a") KNat (TArrow (TUVar (UTypeVar "a")) (TUVar (UTypeVar "a"))))) of
+    Left (TypeHasWrongKindError () (TUVar (UTypeVar "a")) KStar KNat) -> True
+    _ -> False
+
+inferExpr_EAnnot_test3 :: Test
+inferExpr_EAnnot_test3 =
+  case flip evalStateT startState $ inferExpr context5 (EAnnot () (ETuple () [ETuple () [EInt () 44, EFloat () 3.14] 2, EChar () 'c'] 2)
+                          (TProduct [TProduct [TInt, TFloat] 2, TChar] 2)) of
+    Right (TProduct [TProduct [TInt, TFloat] 2, TChar] 2, Principal, c) -> c == context5
+    _ -> False
+
+inferExpr_EAnnot_test4 :: Test
+inferExpr_EAnnot_test4 =
+  case flip evalStateT startState $ inferExpr
+            [CTypeVar (E $ ETypeVar "x") KStar]  (EAnnot () (ETuple () [ETuple () [EUnit (), EUnit ()] 2, EUnit ()] 2) (TEVar $ ETypeVar "x")) of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "x"]) -> True
+    _ -> False
+
+inferExpr_EAnnot_test5 :: Test
+inferExpr_EAnnot_test5 =
+  case flip evalStateT startState $ inferExpr
+            [] (EAnnot () (ETuple () [ETuple () [EUnit (), EUnit ()] 2, EUnit ()] 2)
+            (TExistential (UTypeVar "x") KStar (TUVar $ UTypeVar "x"))) of
+    Right (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x")), Principal, c) -> c ==
+                    [CETypeVar (ETypeVar "x") KStar (MProduct [MEVar (ETypeVar "x-1"), MEVar (ETypeVar "x-2")] 2),
+                     CETypeVar (ETypeVar "x-1") KStar (MProduct [MEVar (ETypeVar "x-1-1"), MEVar (ETypeVar "x-1-2")] 2),
+                     CETypeVar (ETypeVar "x-1-1") KStar MUnit, CETypeVar (ETypeVar "x-1-2") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+    _ -> False
+
+inferExpr_EAnnot_test6 :: Test
+inferExpr_EAnnot_test6 =
+  case flip evalStateT startState $ inferExpr [] (EAnnot () (ENil ()) (TVec MZero TInt)) of
+    Right (TVec MZero TInt, Principal, []) -> True
+    _ -> False
+
+inferExpr_EAnnot_test7 :: Test
+inferExpr_EAnnot_test7 =
+  case flip evalStateT startState $ inferExpr [] (EAnnot () (ECons () (EInt () 5)(ENil ())) (TVec (MSucc MZero) TInt)) of
+    Right (TVec (MSucc MZero) TInt, Principal, []) -> True
+    _ -> False
+
+inferExpr_EAnnot_test8 :: Test
+inferExpr_EAnnot_test8 =
+  case flip evalStateT startState $ inferExpr [CUTypeVarEq (UTypeVar "r") MZero, CTypeVar (U (UTypeVar "r")) KNat]
+            (EAnnot () (ENil ()) (TVec (MUVar $ UTypeVar "r") TInt)) of
+    Right (TVec MZero TInt, Principal, [CUTypeVarEq (UTypeVar "r") MZero, CTypeVar (U (UTypeVar "r")) KNat]) -> True
+    _ -> False
+
+inferExpr_EAnnot_test9 :: Test
+inferExpr_EAnnot_test9 =
+  case flip evalStateT startState $ inferExpr [] (EAnnot () (ENil ())
+            (TUniversal (UTypeVar "r") KNat (TImp (MZero, MUVar (UTypeVar "r")) (TVec (MUVar $ UTypeVar "r") TInt)))) of
+    Right (TUniversal (UTypeVar "r") KNat (TImp (MZero, MUVar (UTypeVar "r")) (TVec (MUVar (UTypeVar "r")) TInt)), Principal, []) -> True
+    _ -> False
+
+inferExpr_EAnnot_test10 :: Test
+inferExpr_EAnnot_test10 =
+  case flip evalStateT startState $ inferExpr [] (EAnnot () (ENil ()) (TVec (MSucc MZero) TInt)) of
+    Left (EquationFalseError () (MSucc MZero) MZero KNat) -> True
+    _ -> False
+
+inferExpr_EAnnot_test11 :: Test
+inferExpr_EAnnot_test11 =
+  case flip evalStateT startState $ inferExpr [] (EAnnot () (ECons () (EInt () 5) (ENil ())) (TVec (MSucc MZero) TInt)) of
+    Right (TVec (MSucc MZero) TInt, Principal, []) -> True
+    _ -> False
+
+inferExpr_EAnnot_test12 :: Test
+inferExpr_EAnnot_test12 =
+  case flip evalStateT startState $ inferExpr [] (EAnnot () (EInt () 5) (TImp (MSucc MZero, MZero) TBool)) of
+    Right (TImp (MSucc MZero, MZero) TBool, Principal, []) -> True
     _ -> False
 
 tests :: [(TestName, Test)]
@@ -3017,6 +3361,7 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("equivalentProp_test7", equivalentProp_test7),
          ("equivalentProp_test8", equivalentProp_test8),
          ("equivalentProp_test9", equivalentProp_test9),
+         ("equivalentProp_test10", equivalentProp_test10),
          ("equivalentType_test1", equivalentType_test1),
          ("equivalentType_test2", equivalentType_test2),
          ("equivalentType_test3", equivalentType_test3),
@@ -3104,8 +3449,11 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("checkExpr_ETuple_test4", checkExpr_ETuple_test4),
          ("checkExpr_ETuple_test5", checkExpr_ETuple_test5),
          ("checkExpr_ETuple_test6", checkExpr_ETuple_test6),
-         --("checkExpr_ETuple_test7", checkExpr_ETuple_test7),
+         ("checkExpr_ETuple_test7", checkExpr_ETuple_test7),
          ("checkExpr_ETuple_test8", checkExpr_ETuple_test8),
+         ("checkExpr_ETuple_test9", checkExpr_ETuple_test9),
+         ("checkExpr_ETuple_test10", checkExpr_ETuple_test10),
+         ("checkExpr_ETuple_test11", checkExpr_ETuple_test11),
          ("checkExpr_ELambda_test1", checkExpr_ELambda_test1),
          ("checkExpr_ELambda_test2", checkExpr_ELambda_test2),
          ("checkExpr_ELambda_test3", checkExpr_ELambda_test3),
@@ -3114,6 +3462,26 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("checkExpr_ELambda_test6", checkExpr_ELambda_test6),
          ("checkExpr_ELambda_test7", checkExpr_ELambda_test7),
          ("checkExpr_ELambda_test8", checkExpr_ELambda_test8),
+         ("checkExpr_ELambda_test9", checkExpr_ELambda_test9),
+         ("checkExpr_ELambda_test10", checkExpr_ELambda_test10),
+         ("checkExpr_ELambda_test11", checkExpr_ELambda_test11),
+         ("checkExpr_ELambda_test12", checkExpr_ELambda_test12),
+         ("checkExpr_ELambda_test13", checkExpr_ELambda_test13),
+         ("checkExpr_ELambda_test14", checkExpr_ELambda_test14),
+         ("checkExpr_ECons_test1", checkExpr_ECons_test1),
+         ("checkExpr_ECons_test2", checkExpr_ECons_test2),
+         ("checkExpr_EConstr_test1", checkExpr_EConstr_test1),
+         ("checkExpr_EConstr_test2", checkExpr_EConstr_test2),
+         ("checkExpr_EConstr_test3", checkExpr_EConstr_test3),
+         ("checkExpr_EConstr_test4", checkExpr_EConstr_test4),
+         ("checkExpr_EConstr_test5", checkExpr_EConstr_test5),
+         ("checkExpr_EConstr_test6", checkExpr_EConstr_test6),
+         ("checkExpr_EConstr_test7", checkExpr_EConstr_test7),
+         ("checkExpr_EConstr_test8", checkExpr_EConstr_test8),
+         ("checkExpr_EConstr_test9", checkExpr_EConstr_test9),
+         ("checkExpr_EConstr_test10", checkExpr_EConstr_test10),
+         ("checkExpr_EConstr_test11", checkExpr_EConstr_test11),
+         ("checkExpr_EConstr_test12", checkExpr_EConstr_test12),
          ("inferExpr_EVar_test1", inferExpr_EVar_test1),
          ("inferExpr_EVar_test2", inferExpr_EVar_test2),
          ("inferExpr_EVar_test3", inferExpr_EVar_test3),
@@ -3121,7 +3489,19 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("inferExpr_EVar_test5", inferExpr_EVar_test5),
          ("inferExpr_EVar_test6", inferExpr_EVar_test6),
          ("inferExpr_EVar_test7", inferExpr_EVar_test7),
-         ("inferExpr_EVar_test8", inferExpr_EVar_test8)]
+         ("inferExpr_EVar_test8", inferExpr_EVar_test8),
+         ("inferExpr_EAnnot_test1", inferExpr_EAnnot_test1),
+         ("inferExpr_EAnnot_test2", inferExpr_EAnnot_test2),
+         ("inferExpr_EAnnot_test3", inferExpr_EAnnot_test3),
+         ("inferExpr_EAnnot_test4", inferExpr_EAnnot_test4),
+         ("inferExpr_EAnnot_test5", inferExpr_EAnnot_test5),
+         ("inferExpr_EAnnot_test6", inferExpr_EAnnot_test6),
+         ("inferExpr_EAnnot_test7", inferExpr_EAnnot_test7),
+         ("inferExpr_EAnnot_test8", inferExpr_EAnnot_test8),
+         ("inferExpr_EAnnot_test9", inferExpr_EAnnot_test9),
+         ("inferExpr_EAnnot_test10", inferExpr_EAnnot_test10),
+         ("inferExpr_EAnnot_test11", inferExpr_EAnnot_test11),
+         ("inferExpr_EAnnot_test12", inferExpr_EAnnot_test12)]
 
 runTest :: (TestName, Test) -> String
 runTest (name, t) =

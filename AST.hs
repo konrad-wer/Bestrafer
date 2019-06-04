@@ -182,6 +182,8 @@ data Constructor = Constructor { constrTypeName :: String,
 
 type ConstructorsContext = Map.Map String Constructor
 
+type GADTArities = Map.Map String Int
+
 type Context = [ContextEntry]
 
 data Principality = Principal | NotPrincipal deriving (Show, Eq)

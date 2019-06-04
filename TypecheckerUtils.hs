@@ -8,8 +8,11 @@ import Control.Lens hiding (Context)
 
 data Error p
   = UndeclaredVariableError p Var
+  | UndeclaredGADTError p String
   | UndeclaredConstructorError (Expr p)
+  | MismatchedGADTArityError p String Int Int
   | MismatchedConstructorError (Expr p) String String
+  | MismatchedConstructorArityError (Expr p) Int Int
   | InternalCompilerError p String
   | ETypeVarTypeMismatchError p ETypeVar Monotype Monotype
   | ETypeVarKindMismatchError p ETypeVar Kind Kind
@@ -33,7 +36,7 @@ data Error p
   | ExprIsACaseError (Expr p)
   deriving (Show)
 
-data TypecheckerState = TypecheckerState {_freshVarNum :: Integer, _constrContext :: ConstructorsContext}
+data TypecheckerState = TypecheckerState {_freshVarNum :: Integer, _constrContext :: ConstructorsContext, _gadtArities :: GADTArities}
 
 makeLenses ''TypecheckerState
 
@@ -412,8 +415,8 @@ applyContextToType c (TEVar e) p =
     Just (CETypeVar _ KNat _) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
     Just (CTypeVar (E _) KNat) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
     _ -> Left $ UndeclaredETypeVarError p e
-applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType (CTypeVar (U a) k : c) t p --TODO przemyśleć / zapytać
-applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType (CTypeVar (U a) k : c) t p
+applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType c t p --TODO przemyśleć / zapytać
+applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType c t p
 applyContextToType _ TUnit _   = return TUnit
 applyContextToType _ TBool _   = return TBool
 applyContextToType _ TInt _    = return TInt

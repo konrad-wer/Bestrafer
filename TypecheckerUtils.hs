@@ -118,7 +118,7 @@ typeFromTemplate prms p (TTVec nt tt) = TVec <$> monotypeFromTemplate prms p nt 
 typeFromTemplate prms p (TTParam i) =
   case prms !! i of
     ParameterType t -> return t
-    ParameterMonotype m -> monotypeToType m p
+    ParameterMonotype m -> monotypeToType p m
 
 propositionFromTemplate :: [GADTParameter] -> p -> PropositionTemplate -> Either (Error p) Proposition
 propositionFromTemplate prms p (pt1, pt2) = do
@@ -142,7 +142,7 @@ monotypeFromTemplate prms p (MTGADT n tts)    = MGADT n  <$> mapM (monotypeFromT
 monotypeFromTemplate prms p (MTProduct tts n) = MProduct <$> mapM (monotypeFromTemplate prms p) tts <*> return n
 monotypeFromTemplate prms p (MTParam i) =
   case prms !! i of
-    ParameterType t -> typeToMonotype t p
+    ParameterType t -> typeToMonotype p t
     ParameterMonotype m -> return m
 
 --Free variables computing utils -----------------------------------------------
@@ -359,95 +359,95 @@ substituteUVarInMonotype _ _ (MEVar a) = MEVar a
 
 --Monotype to type and type to monotype-----------------------------------------
 
-monotypeToType :: Monotype -> p -> Either (Error p) Type
-monotypeToType MUnit _   = return TUnit
-monotypeToType MBool _   = return TBool
-monotypeToType MInt _    = return TInt
-monotypeToType MFloat _  = return TFloat
-monotypeToType MChar _   = return TChar
-monotypeToType MString _ = return TString
-monotypeToType (MArrow m1 m2) p  = TArrow   <$> monotypeToType m1 p <*> monotypeToType m2 p
-monotypeToType (MGADT n ms) _    = return $ TGADT n $ map ParameterMonotype ms
-monotypeToType (MProduct ms n) p = TProduct <$> mapM (`monotypeToType` p) ms <*> return n
-monotypeToType (MEVar x) _ = return $ TEVar x
-monotypeToType (MUVar x) _ = return $ TUVar x
-monotypeToType n p = Left $ MonotypeIsNotTypeError p n
+monotypeToType :: p -> Monotype -> Either (Error p) Type
+monotypeToType _ MUnit   = return TUnit
+monotypeToType _ MBool   = return TBool
+monotypeToType _ MInt    = return TInt
+monotypeToType _ MFloat  = return TFloat
+monotypeToType _ MChar   = return TChar
+monotypeToType _ MString = return TString
+monotypeToType p (MArrow m1 m2)  = TArrow <$> monotypeToType p m1 <*> monotypeToType p m2
+monotypeToType _ (MGADT n ms)    = return $ TGADT n $ map ParameterMonotype ms
+monotypeToType p (MProduct ms n) = TProduct <$> mapM (monotypeToType p) ms <*> return n
+monotypeToType _ (MEVar x) = return $ TEVar x
+monotypeToType _ (MUVar x) = return $ TUVar x
+monotypeToType p n = Left $ MonotypeIsNotTypeError p n
 
-gADTParameterToMonotype :: GADTParameter -> p -> Either (Error p) Monotype
-gADTParameterToMonotype (ParameterType t) p     = typeToMonotype t p
-gADTParameterToMonotype (ParameterMonotype m) _ = return m
+gADTParameterToMonotype :: p -> GADTParameter -> Either (Error p) Monotype
+gADTParameterToMonotype p (ParameterType t)     = typeToMonotype p t
+gADTParameterToMonotype _ (ParameterMonotype m) = return m
 
-typeToMonotype :: Type -> p -> Either (Error p) Monotype
-typeToMonotype TUnit _   = return MUnit
-typeToMonotype TBool _   = return MBool
-typeToMonotype TInt _    = return MInt
-typeToMonotype TFloat _  = return MFloat
-typeToMonotype TChar _   = return MChar
-typeToMonotype TString _ = return MString
-typeToMonotype (TUVar a) _ = return $ MUVar a
-typeToMonotype (TEVar a) _ = return $ MEVar a
-typeToMonotype (TArrow t1 t2)  p = MArrow   <$> typeToMonotype t1 p <*> typeToMonotype t2 p
-typeToMonotype (TGADT n ts)    p = MGADT n  <$> mapM (`gADTParameterToMonotype` p) ts
-typeToMonotype (TProduct ts n) p = MProduct <$> mapM (`typeToMonotype` p) ts <*> return n
-typeToMonotype t p = Left $ TypeIsNotMonotypeError p t
+typeToMonotype :: p -> Type -> Either (Error p) Monotype
+typeToMonotype _ TUnit   = return MUnit
+typeToMonotype _ TBool   = return MBool
+typeToMonotype _ TInt    = return MInt
+typeToMonotype _ TFloat  = return MFloat
+typeToMonotype _ TChar   = return MChar
+typeToMonotype _ TString = return MString
+typeToMonotype _ (TUVar a) = return $ MUVar a
+typeToMonotype _ (TEVar a) = return $ MEVar a
+typeToMonotype p (TArrow t1 t2)  = MArrow   <$> typeToMonotype p t1 <*> typeToMonotype p t2
+typeToMonotype p (TGADT n ts)    = MGADT n  <$> mapM (gADTParameterToMonotype p) ts
+typeToMonotype p (TProduct ts n) = MProduct <$> mapM (typeToMonotype p) ts <*> return n
+typeToMonotype p t = Left $ TypeIsNotMonotypeError p t
 
 --Context application-----------------------------------------------------------
 
-applyContextToGADTParameter :: Context -> GADTParameter -> p -> Either (Error p) GADTParameter
-applyContextToGADTParameter c (ParameterType t)     p = ParameterType <$> applyContextToType c t p
-applyContextToGADTParameter c (ParameterMonotype m) p = ParameterMonotype <$> applyContextToMonotype c m p
+applyContextToGADTParameter :: p -> Context -> GADTParameter -> Either (Error p) GADTParameter
+applyContextToGADTParameter p c (ParameterType t)     = ParameterType <$> applyContextToType p c t
+applyContextToGADTParameter p c (ParameterMonotype m) = ParameterMonotype <$> applyContextToMonotype p c m
 
-applyContextToType :: Context -> Type -> p -> Either (Error p) Type
-applyContextToType c (TUVar u) p =
+applyContextToType ::  p -> Context -> Type -> Either (Error p) Type
+applyContextToType p c (TUVar u) =
   case uTypeVarEqContextLookup c u of
-    Just (CUTypeVarEq _ tau) -> applyContextToMonotype c tau p >>= flip monotypeToType p
+    Just (CUTypeVarEq _ tau) -> applyContextToMonotype p c tau >>= monotypeToType p
     _ -> return $ TUVar u
-applyContextToType c (TImp pr t) p = TImp <$> applyContextToProposition c pr p <*> applyContextToType c t p
-applyContextToType c (TAnd t pr) p = TAnd <$> applyContextToType c t p <*> applyContextToProposition c pr p
-applyContextToType c (TArrow t1 t2)  p = TArrow   <$> applyContextToType c t1 p <*> applyContextToType c t2 p
-applyContextToType c (TGADT n ts)    p = TGADT n  <$> mapM (flip (applyContextToGADTParameter c) p) ts
-applyContextToType c (TProduct ts n) p = TProduct <$> mapM (flip (applyContextToType c) p) ts <*> return n
-applyContextToType c (TVec n t) p = TVec <$> applyContextToMonotype c n p <*> applyContextToType c t p
-applyContextToType c (TEVar e) p =
+applyContextToType p c (TImp pr t) = TImp <$> applyContextToProposition p c pr <*> applyContextToType p c t
+applyContextToType p c (TAnd t pr) = TAnd <$> applyContextToType p c t <*> applyContextToProposition p c pr
+applyContextToType p c (TArrow t1 t2)  = TArrow   <$> applyContextToType p c t1 <*> applyContextToType p c t2
+applyContextToType p c (TGADT n ts)    = TGADT n  <$> mapM (applyContextToGADTParameter p c) ts
+applyContextToType p c (TProduct ts n) = TProduct <$> mapM (applyContextToType p c) ts <*> return n
+applyContextToType p c (TVec n t) = TVec <$> applyContextToMonotype p c n <*> applyContextToType p c t
+applyContextToType p c (TEVar e) =
   case typeVarContextLookup c $ eTypeVarName e of
-    Just (CETypeVar _ KStar tau) -> applyContextToMonotype c tau p >>= flip monotypeToType p
+    Just (CETypeVar _ KStar tau) -> applyContextToMonotype p c tau >>= monotypeToType p
     Just (CTypeVar (E _) KStar) -> return $ TEVar e
     Just (CETypeVar _ KNat _) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
     Just (CTypeVar (E _) KNat) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
     _ -> Left $ UndeclaredETypeVarError p e
-applyContextToType c (TUniversal a k t) p = TUniversal a k <$> applyContextToType c t p --TODO przemyśleć / zapytać
-applyContextToType c (TExistential a k t) p = TExistential a k <$> applyContextToType c t p
-applyContextToType _ TUnit _   = return TUnit
-applyContextToType _ TBool _   = return TBool
-applyContextToType _ TInt _    = return TInt
-applyContextToType _ TFloat _  = return TFloat
-applyContextToType _ TChar _   = return TChar
-applyContextToType _ TString _ = return TString
+applyContextToType p c (TUniversal a k t) = TUniversal a k <$> applyContextToType p c t --TODO przemyśleć / zapytać
+applyContextToType p c (TExistential a k t) = TExistential a k <$> applyContextToType p c t
+applyContextToType _ _ TUnit   = return TUnit
+applyContextToType _ _ TBool   = return TBool
+applyContextToType _ _ TInt    = return TInt
+applyContextToType _ _ TFloat  = return TFloat
+applyContextToType _ _ TChar   = return TChar
+applyContextToType _ _ TString = return TString
 
-applyContextToMonotype :: Context -> Monotype -> p -> Either (Error p) Monotype
-applyContextToMonotype c (MUVar u) p =
+applyContextToMonotype :: p -> Context -> Monotype -> Either (Error p) Monotype
+applyContextToMonotype p c (MUVar u) =
   case uTypeVarEqContextLookup c u of
-    Just (CUTypeVarEq _ tau) -> applyContextToMonotype c tau p
+    Just (CUTypeVarEq _ tau) -> applyContextToMonotype p c tau
     _ -> return $ MUVar u
-applyContextToMonotype c (MArrow m1 m2)  p = MArrow   <$> applyContextToMonotype c m1 p <*> applyContextToMonotype c m2 p
-applyContextToMonotype c (MGADT n ms)    p = MGADT n  <$> mapM (flip (applyContextToMonotype c) p) ms
-applyContextToMonotype c (MProduct ms n) p = MProduct <$> mapM (flip (applyContextToMonotype c) p) ms  <*> return n
-applyContextToMonotype c (MEVar e) p =
+applyContextToMonotype p c (MArrow m1 m2)  = MArrow   <$> applyContextToMonotype p c m1 <*> applyContextToMonotype p c m2
+applyContextToMonotype p c (MGADT n ms)    = MGADT n  <$> mapM (applyContextToMonotype p c) ms
+applyContextToMonotype p c (MProduct ms n) = MProduct <$> mapM (applyContextToMonotype p c) ms <*> return n
+applyContextToMonotype p c (MEVar e) =
   case typeVarContextLookup c $ eTypeVarName e of
-    Just (CETypeVar _ _ tau) -> applyContextToMonotype c tau p
+    Just (CETypeVar _ _ tau) -> applyContextToMonotype p c tau
     Just (CTypeVar (E _) _) -> return $ MEVar e
     _ -> Left $ UndeclaredETypeVarError p e
-applyContextToMonotype _ MUnit _   = return MUnit
-applyContextToMonotype _ MBool _   = return MBool
-applyContextToMonotype _ MInt _    = return MInt
-applyContextToMonotype _ MFloat _  = return MFloat
-applyContextToMonotype _ MChar _   = return MChar
-applyContextToMonotype _ MString _ = return MString
-applyContextToMonotype _ MZero _   = return MZero
-applyContextToMonotype c (MSucc n) p = MSucc <$> applyContextToMonotype c n p
+applyContextToMonotype _ _ MUnit   = return MUnit
+applyContextToMonotype _ _ MBool   = return MBool
+applyContextToMonotype _ _ MInt    = return MInt
+applyContextToMonotype _ _ MFloat  = return MFloat
+applyContextToMonotype _ _ MChar   = return MChar
+applyContextToMonotype _ _ MString = return MString
+applyContextToMonotype _ _ MZero   = return MZero
+applyContextToMonotype p c (MSucc n) = MSucc <$> applyContextToMonotype p c n
 
-applyContextToProposition :: Context -> Proposition -> p -> Either (Error p) Proposition
-applyContextToProposition c (m1, m2) p = do
-  m1' <- applyContextToMonotype c m1 p
-  m2' <- applyContextToMonotype c m2 p
+applyContextToProposition :: p -> Context -> Proposition -> Either (Error p) Proposition
+applyContextToProposition p c (m1, m2) = do
+  m1' <- applyContextToMonotype p c m1
+  m2' <- applyContextToMonotype p c m2
   return (m1', m2')

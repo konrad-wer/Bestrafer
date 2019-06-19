@@ -63,14 +63,23 @@ type Spine p = [Expr p]
 
 data Pattern p
   = PVar p Var
-  | PPair p (Pattern p) (Pattern p)
-  | PInjk p (Pattern p) Int
+  | PTuple p [Pattern p] Int
   | PNil  p
   | PCons p (Pattern p) (Pattern p)
   | PWild p
   deriving (Show)
 
-type Branch p = ([Pattern p], Expr p)
+type Branch p = ([Pattern p], Expr p, p)
+
+getPosFromPattern :: Pattern p -> p
+getPosFromPattern (PVar   p _)   = p
+getPosFromPattern (PTuple p _ _) = p
+getPosFromPattern (PNil   p)     = p
+getPosFromPattern (PCons  p _ _) = p
+getPosFromPattern (PWild  p)     = p
+
+getPosFromBranch :: Branch p -> p
+getPosFromBranch (_, _, p) = p
 
 --Types Syntax------------------------------------------------------------------
 

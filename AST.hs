@@ -62,21 +62,35 @@ getPos (ECons   p _ _) = p
 type Spine p = [Expr p]
 
 data Pattern p
-  = PVar p Var
-  | PTuple p [Pattern p] Int
-  | PNil  p
-  | PCons p (Pattern p) (Pattern p)
-  | PWild p
+  = PVar    p Var
+  | PTuple  p [Pattern p] Int
+  | PNil    p
+  | PCons   p (Pattern p) (Pattern p)
+  | PWild   p
+  | PUnit   p
+  | PBool   p Bool
+  | PInt    p Int64
+  | PFloat  p Double
+  | PChar   p Char
+  | PString p String
+  | PConstr p String [Pattern p]
   deriving (Show)
 
 type Branch p = ([Pattern p], Expr p, p)
 
 getPosFromPattern :: Pattern p -> p
-getPosFromPattern (PVar   p _)   = p
-getPosFromPattern (PTuple p _ _) = p
-getPosFromPattern (PNil   p)     = p
-getPosFromPattern (PCons  p _ _) = p
-getPosFromPattern (PWild  p)     = p
+getPosFromPattern (PVar    p _)   = p
+getPosFromPattern (PTuple  p _ _) = p
+getPosFromPattern (PNil    p)     = p
+getPosFromPattern (PCons   p _ _) = p
+getPosFromPattern (PWild   p)     = p
+getPosFromPattern (PUnit   p)     = p
+getPosFromPattern (PBool   p _)   = p
+getPosFromPattern (PInt    p _)   = p
+getPosFromPattern (PFloat  p _)   = p
+getPosFromPattern (PChar   p _)   = p
+getPosFromPattern (PString p _)   = p
+getPosFromPattern (PConstr p _ _) = p
 
 getPosFromBranch :: Branch p -> p
 getPosFromBranch (_, _, p) = p

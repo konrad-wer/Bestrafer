@@ -34,6 +34,15 @@ data Error p
   | EliminateEquationError p Monotype Monotype Kind
   | ExprNotCheckedIntroductionFormError (Expr p)
   | ExprIsACaseError (Expr p)
+  | TooLongPatternError p
+  | TooShortPatternError p
+  | MismatchedProductArityInPatternError (Pattern p) Type
+  | VarPatternHeadedByExistsOrAndError (Pattern p) Type
+  | ExpectedPrincipalTypeInPatternError (Branch p)
+  | UndeclaredConstructorInPatternError (Pattern p)
+  | MismatchedConstructorInPatternError (Pattern p) String String
+  | MismatchedConstructorArityInPatternError (Pattern p) Int Int
+  | PatternMatchingTypecheckingError (Pattern p) Type
   deriving (Show)
 
 data TypecheckerState = TypecheckerState {_freshVarNum :: Integer, _constrContext :: ConstructorsContext, _gadtArities :: GADTArities}
@@ -91,6 +100,10 @@ headedByUniversal _ = False
 headedByExistential :: Type -> Bool
 headedByExistential TExistential {} = True
 headedByExistential _ = False
+
+headedByAnd :: Type -> Bool
+headedByAnd TAnd {} = True
+headedByAnd _ = False
 
 --TemplateUtils-----------------------------------------------------------------
 

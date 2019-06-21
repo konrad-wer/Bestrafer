@@ -616,4 +616,79 @@ checkBranches c (b : bs) ts pr1 t pr2 = do
 checkBranch ::
   Context -> Branch p -> [Type] -> Principality -> Type -> Principality
   -> StateT TypecheckerState (Either (Error p)) Context
-checkBranch = undefined
+checkBranch c ([], e, _) [] _ te pr = checkExpr c e te pr
+checkBranch _ ([], _, p) _ _ _ _ = lift . Left $ TooShortPatternError p
+checkBranch _ (_, _, p) [] _ _ _ = lift . Left $ TooLongPatternError p
+checkBranch c (PUnit   _   : ptrns, e, p) (TUnit : ts)   pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
+checkBranch c (PBool   _ _ : ptrns, e, p) (TBool : ts)   pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
+checkBranch c (PInt    _ _ : ptrns, e, p) (TInt  : ts)   pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
+checkBranch c (PFloat  _ _ : ptrns, e, p) (TFloat : ts)  pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
+checkBranch c (PChar   _ _ : ptrns, e, p) (TChar: ts)    pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
+checkBranch c (PString _ _ : ptrns, e, p) (TString : ts) pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
+checkBranch c (PTuple p1 pargs n1 : ptrns, e, p2) (TProduct targs n2 : ts) pr1 te pr2
+  | n1 /= n2 = lift . Left $ MismatchedProductArityInPatternError (PTuple p1 pargs n1) (TProduct targs n2)
+  | otherwise = checkBranch c (pargs ++ ptrns, e, p2) (targs ++ ts) pr1 te pr2
+checkBranch c (PWild p1 : ptrns, e, p2) (t : ts) pr1 te pr2
+  | headedByExistential t || headedByAnd t = lift . Left $ VarPatternHeadedByExistsOrAndError (PWild p1) t
+  | otherwise = checkBranch c (ptrns, e, p2) ts pr1 te pr2
+checkBranch c (PVar p1 x : ptrns, e, p2) (t : ts) pr1 te pr2
+  | headedByExistential t || headedByAnd t = lift . Left $ VarPatternHeadedByExistsOrAndError (PVar p1 x) t
+  | otherwise = dropContextToMarker <$> checkBranch (CVar x t Principal : CMarker : c) (ptrns, e, p2) ts pr1 te pr2
+checkBranch c b (TAnd t _ : ts) NotPrincipal te pr = checkBranch c b (t : ts) NotPrincipal te pr
+checkBranch c b (TAnd t prop : ts) Principal te pr =
+  checkBranchIncorporatingProps (getPosFromBranch b) c [prop] b (t : ts) Principal te pr
+checkBranch c b (TExistential u k t : ts) pr1 te pr2 =
+  dropContextToMarker <$> checkBranch (CTypeVar (U u) k : CMarker : c) b (t : ts) pr1 te pr2
+checkBranch c (PNil _ : ptrns, e, p) (TVec {} : ts) NotPrincipal te pr =
+  checkBranch c (ptrns, e, p) ts NotPrincipal te pr
+checkBranch c (PCons _ x xs : ptrns, e, p) (TVec _ t : ts) NotPrincipal te pr = do
+  n <- UTypeVar . ("#" ++). show . view freshVarNum <$> get
+  modify $ over freshVarNum (+ 1)
+  let c2 = CTypeVar (U n) KNat : CMarker : c
+  dropContextToMarker <$> checkBranch c2 (x : xs : ptrns, e, p) (t : TVec (MUVar n) t : ts) NotPrincipal te pr
+checkBranch c (PNil p1 : ptrns, e, p2) (TVec n _ : ts) Principal te pr =
+  checkBranchIncorporatingProps p1 c [(n, MZero)] (ptrns, e, p2) ts Principal te pr
+checkBranch c (PCons p1 x xs : ptrns, e, p2) (TVec n1 t : ts) Principal te pr = do
+  n2 <- UTypeVar . ("#" ++). show . view freshVarNum <$> get
+  modify $ over freshVarNum (+ 1)
+  let c2 = CTypeVar (U n2) KNat : CMarker : c
+  let prop = (n1, MSucc $ MUVar n2)
+  let b = (x : xs : ptrns, e, p2)
+  let ts' = t : TVec (MUVar n2) t : ts
+  dropContextToMarker <$> checkBranchIncorporatingProps p1 c2 [prop] b ts' Principal te pr
+checkBranch c (PConstr p1 constrName pargs : ptrns, e, p2) (TGADT typeName params : ts) pr1 te pr2 = do
+  lookupRes <- Map.lookup constrName . view constrContext <$> get
+  case lookupRes of
+    Nothing -> lift . Left $ UndeclaredConstructorInPatternError $ PConstr p1 constrName pargs
+    Just constr
+      | constrTypeName constr /= typeName ->
+        lift . Left $ MismatchedConstructorInPatternError (PConstr p1 constrName pargs) (constrTypeName constr) typeName
+      | length (constrArgsTemplates constr) /= length pargs ->
+        lift . Left $ MismatchedConstructorArityInPatternError
+        (PConstr p1 constrName pargs)
+        (length $ constrArgsTemplates constr) (length pargs)
+      | otherwise -> do
+        firstFreshVarNum <- view freshVarNum <$> get
+        modify $ over freshVarNum (+ (fromIntegral . length . constrUVars $ constr))
+        let uvars = map (U . UTypeVar . ("#" ++) . show) [firstFreshVarNum .. firstFreshVarNum + (fromIntegral . length . constrUVars $ constr)]
+        uArgs <- lift $ mapM (typeFromTemplate params p1) $ constrArgsTemplates constr
+        uProps <- lift $ mapM (propositionFromTemplate params p1) $ constrProps constr
+        let args = map (flip (foldl (flip $ uncurry substituteUVarInType)) (zip (map fst (constrUVars constr)) uvars)) uArgs
+        let props = map (flip (foldl (flip $ uncurry substituteUVarInProp)) (zip (map fst (constrUVars constr)) uvars)) uProps
+        let c2 = zipWith CTypeVar uvars (map snd $ constrUVars constr) ++ CMarker : c
+        case pr1 of
+          NotPrincipal -> dropContextToMarker <$> checkBranch c2 (pargs ++ ptrns, e, p2) (args ++ ts) pr1 te pr2
+          Principal -> dropContextToMarker <$> checkBranchIncorporatingProps p1 c2 props (pargs ++ ptrns, e, p2) (args ++ ts) pr1 te pr2
+checkBranch _ (ptrn : _, _, _) (t : _) _ _ _ = lift . Left $ PatternMatchingTypecheckingError ptrn t
+
+checkBranchIncorporatingProps ::
+ p -> Context -> [Proposition] -> Branch p -> [Type] -> Principality -> Type -> Principality
+ -> StateT TypecheckerState (Either (Error p)) Context
+checkBranchIncorporatingProps _ c [] b ts Principal te pr =
+  checkBranch c b ts Principal te pr
+checkBranchIncorporatingProps p c (prop : props) b ts Principal te pr = do
+  unificationResult <- runMaybeT $ eliminatePropEquation (CMarker : c) prop p
+  case unificationResult of
+    Nothing -> return c
+    Just c2 -> dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts Principal te pr
+checkBranchIncorporatingProps _ _ _ b _ NotPrincipal _ _ = lift . Left $ ExpectedPrincipalTypeInPatternError b

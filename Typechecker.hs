@@ -690,5 +690,7 @@ checkBranchIncorporatingProps p c (prop : props) b ts Principal te pr = do
   unificationResult <- runMaybeT $ eliminatePropEquation (CMarker : c) prop p
   case unificationResult of
     Nothing -> return c
-    Just c2 -> dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts Principal te pr
+    Just c2 -> do
+    ts' <- mapM (lift . applyContextToType (getPosFromBranch b) c2) ts
+    dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts' Principal te pr
 checkBranchIncorporatingProps _ _ _ b _ NotPrincipal _ _ = lift . Left $ ExpectedPrincipalTypeInPatternError b

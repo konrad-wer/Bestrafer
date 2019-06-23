@@ -13,7 +13,7 @@ type TestName = String
 
 startState :: TypecheckerState
 startState = TypecheckerState {_freshVarNum = 0,
-  _gadtArities = Map.fromList [("Terminator", 2), ("Lion", 1)],
+  _gadtArities = Map.fromList [("Terminator", 2), ("Lion", 1), ("List", 1), ("Vec", 2)],
   _constrContext = Map.fromList
   [("T800", Constructor "Terminator"
     [(UTypeVar "a", KNat)]
@@ -22,7 +22,12 @@ startState = TypecheckerState {_freshVarNum = 0,
    ("T1000", Constructor "Terminator" [] [] [TTString, TTParam 0, TTParam 1]),
    ("TX", Constructor "Terminator" [] [] []),
    ("Simba", Constructor "Lion" [] [] [TTInt, TTBool]),
-   ("Mufasa", Constructor "Lion" [] [(MTParam 0, MTInt)] [TTInt, TTBool])
+   ("Mufasa", Constructor "Lion" [] [(MTParam 0, MTInt)] [TTInt, TTBool]),
+   ("LNil", Constructor "List" [] [] []),
+   ("LCons", Constructor "List" [] [] [TTParam 0, TTGADT "List" [ParameterTypeT $ TTParam 0]]),
+   ("Nil", Constructor "Vec" [] [(MTParam 0, MTZero)] []),
+   ("Cons", Constructor "Vec" [(UTypeVar "a", KNat)] [(MTParam 0, MTSucc . MTUVar $ UTypeVar "a")]
+    [TTParam 1, TTGADT "Vec" [ParameterMonotypeT . MTUVar $ UTypeVar "a", ParameterTypeT $ TTParam 1]])
   ]}
 
 context1 :: Context
@@ -3057,6 +3062,223 @@ inferExpr_EAnnot_test12 =
     Right (TImp (MSucc MZero, MZero) TBool, Principal, []) -> True
     _ -> False
 
+-- checkBranch ::
+--   Context -> Branch p -> [Type] -> Principality -> Type -> Principality
+--   -> StateT TypecheckerState (Either (Error p)) Context
+checkBranch_test1 :: Test
+checkBranch_test1 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PUnit (), PInt () 5, PFloat () 3.14] 3], EInt () 5, ())
+        [TProduct [TUnit, TInt, TFloat] 3] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test2 :: Test
+checkBranch_test2 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PChar () 'k', PBool () True] 2, PString () "Bestrafer"], EInt () 5, ())
+        [TProduct [TChar, TBool] 2, TString] NotPrincipal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test3 :: Test
+checkBranch_test3 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PUnit (), PFloat () 5, PFloat () 3.14] 3], EInt () 5, ())
+        [TProduct [TUnit, TInt, TFloat] 3] Principal TInt Principal of
+    Left (PatternMatchingTypecheckingError (PFloat () 5) TInt) -> True
+    _ -> False
+
+checkBranch_test4 :: Test
+checkBranch_test4 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PChar () 'k', PBool () True] 2, PChar () 'B'], EInt () 5, ())
+        [TProduct [TChar, TBool] 2, TString] NotPrincipal TInt Principal of
+    Left (PatternMatchingTypecheckingError (PChar () 'B') TString) -> True
+    _ -> False
+
+checkBranch_test5 :: Test
+checkBranch_test5 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PUnit (), PInt () 5, PFloat () 3.14] 3], EInt () 5, ())
+        [TProduct [TUnit, TInt, TFloat] 3, TString] Principal TInt Principal of
+    Left (TooShortPatternError ()) -> True
+    _ -> False
+
+checkBranch_test6 :: Test
+checkBranch_test6 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PChar () 'k', PBool () True] 2, PString () "Bestrafer"], EInt () 5, ())
+        [TProduct [TChar, TBool] 2] NotPrincipal TInt Principal of
+    Left (TooLongPatternError ()) -> True
+    _ -> False
+
+checkBranch_test7 :: Test
+checkBranch_test7 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PUnit (), PInt () 5, PWild ()] 3], EInt () 5, ())
+        [TProduct [TUnit, TInt, TFloat] 3] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test8 :: Test
+checkBranch_test8 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PChar () 'k', PBool () True] 2, PVar () "Bestrafer"], EInt () 5, ())
+        [TProduct [TChar, TBool] 2, TString] NotPrincipal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test9 :: Test
+checkBranch_test9 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PUnit (), PInt () 5, PWild ()] 3], EInt () 5, ())
+        [TAnd (TProduct [TUnit, TInt, TFloat] 3) (MZero, MZero)] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test10 :: Test
+checkBranch_test10 =
+  case flip evalStateT startState $ checkBranch [] ([PTuple () [PChar () 'k', PBool () True] 2, PVar () "Bestrafer"], EInt () 5, ())
+        [TExistential (UTypeVar "R") KNat $ TProduct [TChar, TBool] 2, TString] NotPrincipal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test11 :: Test
+checkBranch_test11 =
+  case flip evalStateT startState $ checkBranch [] ([PWild ()], EInt () 5, ())
+        [TAnd (TProduct [TUnit, TInt, TFloat] 3) (MZero, MZero)] Principal TInt Principal of
+    Left (VarPatternHeadedByExistsOrAndError (PWild ()) (TAnd (TProduct [TUnit, TInt, TFloat] 3) (MZero, MZero))) -> True
+    _ -> False
+
+checkBranch_test12 :: Test
+checkBranch_test12 =
+  case flip evalStateT startState $ checkBranch [] ([PVar () "Bestrafer"], EInt () 5, ())
+        [TExistential (UTypeVar "R") KNat $ TProduct [TChar, TBool] 2, TString] NotPrincipal TInt Principal of
+    Left (VarPatternHeadedByExistsOrAndError (PVar () "Bestrafer") (TExistential (UTypeVar "R") KNat (TProduct [TChar, TBool] 2))) -> True
+    _ -> False
+
+checkBranch_test13 :: Test
+checkBranch_test13 =
+  case flip evalStateT startState $ checkBranch [] ([PWild ()], EInt () 5, ())
+        [TProduct [TUnit, TInt, TFloat] 3] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test14 :: Test
+checkBranch_test14 =
+  case flip evalStateT startState $ checkBranch [] ([PVar () "Bestrafer"], EInt () 5, ())
+        [TProduct [TChar, TBool] 2, TString] NotPrincipal TInt Principal of
+    Left (TooShortPatternError ()) -> True
+    _ -> False
+
+checkBranch_test15 :: Test
+checkBranch_test15 =
+  case flip evalStateT startState $ checkBranch [] ([PCons () (PInt () 5) (PWild ())], EInt () 5, ())
+        [TVec (MSucc . MSucc . MSucc $ MZero) TInt] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test16 :: Test
+checkBranch_test16 =
+  case flip evalStateT startState $ checkBranch [] ([PCons () (PInt () 5) (PNil ())], EInt () 5, ())
+        [TVec (MSucc MZero) TInt] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test17 :: Test
+checkBranch_test17 =
+  case flip evalStateT startState $ checkBranch [] ([PCons () (PInt () 5) (PWild ())], EInt () 5, ())
+        [TVec MZero TInt] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test18 :: Test
+checkBranch_test18 =
+  case flip evalStateT startState $ checkBranch [] ([PCons () (PInt () 5) (PNil ())], EInt () 5, ())
+        [TVec (MSucc (MSucc MZero)) TInt] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test19 :: Test
+checkBranch_test19 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "LCons" [PInt () 5, PWild ()]], EInt () 5, ())
+        [TGADT "List" [ParameterType TInt]] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test20 :: Test
+checkBranch_test20 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "LCons" [PInt () 5, PConstr () "LNil" []]], EInt () 5, ())
+        [TGADT "List" [ParameterType TInt]] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test21 :: Test
+checkBranch_test21 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "Cons" [PInt () 5, PWild ()]], EInt () 5, ())
+        [TGADT "Vec" [ParameterMonotype . MSucc . MSucc . MSucc $ MZero , ParameterType TInt]] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test22 :: Test
+checkBranch_test22 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "Cons" [PInt () 5, PConstr () "Nil" []]], EInt () 5, ())
+        [TGADT "Vec" [ParameterMonotype . MSucc $ MZero, ParameterType TInt]] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test23 :: Test
+checkBranch_test23 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "Cons" [PInt () 5, PWild ()]], EInt () 5, ())
+        [TGADT "Vec" [ParameterMonotype MZero , ParameterType TInt]] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test24 :: Test
+checkBranch_test24 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "Cons" [PInt () 5, PConstr () "Nil" []]], EInt () 5, ())
+        [TGADT "Vec" [ParameterMonotype . MSucc . MSucc $ MZero, ParameterType TInt]] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test25 :: Test
+checkBranch_test25 =
+  case flip evalStateT startState $ checkBranch [] ([PCons () (PInt () 5) (PWild ())], EInt () 5, ())
+        [TVec MZero TInt] NotPrincipal TInt NotPrincipal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test26 :: Test
+checkBranch_test26 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "LCons" [PInt () 5, PConstr () "LNil" []]], EInt () 5, ())
+        [TGADT "List" [ParameterType TInt]] NotPrincipal TInt NotPrincipal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test27 :: Test
+checkBranch_test27 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "Cons" [PInt () 5, PConstr () "Nil" []]], EInt () 5, ())
+        [TGADT "Vec" [ParameterMonotype . MSucc . MSucc $ MZero, ParameterType TInt]] NotPrincipal TInt NotPrincipal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test28 :: Test
+checkBranch_test28 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "Cons" [PInt () 5, PWild ()]], EInt () 5, ())
+        [TExistential (UTypeVar "R") KStar $ TAnd (TGADT "Vec"
+        [ParameterMonotype . MSucc $ MZero, ParameterType . TUVar $ UTypeVar "R"])
+        (MUVar $ UTypeVar "R", MInt)] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test29 :: Test
+checkBranch_test29 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "Cons" [PInt () 5, PConstr () "Nil" []]], EInt () 5, ())
+        [TExistential (UTypeVar "R") KNat $ TGADT "Vec"
+        [ParameterMonotype . MUVar $ UTypeVar "R", ParameterType TInt]] Principal TInt Principal of
+    Right [] -> True
+    _ -> False
+
+checkBranch_test30 :: Test
+checkBranch_test30 =
+  case flip evalStateT startState $ checkBranch [] ([PConstr () "Cons" [PInt () 5, PWild ()]], EInt () 5, ())
+        [TExistential (UTypeVar "R") KStar $ TGADT "Vec"
+        [ParameterMonotype . MSucc $ MZero, ParameterType . TUVar $ UTypeVar "R"]] Principal TInt Principal of
+    Left (PatternMatchingTypecheckingError (PInt () 5) (TUVar (UTypeVar "R"))) -> True
+    _ -> False
+
 tests :: [(TestName, Test)]
 tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("typeFromTemplate_test2", typeFromTemplate_test2),
@@ -3501,7 +3723,37 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("inferExpr_EAnnot_test9", inferExpr_EAnnot_test9),
          ("inferExpr_EAnnot_test10", inferExpr_EAnnot_test10),
          ("inferExpr_EAnnot_test11", inferExpr_EAnnot_test11),
-         ("inferExpr_EAnnot_test12", inferExpr_EAnnot_test12)]
+         ("inferExpr_EAnnot_test12", inferExpr_EAnnot_test12),
+         ("checkBranch_test1", checkBranch_test1),
+         ("checkBranch_test2", checkBranch_test2),
+         ("checkBranch_test3", checkBranch_test3),
+         ("checkBranch_test4", checkBranch_test4),
+         ("checkBranch_test5", checkBranch_test5),
+         ("checkBranch_test6", checkBranch_test6),
+         ("checkBranch_test7", checkBranch_test7),
+         ("checkBranch_test8", checkBranch_test8),
+         ("checkBranch_test9", checkBranch_test9),
+         ("checkBranch_test10", checkBranch_test10),
+         ("checkBranch_test11", checkBranch_test11),
+         ("checkBranch_test12", checkBranch_test12),
+         ("checkBranch_test13", checkBranch_test13),
+         ("checkBranch_test14", checkBranch_test14),
+         ("checkBranch_test15", checkBranch_test15),
+         ("checkBranch_test16", checkBranch_test16),
+         ("checkBranch_test17", checkBranch_test17),
+         ("checkBranch_test18", checkBranch_test18),
+         ("checkBranch_test19", checkBranch_test19),
+         ("checkBranch_test20", checkBranch_test20),
+         ("checkBranch_test21", checkBranch_test21),
+         ("checkBranch_test22", checkBranch_test22),
+         ("checkBranch_test23", checkBranch_test23),
+         ("checkBranch_test24", checkBranch_test24),
+         ("checkBranch_test25", checkBranch_test25),
+         ("checkBranch_test26", checkBranch_test26),
+         ("checkBranch_test27", checkBranch_test27),
+         ("checkBranch_test28", checkBranch_test28),
+         ("checkBranch_test29", checkBranch_test29),
+         ("checkBranch_test30", checkBranch_test30)]
 
 runTest :: (TestName, Test) -> String
 runTest (name, t) =

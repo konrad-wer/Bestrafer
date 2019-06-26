@@ -2,6 +2,7 @@
 module Typechecker where
 
 import AST
+import CommonUtils
 import TypecheckerUtils
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -529,6 +530,14 @@ checkExpr c (ELambda p x e) (TEVar a) NotPrincipal = do
   c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
   c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
   return $ dropContextToMarker c3
+checkExpr c (ECase p e bs) t1 pr1 = do
+  (t2, pr2, c2) <- inferExpr c e
+  t1' <- lift $ applyContextToType p c2 t1
+  t2' <- lift $ applyContextToType p c2 t2
+  c3 <- checkBranches c2 bs [t2'] pr2 t1' pr1
+  t2'' <- lift $ applyContextToType p c3 t2'
+  checkCoverage p c3 bs [t2''] pr2
+  return c3
 checkExpr c (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2) pr =
   if n1 /= n2 then
     lift . Left $ TypecheckingError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2)
@@ -558,9 +567,7 @@ checkExpr c (EConstr p constrName es) (TGADT typeName ts) pr = do
       | length (constrArgsTemplates constr) /= length es ->
         lift . Left $ MismatchedConstructorArityError (EConstr p constrName es) (length $ constrArgsTemplates constr) (length es)
       | otherwise -> do
-        firstFreshVarNum <- view freshVarNum <$> get
-        modify $ over freshVarNum (+ (fromIntegral . length . constrUVars $ constr))
-        let evars = map (E . ETypeVar . ("#" ++) . show) [firstFreshVarNum .. firstFreshVarNum + (fromIntegral . length . constrUVars $ constr)]
+        evars <- generateFreshTypeVars (E . ETypeVar) (fromIntegral . length . constrUVars $ constr)
         uArgs <- lift $ mapM (typeFromTemplate ts p) $ constrArgsTemplates constr
         uProps <- lift $ mapM (propositionFromTemplate ts p) $ constrProps constr
         let args = map (flip (foldl (flip $ uncurry substituteUVarInType)) (zip (map fst (constrUVars constr)) evars)) uArgs
@@ -668,9 +675,7 @@ checkBranch c (PConstr p1 constrName pargs : ptrns, e, p2) (TGADT typeName param
         (PConstr p1 constrName pargs)
         (length $ constrArgsTemplates constr) (length pargs)
       | otherwise -> do
-        firstFreshVarNum <- view freshVarNum <$> get
-        modify $ over freshVarNum (+ (fromIntegral . length . constrUVars $ constr))
-        let uvars = map (U . UTypeVar . ("#" ++) . show) [firstFreshVarNum .. firstFreshVarNum + (fromIntegral . length . constrUVars $ constr)]
+        uvars <- generateFreshTypeVars (U . UTypeVar) (fromIntegral . length . constrUVars $ constr)
         uArgs <- lift $ mapM (typeFromTemplate params p1) $ constrArgsTemplates constr
         uProps <- lift $ mapM (propositionFromTemplate params p1) $ constrProps constr
         let args = map (flip (foldl (flip $ uncurry substituteUVarInType)) (zip (map fst (constrUVars constr)) uvars)) uArgs
@@ -691,6 +696,93 @@ checkBranchIncorporatingProps p c (prop : props) b ts Principal te pr = do
   case unificationResult of
     Nothing -> return c
     Just c2 -> do
-    ts' <- mapM (lift . applyContextToType (getPosFromBranch b) c2) ts
-    dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts' Principal te pr
+      ts' <- mapM (lift . applyContextToType (getPosFromBranch b) c2) ts
+      dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts' Principal te pr
 checkBranchIncorporatingProps _ _ _ b _ NotPrincipal _ _ = lift . Left $ ExpectedPrincipalTypeInPatternError b
+
+checkCoverage ::
+  p -> Context -> [Branch p] -> [Type] -> Principality
+  -> StateT TypecheckerState (Either (Error p)) ()
+checkCoverage _ _ (([], _, _) : _) [] _ = return ()
+checkCoverage p c bs (TUnit : ts) pr = do
+  bs' <- expandUnitPatterns bs
+  checkCoverage p c bs' ts pr
+checkCoverage p c bs (TBool : ts) pr = do
+  bs' <- expandBoolPatterns bs
+  checkCoverage p c bs' ts pr
+checkCoverage p c bs (TInt : ts) pr = do
+  bs' <- expandIntPatterns bs
+  checkCoverage p c bs' ts pr
+checkCoverage p c bs (TFloat : ts) pr = do
+  bs' <- expandFloatPatterns bs
+  checkCoverage p c bs' ts pr
+checkCoverage p c bs (TChar : ts) pr = do
+  bs' <- expandCharPatterns bs
+  checkCoverage p c bs' ts pr
+checkCoverage p c bs (TString : ts) pr = do
+  bs' <- expandStringPatterns bs
+  checkCoverage p c bs' ts pr
+checkCoverage p c bs (TProduct args n : ts) pr = do
+  bs' <- expandTuplePatterns n bs
+  checkCoverage p c bs' (args ++ ts) pr
+checkCoverage p c bs (TExistential a k t : ts) pr =
+  checkCoverage p (CTypeVar (U a) k : c) bs (t : ts) pr
+checkCoverage p c bs (TAnd t _ : ts) NotPrincipal =
+  checkCoverage p c bs (t : ts) NotPrincipal
+checkCoverage p c bs (TAnd t prop : ts) Principal =
+  checkCoverageAssumingProps p c [prop] bs (t : ts) Principal
+checkCoverage p c bs (TVec n1 t : ts) pr = do
+  guarded <- vecPatternGuarded bs
+  if guarded then do
+    (nilPtrns, consPtrns) <- expandVecPatterns bs
+    n2 <- UTypeVar . ("#" ++). show . view freshVarNum <$> get
+    modify $ over freshVarNum (+ 1)
+    case pr of
+      NotPrincipal -> do
+        checkCoverage p c nilPtrns ts pr
+        checkCoverage p (CTypeVar (U n2) KNat : c) consPtrns (t : TVec (MUVar n2) t : ts) pr
+      Principal -> do
+        checkCoverageAssumingProps p c [(n1, MZero)] nilPtrns ts pr
+        let props = [(n1, MSucc $ MUVar n2)]
+        let ts' = t : TVec (MUVar n2) t : ts
+        checkCoverageAssumingProps p (CTypeVar (U n2) KNat : c) props consPtrns ts' pr
+  else do
+    bs' <- expandVarPatterns bs
+    checkCoverage p c bs' ts pr
+checkCoverage p c bs (TGADT typeName params : ts) pr = do
+  ptrns <- Map.toList <$> expandGADTPatterns typeName bs
+  iterM (checkConstrCoverage p c params ts pr) ptrns
+checkCoverage p _ _ _ _ = lift . Left $ PatternMatchingNonExhaustive p
+
+checkConstrCoverage ::
+  p -> Context -> [GADTParameter] -> [Type] -> Principality
+  -> (String, [Branch p]) -> StateT TypecheckerState (Either (Error p)) ()
+checkConstrCoverage p c params ts pr (constrName, bs) = do
+  lookupRes <- Map.lookup constrName . view constrContext <$> get
+  case lookupRes of
+    Nothing -> lift . Left $ InternalCompilerError p "checkConstrCoverage"
+    Just constr -> do
+      uvars <- generateFreshTypeVars (U . UTypeVar) (fromIntegral . length . constrUVars $ constr)
+      uArgs <- lift $ mapM (typeFromTemplate params p) $ constrArgsTemplates constr
+      uProps <- lift $ mapM (propositionFromTemplate params p) $ constrProps constr
+      let args = map (flip (foldl (flip $ uncurry substituteUVarInType)) (zip (map fst (constrUVars constr)) uvars)) uArgs
+      let props = map (flip (foldl (flip $ uncurry substituteUVarInProp)) (zip (map fst (constrUVars constr)) uvars)) uProps
+      let c2 = zipWith CTypeVar uvars (map snd $ constrUVars constr) ++ c
+      case pr of
+        NotPrincipal -> checkCoverage p c2 bs (args ++ ts) pr
+        Principal -> checkCoverageAssumingProps p c2 props bs(args ++ ts) pr
+
+checkCoverageAssumingProps ::
+   p -> Context -> [Proposition] -> [Branch p] -> [Type] -> Principality
+  -> StateT TypecheckerState (Either (Error p)) ()
+checkCoverageAssumingProps p c [] bs ts Principal = checkCoverage p c bs ts Principal
+checkCoverageAssumingProps p c ((m1, m2) : props) bs ts Principal = do
+  m1' <- lift $ applyContextToMonotype p c m1
+  m2' <- lift $ applyContextToMonotype p c m2
+  unificationResult <- runMaybeT $ eliminatePropEquation c (m1', m2') p
+  case unificationResult of
+    Nothing -> return ()
+    Just c2 -> do
+      ts' <- mapM (lift . applyContextToType p c2) ts
+      checkCoverageAssumingProps p c2 props bs ts' Principal
+checkCoverageAssumingProps p _ _ _ _ NotPrincipal = lift . Left $ ExpectedPrincipalTypeInCoverageError p

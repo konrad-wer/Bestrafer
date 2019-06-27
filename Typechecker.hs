@@ -708,8 +708,9 @@ checkCoverage p c bs (TUnit : ts) pr = do
   bs' <- expandUnitPatterns bs
   checkCoverage p c bs' ts pr
 checkCoverage p c bs (TBool : ts) pr = do
-  bs' <- expandBoolPatterns bs
-  checkCoverage p c bs' ts pr
+  (falsePtrns, truePtrns) <- expandBoolPatterns bs
+  checkCoverage p c falsePtrns ts pr
+  checkCoverage p c truePtrns ts pr
 checkCoverage p c bs (TInt : ts) pr = do
   bs' <- expandIntPatterns bs
   checkCoverage p c bs' ts pr
@@ -732,7 +733,7 @@ checkCoverage p c bs (TAnd t _ : ts) NotPrincipal =
 checkCoverage p c bs (TAnd t prop : ts) Principal =
   checkCoverageAssumingProps p c [prop] bs (t : ts) Principal
 checkCoverage p c bs (TVec n1 t : ts) pr = do
-  guarded <- vecPatternGuarded bs
+  guarded <- vecPatternsGuarded bs
   if guarded then do
     (nilPtrns, consPtrns) <- expandVecPatterns bs
     n2 <- UTypeVar . ("#" ++). show . view freshVarNum <$> get
@@ -750,8 +751,13 @@ checkCoverage p c bs (TVec n1 t : ts) pr = do
     bs' <- expandVarPatterns bs
     checkCoverage p c bs' ts pr
 checkCoverage p c bs (TGADT typeName params : ts) pr = do
-  ptrns <- Map.toList <$> expandGADTPatterns typeName bs
-  iterM (checkConstrCoverage p c params ts pr) ptrns
+  guarded <- gadtPatternsGuarded typeName bs
+  if guarded then do
+    ptrns <- Map.toList <$> expandGADTPatterns typeName bs
+    iterM (checkConstrCoverage p c params ts pr) ptrns
+  else do
+    bs' <- expandVarPatterns bs
+    checkCoverage p c bs' ts pr
 checkCoverage p _ _ _ _ = lift . Left $ PatternMatchingNonExhaustive p
 
 checkConstrCoverage ::

@@ -3279,6 +3279,332 @@ checkBranch_test30 =
     Left (PatternMatchingTypecheckingError (PInt () 5) (TUVar (UTypeVar "R"))) -> True
     _ -> False
 
+-- checkCoverage ::
+--   p -> Context -> [Branch p] -> [Type] -> Principality
+--   -> StateT TypecheckerState (Either (Error p)) ()
+checkCoverage_test1 :: Test
+checkCoverage_test1 =
+    case flip evalStateT startState $ checkCoverage () [] [] [TProduct [TBool, TUnit] 2] NotPrincipal of
+      Left (PatternMatchingNonExhaustive ()) -> True
+      _ -> False
+
+checkCoverage_test2 :: Test
+checkCoverage_test2 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PTuple () [PBool () True, PBool () True] 2], EUnit (), ()),
+         ([PTuple () [PBool () True, PBool () False] 2], EUnit (), ()),
+         ([PTuple () [PBool () False, PBool () True] 2], EUnit (), ()),
+         ([PTuple () [PBool () False, PBool () False] 2], EUnit (), ())]
+        [TProduct [TBool, TBool] 2] NotPrincipal of
+    Right () -> True
+    _ -> False
+
+checkCoverage_test3 :: Test
+checkCoverage_test3 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PTuple () [PBool () True, PWild ()] 2], EUnit (), ()),
+         ([PTuple () [PBool () False, PVar () "Monado"] 2], EUnit (), ())]
+        [TProduct [TBool, TUnit] 2] NotPrincipal of
+    Right () -> True
+    _ -> False
+
+checkCoverage_test4 :: Test
+checkCoverage_test4 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PTuple () [PBool () True, PWild ()] 2], EUnit (), ()),
+         ([PTuple () [PBool () False, PVar () "Monado"] 2], EUnit (), ())]
+        [TProduct [TBool, TBool] 2] NotPrincipal of
+    Right () -> True
+    _ -> False
+
+checkCoverage_test5 :: Test
+checkCoverage_test5 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PTuple () [PBool () True, PBool () True] 2], EUnit (), ()),
+         ([PTuple () [PBool () True, PBool () False] 2], EUnit (), ()),
+         ([PTuple () [PBool () False, PBool () False] 2], EUnit (), ()),
+         ([PTuple () [PBool () False, PBool () False] 2], EUnit (), ())]
+        [TProduct [TBool, TBool] 2] Principal of
+    Left (PatternMatchingNonExhaustive ()) -> True
+    _ -> False
+
+checkCoverage_test6 :: Test
+checkCoverage_test6 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PTuple () [PBool () True, PBool () False] 2], EUnit (), ()),
+         ([PTuple () [PBool () False, PBool () True] 2], EUnit (), ())]
+        [TProduct [TBool, TBool] 2] NotPrincipal of
+    Left (PatternMatchingNonExhaustive ()) -> True
+    _ -> False
+
+checkCoverage_test7 :: Test
+checkCoverage_test7 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PTuple () [PFloat () 3.14, PWild ()] 2], EUnit (), ()),
+         ([PTuple () [PFloat () 1.41, PVar () "Monado"] 2], EUnit (), ())]
+        [TProduct [TFloat, TInt] 2] NotPrincipal of
+    Left (PatternMatchingNonExhaustive ()) -> True
+    _ -> False
+
+checkCoverage_test8 :: Test
+checkCoverage_test8 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PTuple () [PFloat () 3.14, PWild ()] 2], EUnit (), ()),
+         ([PTuple () [PWild (), PVar () "Monado"] 2], EUnit (), ())]
+        [TProduct [TFloat, TInt] 2] Principal of
+    Right () -> True
+    _ -> False
+
+checkCoverage_test9 :: Test
+checkCoverage_test9 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PTuple () [PVar () "Bestrafer", PWild ()] 2], EUnit (), ()),
+         ([PTuple () [PString () "Spring", PVar () "Monado"] 2], EUnit (), ())]
+        [TProduct [TString, TInt] 2] NotPrincipal of
+    Right () -> True
+    _ -> False
+
+checkCoverage_test10 :: Test
+checkCoverage_test10 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PNil ()], EUnit (), ()),
+         ([PCons () (PVar () "R") (PWild ())], EUnit (), ())]
+        [TVec (MSucc MZero) TBool] NotPrincipal of
+    Right () -> True
+    _ -> False
+
+checkCoverage_test11 :: Test
+checkCoverage_test11 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PCons () (PVar () "R") (PWild ())], EUnit (), ())]
+        [TVec (MSucc MZero) TBool] NotPrincipal of
+    Left (PatternMatchingNonExhaustive ()) -> True
+    _ -> False
+
+checkCoverage_test12 :: Test
+checkCoverage_test12 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PNil ()], EUnit (), ()),
+         ([PCons () (PBool () True) (PWild ())], EUnit (), ())]
+        [TVec (MSucc MZero) TBool] Principal of
+    Left (PatternMatchingNonExhaustive ()) -> True
+    _ -> False
+
+checkCoverage_test13 :: Test
+checkCoverage_test13 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PNil ()], EUnit (), ()),
+           ([PCons () (PBool () False) (PWild ())], EUnit (), ()),
+           ([PCons () (PBool () True) (PWild ())], EUnit (), ())]
+          [TVec (MSucc MZero) TBool] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test14 :: Test
+checkCoverage_test14 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PCons () (PBool () False) (PWild ())], EUnit (), ()),
+           ([PCons () (PBool () True) (PWild ())], EUnit (), ())]
+          [TVec (MSucc MZero) TBool] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test15 :: Test
+checkCoverage_test15 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "LNil" []], EUnit (), ()),
+           ([PConstr () "LCons" [PBool () False, PWild ()]], EUnit (), ()),
+           ([PConstr () "LCons" [PBool () True, PWild ()]], EUnit (), ())]
+          [TGADT "List" [ParameterType TBool]] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test16 :: Test
+checkCoverage_test16 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "LCons" [PBool () False, PWild ()]], EUnit (), ()),
+           ([PConstr () "LCons" [PBool () True, PWild ()]], EUnit (), ())]
+          [TGADT "List" [ParameterType TBool]] Principal of
+      Left (PatternMatchingNonExhaustive ()) -> True
+      _ -> False
+
+checkCoverage_test17 :: Test
+checkCoverage_test17 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "LNil" []], EUnit (), ()),
+           ([PConstr () "LCons" [PWild (), PWild ()]], EUnit (), ())]
+          [TGADT "List" [ParameterType TBool]] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test18 :: Test
+checkCoverage_test18 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "LNil" []], EUnit (), ()),
+           ([PConstr () "LCons" [PBool () True, PWild ()]], EUnit (), ())]
+          [TGADT "List" [ParameterType TBool]] Principal of
+      Left (PatternMatchingNonExhaustive ()) -> True
+      _ -> False
+
+checkCoverage_test19 :: Test
+checkCoverage_test19 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Nil" []], EUnit (), ()),
+           ([PConstr () "Cons" [PBool () False, PWild ()]], EUnit (), ()),
+           ([PConstr () "Cons" [PBool () True, PWild ()]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TBool]] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test20 :: Test
+checkCoverage_test20 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Cons" [PBool () False, PWild ()]], EUnit (), ()),
+           ([PConstr () "Cons" [PBool () True, PWild ()]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TBool]] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test21 :: Test
+checkCoverage_test21 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Nil" []], EUnit (), ()),
+           ([PConstr () "Cons" [PWild (), PWild ()]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TBool]] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test22 :: Test
+checkCoverage_test22 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Nil" []], EUnit (), ()),
+           ([PConstr () "Cons" [PBool () True, PWild ()]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TBool]] Principal of
+      Left (PatternMatchingNonExhaustive ()) -> True
+      _ -> False
+
+checkCoverage_test23 :: Test
+checkCoverage_test23 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Nil" []], EUnit (), ()),
+           ([PConstr () "Cons" [PBool () False, PWild ()]], EUnit (), ()),
+           ([PConstr () "Cons" [PBool () True, PWild ()]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TBool]] NotPrincipal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test24 :: Test
+checkCoverage_test24 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Cons" [PBool () False, PWild ()]], EUnit (), ()),
+           ([PConstr () "Cons" [PBool () True, PWild ()]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TBool]] NotPrincipal of
+      Left (PatternMatchingNonExhaustive ()) -> True
+      _ -> False
+
+checkCoverage_test25 :: Test
+checkCoverage_test25 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Cons" [PBool () False, PConstr () "Nil" []]], EUnit (), ()),
+           ([PConstr () "Cons" [PBool () True, PConstr () "Nil" []]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TBool]] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test26 :: Test
+checkCoverage_test26 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PCons () (PBool () False) (PNil ())], EUnit (), ()),
+           ([PCons () (PBool () True) (PNil ())], EUnit (), ())]
+          [TVec (MSucc MZero) TBool] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test27 :: Test
+checkCoverage_test27 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Cons" [PChar () 'S', PConstr () "Nil" []]], EUnit (), ()),
+           ([PConstr () "Cons" [PChar () 'B', PConstr () "Nil" []]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TChar]] Principal of
+      Left (PatternMatchingNonExhaustive ()) -> True
+      _ -> False
+
+checkCoverage_test28 :: Test
+checkCoverage_test28 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PCons () (PChar () 'S') (PNil ())], EUnit (), ()),
+           ([PCons () (PChar () 'B') (PNil ())], EUnit (), ())]
+          [TVec (MSucc MZero) TChar] Principal of
+      Left (PatternMatchingNonExhaustive ()) -> True
+      _ -> False
+
+checkCoverage_test29 :: Test
+checkCoverage_test29 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Cons" [PVar () "Haskell", PConstr () "Nil" []]], EUnit (), ()),
+           ([PConstr () "Cons" [PChar () 'B', PConstr () "Nil" []]], EUnit (), ())]
+          [TGADT "Vec" [ParameterMonotype $ MSucc MZero, ParameterType TChar]] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test30 :: Test
+checkCoverage_test30 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PCons () (PChar () 'S') (PNil ())], EUnit (), ()),
+           ([PCons () (PWild ()) (PNil ())], EUnit (), ())]
+          [TVec (MSucc MZero) TChar] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test31 :: Test
+checkCoverage_test31 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PConstr () "Nil" []], EUnit (), ())]
+          [TExistential (UTypeVar "A") KNat $ TAnd
+           (TGADT "Vec" [ParameterMonotype . MUVar $ UTypeVar "A", ParameterType TChar])
+           (MUVar $ UTypeVar "A", MZero)] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test32 :: Test
+checkCoverage_test32 =
+    case flip evalStateT startState $ checkCoverage () []
+          [([PCons () (PBool () True) (PNil ())], EUnit (), ()),
+           ([PCons () (PBool () False) (PNil ())], EUnit (), ())]
+          [TExistential (UTypeVar "A") KNat $ TAnd
+          (TExistential (UTypeVar "B") KNat $ TAnd
+          (TVec (MUVar $ UTypeVar "B") $ TUVar (UTypeVar "A"))
+          (MUVar $ UTypeVar "B", MSucc MZero))
+          (MUVar $ UTypeVar "A", MBool)] Principal of
+      Right () -> True
+      _ -> False
+
+checkCoverage_test33 :: Test
+checkCoverage_test33 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PConstr () "Nil" []], EUnit (), ())]
+        [TExistential (UTypeVar "A") KNat $ TAnd
+         (TGADT "Vec" [ParameterMonotype . MUVar $ UTypeVar "A", ParameterType TChar])
+         (MUVar $ UTypeVar "A", MZero)] NotPrincipal of
+    Left (PatternMatchingNonExhaustive ()) -> True
+    _ -> False
+
+checkCoverage_test34 :: Test
+checkCoverage_test34 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PCons () (PUnit ()) (PCons () (PUnit ()) (PNil ()))], EUnit (), ())]
+        [TVec (MSucc $ MSucc MZero) TUnit] Principal of
+    Right () -> True
+    _ -> False
+
+checkCoverage_test35 :: Test
+checkCoverage_test35 =
+  case flip evalStateT startState $ checkCoverage () []
+        [([PCons () (PUnit ()) (PCons () (PUnit ()) (PNil ()))], EUnit (), ())]
+        [TVec (MSucc $ MSucc MZero) TUnit] NotPrincipal of
+    Left (PatternMatchingNonExhaustive ()) -> True
+    _ -> False
+
 tests :: [(TestName, Test)]
 tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("typeFromTemplate_test2", typeFromTemplate_test2),
@@ -3753,7 +4079,42 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("checkBranch_test27", checkBranch_test27),
          ("checkBranch_test28", checkBranch_test28),
          ("checkBranch_test29", checkBranch_test29),
-         ("checkBranch_test30", checkBranch_test30)]
+         ("checkBranch_test30", checkBranch_test30),
+         ("checkCoverage_test1", checkCoverage_test1),
+         ("checkCoverage_test2", checkCoverage_test2),
+         ("checkCoverage_test3", checkCoverage_test3),
+         ("checkCoverage_test4", checkCoverage_test4),
+         ("checkCoverage_test5", checkCoverage_test5),
+         ("checkCoverage_test6", checkCoverage_test6),
+         ("checkCoverage_test7", checkCoverage_test7),
+         ("checkCoverage_test8", checkCoverage_test8),
+         ("checkCoverage_test9", checkCoverage_test9),
+         ("checkCoverage_test10", checkCoverage_test10),
+         ("checkCoverage_test11", checkCoverage_test11),
+         ("checkCoverage_test12", checkCoverage_test12),
+         ("checkCoverage_test13", checkCoverage_test13),
+         ("checkCoverage_test14", checkCoverage_test14),
+         ("checkCoverage_test15", checkCoverage_test15),
+         ("checkCoverage_test16", checkCoverage_test16),
+         ("checkCoverage_test17", checkCoverage_test17),
+         ("checkCoverage_test18", checkCoverage_test18),
+         ("checkCoverage_test19", checkCoverage_test19),
+         ("checkCoverage_test20", checkCoverage_test20),
+         ("checkCoverage_test21", checkCoverage_test21),
+         ("checkCoverage_test22", checkCoverage_test22),
+         ("checkCoverage_test23", checkCoverage_test23),
+         ("checkCoverage_test24", checkCoverage_test24),
+         ("checkCoverage_test25", checkCoverage_test25),
+         ("checkCoverage_test26", checkCoverage_test26),
+         ("checkCoverage_test27", checkCoverage_test27),
+         ("checkCoverage_test28", checkCoverage_test28),
+         ("checkCoverage_test29", checkCoverage_test29),
+         ("checkCoverage_test30", checkCoverage_test30),
+         ("checkCoverage_test31", checkCoverage_test31),
+         ("checkCoverage_test32", checkCoverage_test32),
+         ("checkCoverage_test33", checkCoverage_test33),
+         ("checkCoverage_test34", checkCoverage_test34),
+         ("checkCoverage_test35", checkCoverage_test35)]
 
 runTest :: (TestName, Test) -> String
 runTest (name, t) =

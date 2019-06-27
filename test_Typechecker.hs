@@ -2928,6 +2928,61 @@ checkExpr_EConstr_test12 =
     Left (EquationFalseError () MInt MBool KStar) -> True
     _ -> False
 
+checkExpr_ECase_test1 :: Test
+checkExpr_ECase_test1 =
+  case flip evalStateT startState $ checkExpr [] (ECase() (EAnnot () (ECons () (EBool () True) (ENil ()))
+          (TExistential (UTypeVar "A") KStar $ TAnd
+          (TExistential (UTypeVar "B") KNat $ TAnd
+          (TVec (MUVar $ UTypeVar "B") $ TUVar (UTypeVar "A"))
+          (MUVar $ UTypeVar "B", MSucc MZero))
+          (MUVar $ UTypeVar "A", MBool)))
+          [([PCons () (PBool () True) (PNil ())], EUnit (), ()),
+          ([PCons () (PBool () False) (PNil ())], EUnit (), ())])
+          TUnit Principal of
+      Right _ -> True
+      _ -> False
+
+checkExpr_ECase_test2 :: Test
+checkExpr_ECase_test2 =
+  case flip evalStateT startState $ checkExpr [] (ECase() (EAnnot () (ECons () (EBool () True) (ENil ()))
+          (TExistential (UTypeVar "A") KStar $ TAnd
+          (TExistential (UTypeVar "B") KNat $ TAnd
+          (TVec (MUVar $ UTypeVar "B") $ TUVar (UTypeVar "A"))
+          (MUVar $ UTypeVar "B", MSucc MZero))
+          (MUVar $ UTypeVar "A", MBool)))
+          [([PCons () (PBool () True) (PNil ())], EUnit (), ())])
+          TUnit Principal of
+      Left (PatternMatchingNonExhaustive ()) -> True
+      _ -> False
+
+checkExpr_ECase_test3 :: Test
+checkExpr_ECase_test3 =
+  case flip evalStateT startState $ checkExpr [] (ECase() (EAnnot () (ECons () (EInt () 5) (ENil ()))
+          (TExistential (UTypeVar "A") KStar $ TAnd
+          (TExistential (UTypeVar "B") KNat $ TAnd
+          (TVec (MUVar $ UTypeVar "B") $ TUVar (UTypeVar "A"))
+          (MUVar $ UTypeVar "B", MSucc MZero))
+          (MUVar $ UTypeVar "A", MInt)))
+          [([PCons () (PBool () True) (PNil ())], EUnit (), ()),
+          ([PCons () (PBool () False) (PNil ())], EUnit (), ())])
+          TUnit Principal of
+      Left (PatternMatchingTypecheckingError (PBool () True) TInt) -> True
+      _ -> False
+
+checkExpr_ECase_test4 :: Test
+checkExpr_ECase_test4 =
+  case flip evalStateT startState $ checkExpr [] (ECase() (EAnnot () (ECons () (EBool () True) (ENil ()))
+          (TExistential (UTypeVar "A") KStar $ TAnd
+          (TExistential (UTypeVar "B") KNat $ TAnd
+          (TVec (MUVar $ UTypeVar "B") $ TUVar (UTypeVar "A"))
+          (MUVar $ UTypeVar "B", MSucc MZero))
+          (MUVar $ UTypeVar "A", MBool)))
+          [([PCons () (PBool () True) (PNil ())], EUnit (), ()),
+          ([PCons () (PBool () False) (PNil ())], EUnit (), ())])
+          TInt Principal of
+      Left (TypeInferenceError (EUnit ())) -> True
+      _ -> False
+
 --inferExpr :: Context -> Expr p -> Either (Error p) (Type, Principality, Context)
 inferExpr_EVar_test1 :: Test
 inferExpr_EVar_test1 =
@@ -3571,7 +3626,7 @@ checkCoverage_test32 =
     case flip evalStateT startState $ checkCoverage () []
           [([PCons () (PBool () True) (PNil ())], EUnit (), ()),
            ([PCons () (PBool () False) (PNil ())], EUnit (), ())]
-          [TExistential (UTypeVar "A") KNat $ TAnd
+          [TExistential (UTypeVar "A") KStar $ TAnd
           (TExistential (UTypeVar "B") KNat $ TAnd
           (TVec (MUVar $ UTypeVar "B") $ TUVar (UTypeVar "A"))
           (MUVar $ UTypeVar "B", MSucc MZero))
@@ -4030,6 +4085,10 @@ tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("checkExpr_EConstr_test10", checkExpr_EConstr_test10),
          ("checkExpr_EConstr_test11", checkExpr_EConstr_test11),
          ("checkExpr_EConstr_test12", checkExpr_EConstr_test12),
+         ("checkExpr_ECase_test1", checkExpr_ECase_test1),
+         ("checkExpr_ECase_test2", checkExpr_ECase_test2),
+         ("checkExpr_ECase_test3", checkExpr_ECase_test3),
+         ("checkExpr_ECase_test4", checkExpr_ECase_test4),
          ("inferExpr_EVar_test1", inferExpr_EVar_test1),
          ("inferExpr_EVar_test2", inferExpr_EVar_test2),
          ("inferExpr_EVar_test3", inferExpr_EVar_test3),

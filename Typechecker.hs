@@ -471,7 +471,8 @@ inferSpine c (e : s) (TImp q t) pr = do
   t' <- lift $ applyContextToType (getPos e) c2 t
   inferSpine c2 (e : s) t' pr
 inferSpine c s @ (_ : _) (TUniversal u k t) _ = do
-  let e = ETypeVar $ uTypeVarName u
+  e <- ETypeVar . ("#" ++) . show . view freshVarNum <$> get
+  modify $ over freshVarNum (+ 1)
   inferSpine (CTypeVar (E e) k : c) s (substituteUVarInType u (E e) t) NotPrincipal
 inferSpine c (e : s) (TEVar a) NotPrincipal = do
   let (a1, a2) = generateSubETypeVars a
@@ -507,7 +508,8 @@ checkExpr c e (TUniversal a k t) pr = do
   dropContextToMarker <$> checkExpr (CTypeVar (U a) k : CMarker : c) e t pr
 checkExpr c e (TExistential a k t) _ = do
   lift $ checkedIntroductionForm e
-  let a' = ETypeVar $ uTypeVarName a
+  a' <- ETypeVar . ("#" ++) . show . view freshVarNum <$> get
+  modify $ over freshVarNum (+ 1)
   checkExpr (CTypeVar (E  a') k : c) e (substituteUVarInType a (E a') t) NotPrincipal
 checkExpr c e (TImp prop t) Principal = do
   lift $ checkedIntroductionForm e

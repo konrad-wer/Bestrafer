@@ -2534,30 +2534,30 @@ inferSpine_test6 :: Test
 inferSpine_test6 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
                                     (TUniversal (UTypeVar "a") KStar (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString))) NotPrincipal of
-    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar MChar]) -> True
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "#0") KStar MChar]) -> True
     _ -> False
 
 inferSpine_test7 :: Test
 inferSpine_test7 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, ETuple () [EChar  () 'k', EInt () 2] 2]
                                     (TUniversal (UTypeVar "a") KStar (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString))) NotPrincipal of
-    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar (MProduct [MEVar (ETypeVar "a-1"), MEVar (ETypeVar "a-2")] 2),
-                                   CETypeVar (ETypeVar "a-1") KStar MChar, CETypeVar (ETypeVar "a-2") KStar MInt]) -> True
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "#0") KStar (MProduct [MEVar (ETypeVar "#0-1"), MEVar (ETypeVar "#0-2")] 2),
+                                   CETypeVar (ETypeVar "#0-1") KStar MChar, CETypeVar (ETypeVar "#0-2") KStar MInt]) -> True
     _ -> False
 
 inferSpine_test8 :: Test
 inferSpine_test8 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
                                     (TUniversal (UTypeVar "a") KStar (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString))) Principal of
-    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar MChar]) -> True
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "#0") KStar MChar]) -> True
     _ -> False
 
 inferSpine_test9 :: Test
 inferSpine_test9 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, ETuple () [EChar  () 'k', EInt () 2] 2]
                                     (TUniversal (UTypeVar "a") KStar (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString))) Principal of
-    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar (MProduct [MEVar (ETypeVar "a-1"), MEVar (ETypeVar "a-2")] 2),
-                                   CETypeVar (ETypeVar "a-1") KStar MChar, CETypeVar (ETypeVar "a-2") KStar MInt]) -> True
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "#0") KStar (MProduct [MEVar (ETypeVar "#0-1"), MEVar (ETypeVar "#0-2")] 2),
+                                   CETypeVar (ETypeVar "#0-1") KStar MChar, CETypeVar (ETypeVar "#0-2") KStar MInt]) -> True
     _ -> False
 
 inferSpine_test10 :: Test
@@ -2565,7 +2565,7 @@ inferSpine_test10 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
                                     (TUniversal (UTypeVar "a") KStar (TImp (MUVar (UTypeVar "a"), MChar)
                                     (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString)))) NotPrincipal of
-    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar MChar]) -> True
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "#0") KStar MChar]) -> True
     _ -> False
 
 inferSpine_test11 :: Test
@@ -2581,7 +2581,7 @@ inferSpine_test12 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
                                     (TUniversal (UTypeVar "a") KStar (TImp (MUVar (UTypeVar "a"), MChar)
                                     (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString)))) Principal of
-    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "a") KStar MChar]) -> True
+    Right (TString, NotPrincipal, [CETypeVar (ETypeVar "#0") KStar MChar]) -> True
     _ -> False
 
 inferSpine_test13 :: Test
@@ -2781,10 +2781,10 @@ checkExpr_ELambda_test10 :: Test
 checkExpr_ELambda_test10=
   case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x"))
             (TExistential (UTypeVar "r") KStar (TUVar $ UTypeVar "r")) NotPrincipal of
-    Right [CETypeVar (ETypeVar "r") KStar (MArrow (MEVar (ETypeVar "r-1")) (MEVar (ETypeVar "r-2"))),
-           CETypeVar (ETypeVar "r-1") KStar (MEVar (ETypeVar "r-2-2")),
-           CETypeVar (ETypeVar "r-2") KStar (MArrow (MEVar (ETypeVar "r-2-1")) (MEVar (ETypeVar "r-2-2"))),
-           CTypeVar (E (ETypeVar "r-2-1")) KStar, CTypeVar (E (ETypeVar "r-2-2")) KStar,
+    Right [CETypeVar (ETypeVar "#0") KStar (MArrow (MEVar (ETypeVar "#0-1")) (MEVar (ETypeVar "#0-2"))),
+           CETypeVar (ETypeVar "#0-1") KStar (MEVar (ETypeVar "#0-2-2")),
+           CETypeVar (ETypeVar "#0-2") KStar (MArrow (MEVar (ETypeVar "#0-2-1")) (MEVar (ETypeVar "#0-2-2"))),
+           CTypeVar (E (ETypeVar "#0-2-1")) KStar, CTypeVar (E (ETypeVar "#0-2-2")) KStar,
            CTypeVar (E (ETypeVar "a")) KNat, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
@@ -2799,7 +2799,7 @@ checkExpr_ELambda_test12 :: Test
 checkExpr_ELambda_test12 =
   case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x"))
             (TExistential (UTypeVar "r") KNat (TUVar $ UTypeVar "r")) NotPrincipal of
-    Left (ETypeVarKindMismatchError () (ETypeVar "r") KNat KStar) -> True
+    Left (ETypeVarKindMismatchError () (ETypeVar "#0") KNat KStar) -> True
     _ -> False
 
 checkExpr_ELambda_test13 :: Test
@@ -3068,9 +3068,9 @@ inferExpr_EAnnot_test5 =
             [] (EAnnot () (ETuple () [ETuple () [EUnit (), EUnit ()] 2, EUnit ()] 2)
             (TExistential (UTypeVar "x") KStar (TUVar $ UTypeVar "x"))) of
     Right (TExistential (UTypeVar "x") KStar (TUVar (UTypeVar "x")), Principal, c) -> c ==
-                    [CETypeVar (ETypeVar "x") KStar (MProduct [MEVar (ETypeVar "x-1"), MEVar (ETypeVar "x-2")] 2),
-                     CETypeVar (ETypeVar "x-1") KStar (MProduct [MEVar (ETypeVar "x-1-1"), MEVar (ETypeVar "x-1-2")] 2),
-                     CETypeVar (ETypeVar "x-1-1") KStar MUnit, CETypeVar (ETypeVar "x-1-2") KStar MUnit, CETypeVar (ETypeVar "x-2") KStar MUnit]
+                    [CETypeVar (ETypeVar "#0") KStar (MProduct [MEVar (ETypeVar "#0-1"), MEVar (ETypeVar "#0-2")] 2),
+                     CETypeVar (ETypeVar "#0-1") KStar (MProduct [MEVar (ETypeVar "#0-1-1"), MEVar (ETypeVar "#0-1-2")] 2),
+                     CETypeVar (ETypeVar "#0-1-1") KStar MUnit, CETypeVar (ETypeVar "#0-1-2") KStar MUnit, CETypeVar (ETypeVar "#0-2") KStar MUnit]
     _ -> False
 
 inferExpr_EAnnot_test6 :: Test

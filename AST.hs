@@ -7,16 +7,14 @@ type Var = String
 
 --Source Syntax-----------------------------------------------------------------
 
-data ArithmBinOp
-  = BinOpPlus
-  | BinOpMinus
-  | BinOpMult
-  | BinOpDiv
-  | BinOpRem
+newtype BinOp = BinOp String
 
-data ArithmUnOp
+data UnOp
   = UnOpPlus
   | UnOpMinus
+  | UnOpPlusFloat
+  | UnOpMinusFloat
+  | UnOpNot
 
 --TODO Arithm ?
 data Expr p
@@ -36,9 +34,10 @@ data Expr p
   | ECase         p (Expr p) [Branch p]
   | ENil          p
   | ECons         p (Expr p) (Expr p)
-  -- | EIf           p (Expr p) (Expr p) (Expr p)
-  -- | EArithmBinOp  p ArithmBinOp (Expr p) (Expr p)
-  -- | EArithmUnOp   p ArithmUnOp (Expr p)
+  | EIf           p (Expr p) (Expr p) (Expr p)
+  | ELet          p Var (Expr p) (Expr p)
+  | EBinOp        p BinOp (Expr p) (Expr p)
+  | EUnOp         p UnOp (Expr p)
   deriving (Show)
 
 getPos :: Expr p -> p
@@ -58,6 +57,10 @@ getPos (EConstr p _ _) = p
 getPos (ECase   p _ _) = p
 getPos (ENil    p) = p
 getPos (ECons   p _ _) = p
+getPos (EIf     p _ _ _) = p
+getPos (ELet    p _ _ _) = p
+getPos (EBinOp  p _ _ _ ) = p
+getPos (EUnOp   p _ _) = p
 
 type Spine p = [Expr p]
 
@@ -213,13 +216,12 @@ data Principality = Principal | NotPrincipal deriving (Show, Eq)
 
 data Polarity = Neutral | Positive | Negative deriving (Show, Eq)
 
-instance Show ArithmBinOp where
-  show BinOpPlus = "+"
-  show BinOpMinus = "-"
-  show BinOpMult = "*"
-  show BinOpDiv = "/"
-  show BinOpRem = "%"
+instance Show BinOp where
+  show (BinOp op) = op
 
-instance Show ArithmUnOp where
+instance Show UnOp where
   show UnOpPlus = "+"
   show UnOpMinus = "-"
+  show UnOpNot = "!"
+  show UnOpPlusFloat = "+."
+  show UnOpMinusFloat = "-."

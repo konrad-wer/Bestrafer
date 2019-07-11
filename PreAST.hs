@@ -4,7 +4,7 @@ import AST
 
 data PreGADTParameterTemplate
   = ParameterTypePT PreTypeTemplate
-  | ParameterMonotypePT MonotypeTemplate
+  | ParameterMonotypePT Monotype
   deriving (Show, Eq)
 
 data PreTypeTemplate
@@ -23,19 +23,6 @@ data PreTypeTemplate
   | PTTExistential UTypeVar Kind PreTypeTemplate
   | PTTImp PropositionTemplate PreTypeTemplate
   | PTTAnd PreTypeTemplate PropositionTemplate
-  | PTTVec MonotypeTemplate PreTypeTemplate
+  | PTTVec Monotype PreTypeTemplate
   | PTTParam String
   deriving (Show, Eq)
-
-data GADTDefParameter
-  = GADTDefParamType String
-  | GADTDefParamMonotype Kind
-  deriving (Show, Eq)
-
-data ConstrDef p = ConstrDef p String PreTypeTemplate deriving (Show, Eq)
-
-data ProgramBlock p
-  = FunTypeAnnot p Var Type
-  | FunDefCase p Var [Pattern p] (Expr p)
-  | GADTDef p String [GADTDefParameter] [ConstrDef p]
-  deriving (Show)

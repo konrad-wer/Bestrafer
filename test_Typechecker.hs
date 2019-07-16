@@ -13,22 +13,29 @@ type TestName = String
 
 startState :: TypecheckerState
 startState = TypecheckerState {_freshVarNum = 0,
-  _gadtArities = Map.fromList [("Terminator", 2), ("Lion", 1), ("List", 1), ("Vec", 2)],
+  _gadtDefs = Map.fromList
+  [("Terminator", [GADTDefParamMonotype KNat, GADTDefParamMonotype KStar]),
+   ("Lion", [GADTDefParamMonotype KStar]),
+   ("List", [GADTDefParamType "`A"]),
+   ("Vec", [GADTDefParamMonotype KNat, GADTDefParamType "`A"])],
   _constrContext = Map.fromList
   [("T800", Constructor "Terminator"
+    ["`#0", "`#1"]
     [(UTypeVar "a", KNat)]
-    [(MTInt, MTParam 1), (MTSucc (MTUVar (UTypeVar "a")), MTParam 0)]
-    [TTInt, TTVec (MTUVar (UTypeVar "a")) (TTParam 1), TTBool]),
-   ("T1000", Constructor "Terminator" [] [] [TTString, TTParam 0, TTParam 1]),
-   ("TX", Constructor "Terminator" [] [] []),
-   ("Simba", Constructor "Lion" [] [] [TTInt, TTBool]),
-   ("Mufasa", Constructor "Lion" [] [(MTParam 0, MTInt)] [TTInt, TTBool]),
-   ("LNil", Constructor "List" [] [] []),
-   ("LCons", Constructor "List" [] [] [TTParam 0, TTGADT "List" [ParameterTypeT $ TTParam 0]]),
-   ("Nil", Constructor "Vec" [] [(MTParam 0, MTZero)] []),
-   ("Cons", Constructor "Vec" [(UTypeVar "a", KNat)] [(MTParam 0, MTSucc . MTUVar $ UTypeVar "a")]
-    [TTParam 1, TTGADT "Vec" [ParameterMonotypeT . MTUVar $ UTypeVar "a", ParameterTypeT $ TTParam 1]])
-  ]}
+    [(MTMono MInt, MTParam "`#1"), (MTMono $ MSucc (MUVar (UTypeVar "a")), MTParam "`#0")]
+    [TTInt, TTVec (MUVar (UTypeVar "a")) (TTParam "`#1"), TTBool]),
+   ("T1000", Constructor "Terminator" ["`#0", "`#1"] [] [] [TTString, TTParam "`#0", TTParam "`#1"]),
+   ("TX", Constructor "Terminator" ["`#0", "`#1"] [] [] []),
+   ("Simba", Constructor "Lion" ["`#0"] [] [] [TTInt, TTBool]),
+   ("Mufasa", Constructor "Lion" ["`#0"] [] [(MTParam "`#0", MTMono MInt)] [TTInt, TTBool]),
+   ("LNil", Constructor "List" ["`A"] [] [] []),
+   ("LCons", Constructor "List" ["`A"] [] [] [TTParam "`A", TTGADT "List" [ParameterTypeT $ TTParam "`A"]]),
+   ("Nil", Constructor "Vec" ["`#0", "`A"] [] [(MTParam "`#0", MTMono MZero)] []),
+   ("Cons", Constructor "Vec" ["`#0", "`A"] [(UTypeVar "a", KNat)] [(MTParam "`#0", MTMono $ MSucc . MUVar $ UTypeVar "a")]
+    [TTParam "`A", TTGADT "Vec" [ParameterMonotypeT . MUVar $ UTypeVar "a", ParameterTypeT $ TTParam "`A"]])
+  ],
+  _funContext = Map.empty
+}
 
 context1 :: Context
 context1 = [CVar "x" TUnit Principal, CTypeVar (U $ UTypeVar "y") KStar, CUTypeVarEq (UTypeVar "n") (MSucc (MSucc (MSucc MZero))),
@@ -58,44 +65,26 @@ context5 = [CUTypeVarEq (UTypeVar "x") MZero, CETypeVar (ETypeVar "x") KNat (MSu
 
 typeFromTemplate_test1 :: Test
 typeFromTemplate_test1 =
-  case typeFromTemplate [ParameterType TUnit, ParameterMonotype $ MArrow MBool MInt] ()
+  case typeFromTemplate (Map.fromList [("'A", ParameterType TUnit), ("'#1", ParameterMonotype $ MArrow MBool MInt)]) ()
                         (TTArrow (TTProduct [TTUnit, TTBool, TTInt, TTFloat, TTChar, TTString] 6)
-                        (TTGADT "T" [ParameterTypeT (TTParam 0), ParameterTypeT (TTParam 1)])) of
+                        (TTGADT "T" [ParameterTypeT (TTParam "'A"), ParameterTypeT (TTParam "'#1")])) of
     Right (TArrow (TProduct [TUnit, TBool, TInt, TFloat, TChar, TString] 6) (TGADT "T" [ParameterType TUnit, ParameterType (TArrow TBool TInt)])) -> True
     _ -> False
 
 typeFromTemplate_test2 :: Test
 typeFromTemplate_test2 =
-  case typeFromTemplate [ParameterType TUnit, ParameterMonotype $ MSucc MZero] ()
+  case typeFromTemplate (Map.fromList [("'A", ParameterType TUnit), ("'#1", ParameterMonotype $ MSucc MZero)]) ()
                         (TTArrow (TTProduct [TTUnit, TTBool, TTInt, TTFloat, TTChar, TTString] 6)
-                        (TTGADT "F" [ParameterTypeT (TTParam 0), ParameterTypeT (TTParam 1)])) of
+                        (TTGADT "F" [ParameterTypeT (TTParam "'A"), ParameterTypeT (TTParam "'#1")])) of
     Left (MonotypeIsNotTypeError () (MSucc MZero)) -> True
     _ -> False
 
 typeFromTemplate_test3 :: Test
 typeFromTemplate_test3 =
-  case typeFromTemplate [ParameterMonotype $ MSucc MZero] () (TTVec (MTParam 0) TTUnit) of
-    Right (TVec (MSucc MZero) TUnit) -> True
-    _ -> False
-
-typeFromTemplate_test4 :: Test
-typeFromTemplate_test4 =
-  case typeFromTemplate [ParameterType $ TImp (MEVar (ETypeVar"A"), MZero) TUnit] () (TTVec (MTParam 0) TTUnit) of
-    Left (TypeIsNotMonotypeError () (TImp (MEVar (ETypeVar"A"), MZero) TUnit)) -> True
-    _ -> False
-
-typeFromTemplate_test5 :: Test
-typeFromTemplate_test5 =
-  case typeFromTemplate [ParameterType TFloat] ()
-       (TTUniversal (UTypeVar "x") KStar (TTImp (MTUVar (UTypeVar "x"), MTProduct [MTInt, MTGADT "T" [MTUnit, MTBool], MTFloat] 3) (TTParam 0))) of
+  case typeFromTemplate (Map.fromList [("'A", ParameterType TFloat)]) ()
+       (TTUniversal (UTypeVar "x") KStar (TTImp (MTMono $ MUVar (UTypeVar "x"),
+       MTMono $ MProduct [MInt, MGADT "T" [MUnit, MBool], MFloat] 3) (TTParam "'A"))) of
     Right (TUniversal (UTypeVar "x") KStar (TImp (MUVar (UTypeVar "x"),  MProduct [MInt, MGADT "T" [MUnit, MBool], MFloat] 3) TFloat)) -> True
-    _ -> False
-
-typeFromTemplate_test6 :: Test
-typeFromTemplate_test6 =
-  case typeFromTemplate [ParameterMonotype (MSucc (MSucc (MSucc MZero)))] ()
-       (TTExistential (UTypeVar "x") KNat (TTAnd (TTVec (MTParam 0) TTInt) (MTUVar (UTypeVar "x"), MTSucc MTZero))) of
-    Right (TExistential (UTypeVar "x") KNat (TAnd (TVec (MSucc (MSucc (MSucc MZero))) TInt) (MUVar (UTypeVar "x"), MSucc MZero))) -> True
     _ -> False
 
 --freeExistentialVariablesOfMonotype :: Monotype -> Set.Set ETypeVar
@@ -244,55 +233,55 @@ freeVariablesOfMonotype_test5 =
 --varContextLookup :: Context -> Expr p -> Either (Error p) ContextEntry
 varContextLookup_test1 :: Test
 varContextLookup_test1 =
-  case varContextLookup context1 "x" "1 , 3" of
+  case flip evalStateT startState $  varContextLookup context1 "x" "1 , 3" of
     Right (CVar "x" TUnit Principal) -> True
     _ -> False
 
 varContextLookup_test2 :: Test
 varContextLookup_test2 =
-  case varContextLookup []  "x"  "1 , 3"of
+  case flip evalStateT startState $ varContextLookup []  "x"  "1 , 3"of
     Left (UndeclaredVariableError _ "x") -> True
     _ -> False
 
 varContextLookup_test3 :: Test
 varContextLookup_test3 =
-  case varContextLookup context1 "y" "1 , 3" of
+  case flip evalStateT startState $ varContextLookup context1 "y" "1 , 3" of
     Left (UndeclaredVariableError _ "y") -> True
     _ -> False
 
 varContextLookup_test4 :: Test
 varContextLookup_test4 =
-  case varContextLookup context1  "z" "1 , 3" of
+  case flip evalStateT startState $ varContextLookup context1  "z" "1 , 3" of
     Left (UndeclaredVariableError _ "z") -> True
     _ -> False
 
 varContextLookup_test5 :: Test
 varContextLookup_test5 =
-  case varContextLookup context1 "k" "1 , 3" of
+  case flip evalStateT startState $ varContextLookup context1 "k" "1 , 3" of
     Left (UndeclaredVariableError _ "k") -> True
     _ -> False
 
 varContextLookup_test6 :: Test
 varContextLookup_test6 =
-  case varContextLookup context1 "Konrad" "1 , 3" of
+  case flip evalStateT startState $ varContextLookup context1 "Konrad" "1 , 3" of
     Left (UndeclaredVariableError _ "Konrad")  -> True
     _ -> False
 
 varContextLookup_test7 :: Test
 varContextLookup_test7 =
-  case varContextLookup context4 "x" "1 , 3" of
+  case flip evalStateT startState $ varContextLookup context4 "x" "1 , 3" of
     Right (CVar "x" TUnit NotPrincipal) -> True
     _ -> False
 
 varContextLookup_test8 :: Test
 varContextLookup_test8 =
-  case varContextLookup context5 "x" "1 , 3" of
+  case flip evalStateT startState $ varContextLookup context5 "x" "1 , 3" of
     Right (CVar "x" (TUVar (UTypeVar "x")) Principal) -> True
     _ -> False
 
 varContextLookup_test9 :: Test
 varContextLookup_test9 =
-  case varContextLookup context1 "r" "1 , 3" of
+  case flip evalStateT startState $ varContextLookup context1 "r" "1 , 3" of
     Right (CVar "r" (TEVar (ETypeVar "z")) NotPrincipal) -> True
     _ -> False
 
@@ -1106,7 +1095,7 @@ applyContextToType_test10 :: Test
 applyContextToType_test10 =
   case applyContextToType () context5 (TUniversal (UTypeVar "x") KNat
                           (TVec (MUVar $ UTypeVar "x") (TGADT "Elton" [ParameterType TUnit, ParameterType TUnit]))) of
-    Right (TUniversal (UTypeVar "x") KNat (TVec MZero (TGADT "Elton" [ParameterType TUnit, ParameterType TUnit]))) -> True
+    Right (TUniversal (UTypeVar "x") KNat (TVec (MUVar (UTypeVar "x")) (TGADT "Elton" [ParameterType TUnit, ParameterType TUnit]))) -> True
     _ -> False
 
 applyContextToType_test11 :: Test
@@ -1126,16 +1115,15 @@ applyContextToType_test12 =
 
 applyContextToType_test13 :: Test
 applyContextToType_test13  =
-  case applyContextToType () context1 (TExistential (UTypeVar "b") KNat
-       (TImp (MUVar (UTypeVar "n"), MEVar (ETypeVar "b")) (TVec (MEVar (ETypeVar "b")) TUnit))) of
-    Right (TExistential (UTypeVar "b") KNat (TImp (MSucc (MSucc (MSucc MZero)), MSucc MZero) (TVec (MSucc MZero) TUnit))) -> True
+  case applyContextToType () context1 (TExistential (UTypeVar "b") KNat (TImp (MUVar (UTypeVar "n"), MUVar (UTypeVar "b")) (TVec (MUVar (UTypeVar "b")) TUnit))) of
+    Right (TExistential (UTypeVar "b") KNat (TImp (MSucc (MSucc (MSucc MZero)), MUVar (UTypeVar "b")) (TVec (MUVar (UTypeVar "b")) TUnit))) -> True
     _ -> False
 
 applyContextToType_test14 :: Test
 applyContextToType_test14  =
   case applyContextToType () context5 (TExistential (UTypeVar "x") KNat
        (TImp (MUVar (UTypeVar "x"), MUVar (UTypeVar "x")) (TVec (MUVar (UTypeVar "x")) TUnit))) of
-    Right (TExistential (UTypeVar "x") KNat (TImp (MZero, MZero) (TVec MZero TUnit))) -> True
+    Right (TExistential (UTypeVar "x") KNat (TImp (MUVar (UTypeVar "x"), MUVar (UTypeVar "x")) (TVec (MUVar (UTypeVar "x")) TUnit))) -> True
     _ -> False
 
 applyContextToType_test15 :: Test
@@ -1161,7 +1149,7 @@ inferMonotypeKind_test2 =
 inferMonotypeKind_test3 :: Test
 inferMonotypeKind_test3 =
   case flip evalStateT startState $ inferMonotypeKind "1, 3" context1 (MGADT "Terminator" [MUVar $ UTypeVar "y", MEVar $ ETypeVar "z"]) of
-    Right KStar -> True
+    Left (MonotypeHasWrongKindError "1, 3" (MUVar UTypeVar {uTypeVarName = "y"}) KNat KStar) -> True
     _ -> False
 
 inferMonotypeKind_test4 :: Test
@@ -1298,16 +1286,16 @@ checkTypeWellFormedness_test1 =
 
 checkTypeWellFormedness_test2 :: Test
 checkTypeWellFormedness_test2 =
-  case flip evalStateT startState $ checkTypeWellFormedness () context1 (TGADT "Terminator" [ParameterType $ TUVar $ UTypeVar "y",
+  case flip evalStateT startState $ checkTypeWellFormedness () context1 (TGADT "Terminator" [ParameterType $ TEVar $ ETypeVar "b",
                                                     ParameterType $ TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "a"] 2]) of
     Right () -> True
     _ -> False
 
 checkTypeWellFormedness_test3 :: Test
 checkTypeWellFormedness_test3 =
-  case flip evalStateT startState $ checkTypeWellFormedness ((), ()) context1 (TGADT "Terminator" [ParameterType $ TUVar $ UTypeVar "y",
+  case flip evalStateT startState $ checkTypeWellFormedness ((), ()) context1 (TGADT "Terminator" [ParameterType $ TEVar $ ETypeVar "b",
                                                     ParameterType $ TProduct [TEVar $ ETypeVar "z", TEVar $ ETypeVar "b"] 2]) of
-    Left (TypeHasWrongKindError ((), ()) (TEVar (ETypeVar "b")) KStar KNat) -> True
+    Left (MonotypeHasWrongKindError ((), ()) (MEVar (ETypeVar "b")) KStar KNat) -> True
     _ -> False
 
 checkTypeWellFormedness_test4 :: Test
@@ -1985,32 +1973,32 @@ checkEquation_test24 =
 equivalentProp_test1 :: Test
 equivalentProp_test1 =
   case flip evalStateT startState $ equivalentProp context1
-            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2])
-            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2]) () of
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MZero, MProduct [MUnit, MUnit] 2])
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MZero, MProduct [MUnit, MUnit] 2]) () of
     Right c -> c == context1
     _ -> False
 
 equivalentProp_test2 :: Test
 equivalentProp_test2 =
   case flip evalStateT startState $ equivalentProp context1
-            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2])
-            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MArrow MUnit MUnit]) () of
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MZero, MProduct [MUnit, MUnit] 2])
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MZero, MArrow MUnit MUnit]) () of
     Left (EquationFalseError () (MProduct [MUnit, MUnit] 2) (MArrow MUnit MUnit) KStar) -> True
     _ -> False
 
 equivalentProp_test3 :: Test
 equivalentProp_test3 =
   case flip evalStateT startState $ equivalentProp context1
-            (MArrow (MProduct [MGADT "Terminator" [MUnit, MUnit], MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2])
-            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MArrow MUnit MUnit]) () of
-    Left (EquationFalseError () (MGADT "Terminator" [MUnit, MUnit]) MUnit KStar) -> True
+            (MArrow (MProduct [MGADT "Terminator" [MZero, MUnit], MUnit] 2) MUnit, MGADT "Terminator" [MZero, MProduct [MUnit, MUnit] 2])
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MZero, MArrow MUnit MUnit]) () of
+    Left (EquationFalseError () (MGADT "Terminator" [MZero, MUnit]) MUnit KStar) -> True
     _ -> False
 
 equivalentProp_test4 :: Test
 equivalentProp_test4 =
   case flip evalStateT startState $ equivalentProp context1
-            (MArrow (MProduct [MGADT "Terminator" [MUnit, MUnit], MUnit] 2) MUnit, MSucc MZero)
-            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MArrow MUnit MUnit]) () of
+            (MArrow (MProduct [MGADT "Terminator" [MZero, MUnit], MUnit] 2) MUnit, MSucc MZero)
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MZero, MArrow MUnit MUnit]) () of
     Left (MonotypeHasWrongKindError () (MSucc MZero) KStar KNat) -> True
     _ -> False
 
@@ -2048,9 +2036,9 @@ equivalentProp_test9 =
 equivalentProp_test10 :: Test
 equivalentProp_test10 =
   case flip evalStateT startState $ equivalentProp context1
-            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2])
+            (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Terminator" [MZero, MProduct [MUnit, MUnit] 2])
             (MArrow (MProduct [MUnit, MUnit] 2) MUnit, MGADT "Lion" [MProduct [MUnit, MUnit] 2]) () of
-    Left (EquationFalseError () (MGADT "Terminator" [MUnit, MProduct [MUnit, MUnit] 2]) (MGADT "Lion" [MProduct [MUnit, MUnit] 2]) KStar) -> True
+    Left (EquationFalseError () (MGADT "Terminator" [MZero, MProduct [MUnit, MUnit] 2]) (MGADT "Lion" [MProduct [MUnit, MUnit] 2]) KStar) -> True
     _ -> False
 
 --equivalentType :: Context -> Type -> Type -> p -> StateT Integer (Either (Error p)) Context
@@ -3664,9 +3652,6 @@ tests :: [(TestName, Test)]
 tests = [("typeFromTemplate_test1", typeFromTemplate_test1),
          ("typeFromTemplate_test2", typeFromTemplate_test2),
          ("typeFromTemplate_test3", typeFromTemplate_test3),
-         ("typeFromTemplate_test4", typeFromTemplate_test4),
-         ("typeFromTemplate_test5", typeFromTemplate_test5),
-         ("typeFromTemplate_test6", typeFromTemplate_test6),
          ("freeExistentialVariablesOfMonotype_test1", freeExistentialVariablesOfMonotype_test1),
          ("freeExistentialVariablesOfMonotype_test2", freeExistentialVariablesOfMonotype_test2),
          ("freeExistentialVariablesOfMonotype_test3", freeExistentialVariablesOfMonotype_test3),

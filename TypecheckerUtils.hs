@@ -9,18 +9,18 @@ import qualified Data.Map as Map
 import Control.Lens hiding (Context)
 import Control.Monad.State
 
-data Error p
+data TypeError p
   = UndeclaredVariableError p Var
   | UndeclaredGADTError p String
   | UndeclaredConstructorError (Expr p)
   | MismatchedGADTArityError p String Int Int
   | MismatchedConstructorError (Expr p) String String
   | MismatchedConstructorArityError (Expr p) Int Int
-  | InternalCompilerError p String
+  | InternalCompilerTypeError p String
   | ETypeVarTypeMismatchError p ETypeVar Monotype Monotype
   | ETypeVarKindMismatchError p ETypeVar Kind Kind
   | UndeclaredETypeVarError p ETypeVar
-  | UndeclaredUTypeVarError p UTypeVar
+  | UndeclaredUTypeVarError p UTypeVar Context
   | TypeHasWrongKindError p Type Kind Kind
   | MonotypeHasWrongKindError p Monotype Kind Kind
   | MonotypeIsNotTypeError p Monotype
@@ -35,8 +35,9 @@ data Error p
   | TypeInferenceError (Expr p)
   | EquationAlreadyExistsError p UTypeVar Monotype Monotype
   | EliminateEquationError p Monotype Monotype Kind
-  | ExprNotCheckedIntroductionFormError (Expr p)
+  | ExprNotCheckedIntroductionFormError (Expr p) Type
   | ExprIsACaseError (Expr p)
+  | DuplicateVarsInBranchError (Branch p)
   | TooLongPatternError p
   | TooShortPatternError p
   | MismatchedProductArityInPatternError (Pattern p) Type
@@ -52,7 +53,13 @@ data Error p
   | PatternMatchingNonExhaustive p
   deriving (Show)
 
-data TypecheckerState = TypecheckerState {_freshVarNum :: Integer, _constrContext :: ConstructorsContext, _gadtArities :: GADTArities}
+data TypecheckerState = TypecheckerState
+  {
+    _freshVarNum :: Integer,
+    _constrContext :: ConstructorsContext,
+    _gadtDefs :: GADTDefs,
+    _funContext :: FunTypeContext
+  } deriving (Show)
 
 makeLenses ''TypecheckerState
 
@@ -64,15 +71,22 @@ generateSubETypeVars a = (ETypeVar $ eTypeVarName a ++ "-1", ETypeVar $ eTypeVar
 generateSubETypeVarsList :: ETypeVar -> Int -> [ETypeVar]
 generateSubETypeVarsList a n = [ETypeVar $ eTypeVarName a ++ "-" ++ show k | k <- [1..n]]
 
-generateFreshTypeVars :: (String -> TypeVar) -> Integer -> StateT TypecheckerState (Either (Error p)) [TypeVar]
-generateFreshTypeVars f n = do
-   firstFreshVarNum <- view freshVarNum <$> get
-   modify $ over freshVarNum (+ n)
-   return $ map (f . ("#" ++) . show) [firstFreshVarNum .. firstFreshVarNum + n]
+generateFreshTypeVars :: (Var -> TypeVar) -> String -> [Var] -> StateT TypecheckerState (Either (TypeError p)) [TypeVar]
+generateFreshTypeVars f trace names = do
+  let n = fromIntegral $ length names
+  firstFreshVarNum <- view freshVarNum <$> get
+  modify $ over freshVarNum (+ n)
+  return $ map f $ zipWith (++) names (map ((("#" ++ trace ++ "#") ++) . show) [firstFreshVarNum .. firstFreshVarNum + n - 1])
+
+generateFreshTypeVarName :: String -> Var -> StateT TypecheckerState (Either (TypeError p)) Var
+generateFreshTypeVarName trace name = do
+  a <- ((name ++ "#" ++ trace ++ "#") ++) . show . view freshVarNum <$> get
+  modify $ over freshVarNum (+ 1)
+  return a
 
 --exprUtils---------------------------------------------------------------------
 
-exprIsNotACase :: Expr p -> Either (Error p) ()
+exprIsNotACase :: Expr p -> Either (TypeError p) ()
 exprIsNotACase e @ ECase {} = Left $ ExprIsACaseError e
 exprIsNotACase _ = return ()
 
@@ -120,11 +134,11 @@ headedByAnd _ = False
 
 --TemplateUtils-----------------------------------------------------------------
 
-typeFromGADTParameterTemplate :: [GADTParameter] -> p -> GADTParameterTemplate -> Either (Error p) GADTParameter
+typeFromGADTParameterTemplate :: Map.Map String GADTParameter -> p -> GADTParameterTemplate -> Either (TypeError p) GADTParameter
 typeFromGADTParameterTemplate prms p (ParameterTypeT tt)     = ParameterType     <$> typeFromTemplate prms p tt
-typeFromGADTParameterTemplate prms p (ParameterMonotypeT mt) = ParameterMonotype <$> monotypeFromTemplate prms p mt
+typeFromGADTParameterTemplate _ _ (ParameterMonotypeT m) = return $ ParameterMonotype m
 
-typeFromTemplate :: [GADTParameter] -> p -> TypeTemplate -> Either (Error p) Type
+typeFromTemplate :: Map.Map String GADTParameter -> p -> TypeTemplate -> Either (TypeError p) Type
 typeFromTemplate _ _ TTUnit   = return TUnit
 typeFromTemplate _ _ TTBool   = return TBool
 typeFromTemplate _ _ TTInt    = return TInt
@@ -140,36 +154,26 @@ typeFromTemplate prms p (TTUniversal u k tt)   = TUniversal u k    <$> typeFromT
 typeFromTemplate prms p (TTExistential u k tt) = TExistential u k  <$> typeFromTemplate prms p tt
 typeFromTemplate prms p (TTImp pt tt) = TImp <$> propositionFromTemplate prms p pt <*> typeFromTemplate prms p tt
 typeFromTemplate prms p (TTAnd tt pt) = TAnd <$> typeFromTemplate prms p tt <*> propositionFromTemplate prms p pt
-typeFromTemplate prms p (TTVec nt tt) = TVec <$> monotypeFromTemplate prms p nt <*> typeFromTemplate prms p tt
-typeFromTemplate prms p (TTParam i) =
-  case prms !! i of
-    ParameterType t -> return t
-    ParameterMonotype m -> monotypeToType p m
+typeFromTemplate prms p (TTVec n tt) = TVec n <$> typeFromTemplate prms p tt
+typeFromTemplate prms p (TTParam name) =
+  case Map.lookup name prms of
+    Just (ParameterType t) -> return t
+    Just (ParameterMonotype m) -> monotypeToType p m
+    _ -> Left $ InternalCompilerTypeError p "typeFromTemplate"
 
-propositionFromTemplate :: [GADTParameter] -> p -> PropositionTemplate -> Either (Error p) Proposition
+propositionFromTemplate :: Map.Map String GADTParameter -> p -> PropositionTemplate -> Either (TypeError p) Proposition
 propositionFromTemplate prms p (pt1, pt2) = do
   p1 <- monotypeFromTemplate prms p pt1
   p2 <- monotypeFromTemplate prms p pt2
   return (p1, p2)
 
-monotypeFromTemplate :: [GADTParameter] -> p -> MonotypeTemplate -> Either (Error p) Monotype
-monotypeFromTemplate _ _ MTUnit     = return MUnit
-monotypeFromTemplate _ _ MTBool     = return MBool
-monotypeFromTemplate _ _ MTInt      = return MInt
-monotypeFromTemplate _ _ MTFloat    = return MFloat
-monotypeFromTemplate _ _ MTChar     = return MChar
-monotypeFromTemplate _ _ MTString   = return MString
-monotypeFromTemplate _ _ MTZero     = return MZero
-monotypeFromTemplate _ _ (MTUVar u) = return $ MUVar u
-monotypeFromTemplate _ _ (MTEVar e) = return $ MEVar e
-monotypeFromTemplate prms p (MTSucc n)        = MSucc    <$> monotypeFromTemplate prms p n
-monotypeFromTemplate prms p (MTArrow tt1 tt2) = MArrow   <$> monotypeFromTemplate prms p tt1 <*> monotypeFromTemplate prms p tt2
-monotypeFromTemplate prms p (MTGADT n tts)    = MGADT n  <$> mapM (monotypeFromTemplate prms p) tts
-monotypeFromTemplate prms p (MTProduct tts n) = MProduct <$> mapM (monotypeFromTemplate prms p) tts <*> return n
-monotypeFromTemplate prms p (MTParam i) =
-  case prms !! i of
-    ParameterType t -> typeToMonotype p t
-    ParameterMonotype m -> return m
+monotypeFromTemplate :: Map.Map String GADTParameter -> p -> MonotypeTemplate -> Either (TypeError p) Monotype
+monotypeFromTemplate _ _ (MTMono m)     = return m
+monotypeFromTemplate prms p (MTParam name) =
+  case Map.lookup name prms of
+    Just (ParameterType t) -> typeToMonotype p t
+    Just (ParameterMonotype m) -> return m
+    _ -> Left $ InternalCompilerTypeError p "monotypeFromTemplate"
 
 --Free variables computing utils -----------------------------------------------
 
@@ -230,12 +234,16 @@ freeVariablesOfMonotype (MEVar x) = Set.singleton $ eTypeVarName x
 
 --Context utils-----------------------------------------------------------------
 
-varContextLookup :: Context -> Var -> p -> Either (Error p) ContextEntry
+varContextLookup :: Context -> Var -> p ->  StateT TypecheckerState (Either (TypeError p)) ContextEntry
 varContextLookup  (entry @ (CVar y _ _): c) x p
   | x == y = return entry
   | otherwise = varContextLookup c x p
 varContextLookup (_ : c) x p = varContextLookup c x p
-varContextLookup [] x p = Left $ UndeclaredVariableError p x
+varContextLookup [] x p = do
+  fContext <- view funContext <$> get
+  case Map.lookup x fContext of
+    Nothing -> lift . Left $ UndeclaredVariableError p x
+    Just t -> return $ CVar x t Principal
 
 uTypeVarEqContextLookup :: Context -> UTypeVar -> Maybe ContextEntry
 uTypeVarEqContextLookup (entry @ (CUTypeVarEq b _) : c) a
@@ -263,7 +271,7 @@ typeVarContextLookup (entry @ (CTypeVar (U u) _) : c) a
 typeVarContextLookup (_ : c) a = typeVarContextLookup c a
 typeVarContextLookup [] _ = Nothing
 
-eTypeVarContextReplace :: Context -> ETypeVar -> Kind -> Monotype -> [ContextEntry] -> p -> Either (Error p) Context
+eTypeVarContextReplace :: Context -> ETypeVar -> Kind -> Monotype -> [ContextEntry] -> p -> Either (TypeError p) Context
 eTypeVarContextReplace c @ (entry @ (CETypeVar b k2 tau) : ct) a k1 sigma extraEntries p
   | a == b && k1 == k2 && tau == sigma = return c
   | a == b && k1 /= k2 = Left $ ETypeVarKindMismatchError p a k2 k1
@@ -284,7 +292,7 @@ dropContextToMarker [] = []
 dropContextToMarker (CMarker : c) = c
 dropContextToMarker (_ : c) = dropContextToMarker c
 
-dropContextToETypeVar :: ETypeVar -> Context -> p -> Either (Error p) Context
+dropContextToETypeVar :: ETypeVar -> Context -> p -> Either (TypeError p) Context
 dropContextToETypeVar x [] p = Left $ UndeclaredETypeVarError p x
 dropContextToETypeVar x (CETypeVar y _ _  : c) p
   | x == y = return c
@@ -297,7 +305,7 @@ dropContextToETypeVar x (CTypeVar (U y) _  : c) p
   | otherwise = dropContextToETypeVar x c p
 dropContextToETypeVar x (_ : c) p = dropContextToETypeVar x c p
 
-takeContextToETypeVar :: ETypeVar -> Context -> p -> Either (Error p) Context
+takeContextToETypeVar :: ETypeVar -> Context -> p -> Either (TypeError p) Context
 takeContextToETypeVar x c p =
   tc c []
   where
@@ -313,19 +321,19 @@ takeContextToETypeVar x c p =
       | otherwise = tc cx (entry : a)
     tc (entry : cx) a = tc cx (entry : a)
 
-takeContextToUTypeVar :: UTypeVar -> Context -> p -> Either (Error p) Context
+takeContextToUTypeVar :: UTypeVar -> Context -> p -> Either (TypeError p) Context
 takeContextToUTypeVar x c p =
   tc c []
   where
-    tc [] _ = Left $ UndeclaredUTypeVarError p x
+    tc [] _ = Left $ UndeclaredUTypeVarError p x []
     tc (entry @ (CTypeVar (U y) _) : cx) a
       | x == y = return $ reverse a
       | otherwise = tc cx (entry : a)
     tc (entry @ (CETypeVar y _ _) : cx) a
-      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x
+      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x (entry : cx)
       | otherwise = tc cx (entry : a)
     tc (entry @ (CTypeVar (E y) _) : cx) a
-      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x
+      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x (entry : cx)
       | otherwise = tc cx (entry : a)
     tc (entry : cx) a = tc cx (entry : a)
 
@@ -383,9 +391,48 @@ substituteUVarInMonotype u x (MUVar a)
   | otherwise = MUVar a
 substituteUVarInMonotype _ _ (MEVar a) = MEVar a
 
+substituteUVarInGADTParameterTemplate ::  UTypeVar -> TypeVar -> GADTParameterTemplate -> GADTParameterTemplate
+substituteUVarInGADTParameterTemplate u x (ParameterTypeT t)     = ParameterTypeT     $ substituteUVarInTypeTemplate u x t
+substituteUVarInGADTParameterTemplate u x (ParameterMonotypeT m) = ParameterMonotypeT $ substituteUVarInMonotype u x m
+
+substituteUVarInTypeTemplate :: UTypeVar -> TypeVar -> TypeTemplate -> TypeTemplate
+substituteUVarInTypeTemplate _ _ TTUnit      = TTUnit
+substituteUVarInTypeTemplate _ _ TTBool      = TTBool
+substituteUVarInTypeTemplate _ _ TTInt       = TTInt
+substituteUVarInTypeTemplate _ _ TTFloat     = TTFloat
+substituteUVarInTypeTemplate _ _ TTChar      = TTChar
+substituteUVarInTypeTemplate _ _ TTString    = TTString
+substituteUVarInTypeTemplate _ _ (TTParam x) = TTParam x
+substituteUVarInTypeTemplate u x (TTArrow t1 t2)  = TTArrow   (substituteUVarInTypeTemplate u x t1) (substituteUVarInTypeTemplate u x t2)
+substituteUVarInTypeTemplate u x (TTGADT n ts)    = TTGADT n  (map (substituteUVarInGADTParameterTemplate u x) ts)
+substituteUVarInTypeTemplate u x (TTProduct ts n) = TTProduct (map (substituteUVarInTypeTemplate u x) ts) n
+substituteUVarInTypeTemplate u x (TTUVar a)
+  | u == a =  case x of
+    E e -> TTEVar e
+    U u' -> TTUVar u'
+  | otherwise = TTUVar a
+substituteUVarInTypeTemplate _ _ (TTEVar a) = TTEVar a
+substituteUVarInTypeTemplate u x t @ (TTUniversal a k t1)
+  | u /= a = TTUniversal a k $ substituteUVarInTypeTemplate u x t1
+  | otherwise = t
+substituteUVarInTypeTemplate u x t @ (TTExistential a k t1)
+  | u /= a = TTExistential a k $ substituteUVarInTypeTemplate u x t1
+  | otherwise = t
+substituteUVarInTypeTemplate u x (TTImp p t) = TTImp (substituteUVarInPropTemplate u x p) (substituteUVarInTypeTemplate u x t)
+substituteUVarInTypeTemplate u x (TTAnd t p) = TTAnd (substituteUVarInTypeTemplate u x t) (substituteUVarInPropTemplate u x p)
+substituteUVarInTypeTemplate u x (TTVec n t) = TTVec (substituteUVarInMonotype u x n) (substituteUVarInTypeTemplate u x t)
+
+substituteUVarInPropTemplate :: UTypeVar -> TypeVar -> PropositionTemplate -> PropositionTemplate
+substituteUVarInPropTemplate u x (m1, m2) = (substituteUVarInMonotypeTemplate u x m1, substituteUVarInMonotypeTemplate u x m2)
+
+substituteUVarInMonotypeTemplate :: UTypeVar -> TypeVar -> MonotypeTemplate -> MonotypeTemplate
+substituteUVarInMonotypeTemplate _ _ (MTParam x) = MTParam x
+substituteUVarInMonotypeTemplate u x (MTMono m) = MTMono $ substituteUVarInMonotype u x m
+
+
 --Monotype to type and type to monotype-----------------------------------------
 
-monotypeToType :: p -> Monotype -> Either (Error p) Type
+monotypeToType :: p -> Monotype -> Either (TypeError p) Type
 monotypeToType _ MUnit   = return TUnit
 monotypeToType _ MBool   = return TBool
 monotypeToType _ MInt    = return TInt
@@ -399,11 +446,11 @@ monotypeToType _ (MEVar x) = return $ TEVar x
 monotypeToType _ (MUVar x) = return $ TUVar x
 monotypeToType p n = Left $ MonotypeIsNotTypeError p n
 
-gADTParameterToMonotype :: p -> GADTParameter -> Either (Error p) Monotype
+gADTParameterToMonotype :: p -> GADTParameter -> Either (TypeError p) Monotype
 gADTParameterToMonotype p (ParameterType t)     = typeToMonotype p t
 gADTParameterToMonotype _ (ParameterMonotype m) = return m
 
-typeToMonotype :: p -> Type -> Either (Error p) Monotype
+typeToMonotype :: p -> Type -> Either (TypeError p) Monotype
 typeToMonotype _ TUnit   = return MUnit
 typeToMonotype _ TBool   = return MBool
 typeToMonotype _ TInt    = return MInt
@@ -419,11 +466,11 @@ typeToMonotype p t = Left $ TypeIsNotMonotypeError p t
 
 --Context application-----------------------------------------------------------
 
-applyContextToGADTParameter :: p -> Context -> GADTParameter -> Either (Error p) GADTParameter
+applyContextToGADTParameter :: p -> Context -> GADTParameter -> Either (TypeError p) GADTParameter
 applyContextToGADTParameter p c (ParameterType t)     = ParameterType <$> applyContextToType p c t
 applyContextToGADTParameter p c (ParameterMonotype m) = ParameterMonotype <$> applyContextToMonotype p c m
 
-applyContextToType ::  p -> Context -> Type -> Either (Error p) Type
+applyContextToType ::  p -> Context -> Type -> Either (TypeError p) Type
 applyContextToType p c (TUVar u) =
   case uTypeVarEqContextLookup c u of
     Just (CUTypeVarEq _ tau) -> applyContextToMonotype p c tau >>= monotypeToType p
@@ -441,8 +488,8 @@ applyContextToType p c (TEVar e) =
     Just (CETypeVar _ KNat _) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
     Just (CTypeVar (E _) KNat) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
     _ -> Left $ UndeclaredETypeVarError p e
-applyContextToType p c (TUniversal a k t) = TUniversal a k <$> applyContextToType p c t --TODO przemyśleć / zapytać
-applyContextToType p c (TExistential a k t) = TExistential a k <$> applyContextToType p c t
+applyContextToType p c (TUniversal a k t) = TUniversal a k <$> applyContextToType p (CTypeVar (U a) k  : c) t --TODO przemyśleć / zapytać
+applyContextToType p c (TExistential a k t) = TExistential a k <$> applyContextToType p (CTypeVar (U a) k : c) t
 applyContextToType _ _ TUnit   = return TUnit
 applyContextToType _ _ TBool   = return TBool
 applyContextToType _ _ TInt    = return TInt
@@ -450,7 +497,7 @@ applyContextToType _ _ TFloat  = return TFloat
 applyContextToType _ _ TChar   = return TChar
 applyContextToType _ _ TString = return TString
 
-applyContextToMonotype :: p -> Context -> Monotype -> Either (Error p) Monotype
+applyContextToMonotype :: p -> Context -> Monotype -> Either (TypeError p) Monotype
 applyContextToMonotype p c (MUVar u) =
   case uTypeVarEqContextLookup c u of
     Just (CUTypeVarEq _ tau) -> applyContextToMonotype p c tau
@@ -472,13 +519,13 @@ applyContextToMonotype _ _ MString = return MString
 applyContextToMonotype _ _ MZero   = return MZero
 applyContextToMonotype p c (MSucc n) = MSucc <$> applyContextToMonotype p c n
 
-applyContextToProposition :: p -> Context -> Proposition -> Either (Error p) Proposition
+applyContextToProposition :: p -> Context -> Proposition -> Either (TypeError p) Proposition
 applyContextToProposition p c (m1, m2) = do
   m1' <- applyContextToMonotype p c m1
   m2' <- applyContextToMonotype p c m2
   return (m1', m2')
 
-expandUnitPatterns :: [Branch p] -> StateT TypecheckerState (Either (Error p)) [Branch p]
+expandUnitPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
 expandUnitPatterns [] = return []
 expandUnitPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandUnitPatterns ((PUnit _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandUnitPatterns bs
@@ -486,7 +533,7 @@ expandUnitPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expa
 expandUnitPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandUnitPatterns bs
 expandUnitPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Unit" ptrn
 
-expandBoolPatterns :: [Branch p] -> StateT TypecheckerState (Either (Error p)) ([Branch p], [Branch p])
+expandBoolPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) ([Branch p], [Branch p])
 expandBoolPatterns [] = return ([],[])
 expandBoolPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandBoolPatterns ((PBool _ False : ptrns, e, p2) : bs) = cross ((ptrns, e, p2) :) id <$> expandBoolPatterns bs
@@ -495,7 +542,7 @@ expandBoolPatterns ((PWild _ : ptrns, e, p2) : bs) = cross ((ptrns, e, p2) :) ((
 expandBoolPatterns ((PVar _ _ : ptrns, e, p2) : bs) = cross ((ptrns, e, p2) :) ((ptrns, e, p2) :) <$> expandBoolPatterns bs
 expandBoolPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Bool" ptrn
 
-expandIntPatterns :: [Branch p] -> StateT TypecheckerState (Either (Error p)) [Branch p]
+expandIntPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
 expandIntPatterns [] = return []
 expandIntPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandIntPatterns ((PInt {} : _, _, _) : bs) = expandIntPatterns bs
@@ -503,7 +550,7 @@ expandIntPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expan
 expandIntPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandIntPatterns bs
 expandIntPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Int" ptrn
 
-expandFloatPatterns :: [Branch p] -> StateT TypecheckerState (Either (Error p)) [Branch p]
+expandFloatPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
 expandFloatPatterns [] = return []
 expandFloatPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandFloatPatterns ((PFloat {} : _, _, _) : bs) = expandFloatPatterns bs
@@ -511,7 +558,7 @@ expandFloatPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> exp
 expandFloatPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandFloatPatterns bs
 expandFloatPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Float" ptrn
 
-expandCharPatterns :: [Branch p] -> StateT TypecheckerState (Either (Error p)) [Branch p]
+expandCharPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
 expandCharPatterns [] = return []
 expandCharPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandCharPatterns ((PChar {} : _, _, _) : bs) = expandCharPatterns bs
@@ -519,7 +566,7 @@ expandCharPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expa
 expandCharPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandCharPatterns bs
 expandCharPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Char" ptrn
 
-expandStringPatterns :: [Branch p] -> StateT TypecheckerState (Either (Error p)) [Branch p]
+expandStringPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
 expandStringPatterns [] = return []
 expandStringPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandStringPatterns ((PString {} : _, _, _) : bs) = expandStringPatterns bs
@@ -527,14 +574,14 @@ expandStringPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> ex
 expandStringPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandStringPatterns bs
 expandStringPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "String" ptrn
 
-expandVarPatterns :: [Branch p] -> StateT TypecheckerState (Either (Error p)) [Branch p]
+expandVarPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
 expandVarPatterns [] = return []
 expandVarPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandVarPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandVarPatterns bs
 expandVarPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandVarPatterns bs
 expandVarPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Var" ptrn
 
-expandTuplePatterns :: Int -> [Branch p] -> StateT TypecheckerState (Either (Error p)) [Branch p]
+expandTuplePatterns :: Int -> [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
 expandTuplePatterns _ [] = return []
 expandTuplePatterns _ (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandTuplePatterns n ((PTuple p1 args m : ptrns, e, p2) : bs)
@@ -546,7 +593,7 @@ expandTuplePatterns n ((PVar p1 _ : ptrns, e, p2) : bs) =
   ((map (const (PWild p1)) [1..n] ++ ptrns, e, p2) :) <$> expandTuplePatterns n bs
 expandTuplePatterns n ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError ("Tuple" ++ show n) ptrn
 
-expandVecPatterns :: [Branch p] -> StateT TypecheckerState (Either (Error p)) ([Branch p], [Branch p])
+expandVecPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) ([Branch p], [Branch p])
 expandVecPatterns [] = return ([], [])
 expandVecPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
 expandVecPatterns ((PNil _ : ptrns, e, p) : bs) = cross ((ptrns, e, p) :) id <$> expandVecPatterns bs
@@ -559,7 +606,7 @@ expandVecPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Vec"
 
 expandGADTVarPatterns ::
   String -> p -> [Pattern p] -> Expr p -> p -> [Branch p]
-  -> StateT TypecheckerState (Either (Error p)) (Map.Map String [Branch p])
+  -> StateT TypecheckerState (Either (TypeError p)) (Map.Map String [Branch p])
 expandGADTVarPatterns typeName p1 ptrns e p2 bs = do
   cs <- view constrContext <$> get
   bs' <- expandGADTPatterns typeName bs
@@ -568,7 +615,7 @@ expandGADTVarPatterns typeName p1 ptrns e p2 bs = do
     produceWilds cs k b =
       (map (const (PWild p1)) (maybe [] constrArgsTemplates (Map.lookup k cs)) ++ ptrns, e, p2) : b
 
-expandGADTPatterns :: String -> [Branch p] -> StateT TypecheckerState (Either (Error p)) (Map.Map String [Branch p])
+expandGADTPatterns :: String -> [Branch p] -> StateT TypecheckerState (Either (TypeError p)) (Map.Map String [Branch p])
 expandGADTPatterns typeName [] = do
   cs <- view constrContext <$> get
   return . Map.fromList . map (pair (fst, const [])) . Map.toList . Map.filter ((typeName ==) . constrTypeName) $ cs
@@ -585,7 +632,7 @@ expandGADTPatterns typeName ((PVar p1 _ : ptrns, e, p2) : bs) =
   expandGADTVarPatterns typeName p1 ptrns e p2 bs
 expandGADTPatterns _ ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "GADT" ptrn
 
-vecPatternsGuarded :: [Branch p] -> StateT TypecheckerState (Either (Error p)) Bool
+vecPatternsGuarded :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) Bool
 vecPatternsGuarded [] = return False
 vecPatternsGuarded ((PNil _ : _, _, _) : _) = return True
 vecPatternsGuarded ((PCons {} : _, _, _) : _) = return True
@@ -594,7 +641,7 @@ vecPatternsGuarded ((PVar {} : _, _, _) : bs) = vecPatternsGuarded bs
 vecPatternsGuarded (([], _, p) : _) = lift . Left $ TooShortPatternError p
 vecPatternsGuarded ((ptrn : _, _, _) : _) = lift . Left $ PatternTypeError "Vec" ptrn
 
-gadtPatternsGuarded :: String -> [Branch p] -> StateT TypecheckerState (Either (Error p)) Bool
+gadtPatternsGuarded :: String -> [Branch p] -> StateT TypecheckerState (Either (TypeError p)) Bool
 gadtPatternsGuarded _ [] = return False
 gadtPatternsGuarded typeName ((PConstr p constrName args : _, _, _) : _) = do
   lookupRes <- Map.lookup constrName . view constrContext <$> get

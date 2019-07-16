@@ -1,11 +1,10 @@
-
 module Parser (parseProgram) where
 
 -- "You've never heard of the Millennium Falcon?
 -- …It's the ship that made the Kessel Run in less than 0.000012 megaParsecs."
 
-import PreAST
 import AST
+import CommonUtils
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr
 import Data.Void
@@ -220,123 +219,73 @@ mGADT = do
   args <- some mSimple
   return $ MGADT name args
 
-typeTemplateParser :: Parser PreTypeTemplate
-typeTemplateParser = makeExprParser ttTerm [[InfixR (PTTArrow <$ symbol "->")]]
+typeTemplateParser :: Parser TypeTemplate
+typeTemplateParser = makeExprParser ttTerm [[InfixR (TTArrow <$ symbol "->")]]
 
-ttTerm :: Parser PreTypeTemplate
+ttTerm :: Parser TypeTemplate
 ttTerm =
   try ttGADT <|>
   ttSimple <|>
   ttQuantifier
 
-ttQuantifier :: Parser PreTypeTemplate
+ttQuantifier :: Parser TypeTemplate
 ttQuantifier = do
-  q <- ((rword "∀" <|> rword "forall") >> return PTTUniversal) <|> ((rword "∃" <|> rword "exists") >> return PTTExistential)
+  q <- ((rword "∀" <|> rword "forall") >> return TTUniversal) <|> ((rword "∃" <|> rword "exists") >> return TTExistential)
   varAndKinds <- sepBy1 kindDef comma
   void dot
   t <- typeTemplateParser
   return $ buildQuantifierTemplate q varAndKinds t
 
-buildQuantifierTemplate :: (UTypeVar -> Kind -> PreTypeTemplate -> PreTypeTemplate)-> [(Var, Kind)] -> PreTypeTemplate -> PreTypeTemplate
+buildQuantifierTemplate :: (UTypeVar -> Kind -> TypeTemplate -> TypeTemplate)-> [(Var, Kind)] -> TypeTemplate -> TypeTemplate
 buildQuantifierTemplate _ [] t = t
 buildQuantifierTemplate f ((x, k) : vs) t =
   f (UTypeVar x) k $ buildQuantifierTemplate f vs t
 
-ttProduct :: Parser PreTypeTemplate
+ttProduct :: Parser TypeTemplate
 ttProduct = parens
   (do
    ts <- sepBy1 typeTemplateParser comma
    case ts of
      [t] -> return t
-     _ -> return $ PTTProduct ts $ length ts)
+     _ -> return $ TTProduct ts $ length ts)
 
-ttSimple :: Parser PreTypeTemplate
+ttSimple :: Parser TypeTemplate
 ttSimple =
-  (symbol "()" >> return PTTUnit) <|>
-  (rword "Bool" >> return PTTBool) <|>
-  (rword "Int" >> return PTTInt) <|>
-  (rword "Float" >> return PTTFloat) <|>
-  (rword "Char" >> return PTTChar) <|>
-  (rword "String" >> return PTTString) <|>
-  (PTTUVar . UTypeVar <$> identifier) <|>
-  (PTTParam <$> gadtParamIdentifier) <|>
-  (PTTGADT <$> upperIdentifier <*> pure []) <|>
+  (symbol "()" >> return TTUnit) <|>
+  (rword "Bool" >> return TTBool) <|>
+  (rword "Int" >> return TTInt) <|>
+  (rword "Float" >> return TTFloat) <|>
+  (rword "Char" >> return TTChar) <|>
+  (rword "String" >> return TTString) <|>
+  (TTUVar . UTypeVar <$> identifier) <|>
+  (TTParam <$> gadtParamIdentifier) <|>
+  (TTGADT <$> upperIdentifier <*> pure []) <|>
   try ttProduct <|>
   try ttImp <|>
   ttAnd
 
-ttGADT :: Parser PreTypeTemplate
+ttGADT :: Parser TypeTemplate
 ttGADT = do
   name <- upperIdentifier
-  args <- some (try (ParameterMonotypePT <$> mtSimple) <|> (ParameterTypePT <$> ttSimple))
-  return $ PTTGADT name args
+  args <- some (try (ParameterMonotypeT <$> mSimple) <|> (ParameterTypeT <$> ttSimple))
+  return $ TTGADT name args
 
-ttAnd :: Parser PreTypeTemplate
+ttAnd :: Parser TypeTemplate
 ttAnd =  parens (do
   t <- typeTemplateParser
   void $ symbol "^"
   prop <- propTemplateParser
-  return $ PTTAnd t prop)
+  return $ TTAnd t prop)
 
-ttImp :: Parser PreTypeTemplate
+ttImp :: Parser TypeTemplate
 ttImp = parens (do
   prop <- propTemplateParser
   void $ symbol "=>"
   t <- typeTemplateParser
-  return $ PTTImp prop t)
+  return $ TTImp prop t)
 
 propTemplateParser :: Parser PropositionTemplate
-propTemplateParser = do
-  m1 <- monotypeTemplateParser
-  void $ symbol "="
-  m2 <- monotypeTemplateParser
-  return (m1, m2)
-
-monotypeTemplateParser :: Parser MonotypeTemplate
-monotypeTemplateParser = makeExprParser mtTerm [[InfixR (MTArrow <$ symbol "->")]]
-
-mtTerm :: Parser MonotypeTemplate
-mtTerm =
-  try mtGADT <|>
-  mtSimple <|>
-  mtSucc
-
-mtNat :: Parser MonotypeTemplate
-mtNat = natTemplateFromInteger <$> unsignedInteger
-
-mtSucc :: Parser MonotypeTemplate
-mtSucc = rword "S" >> (MTSucc <$> monotypeTemplateParser)
-
-natTemplateFromInteger :: Integer -> MonotypeTemplate
-natTemplateFromInteger 0 = MTZero
-natTemplateFromInteger n = MTSucc $ natTemplateFromInteger (n - 1)
-
-mtProduct :: Parser MonotypeTemplate
-mtProduct = parens
-  (do
-   ms <- sepBy1 monotypeTemplateParser comma
-   case ms of
-     [m] -> return m
-     _ -> return $ MTProduct ms $ length ms)
-
-mtSimple :: Parser MonotypeTemplate
-mtSimple =
-  (symbol "()" >> return MTUnit) <|>
-  (rword "Bool" >> return MTBool) <|>
-  (rword "Int" >> return MTInt) <|>
-  (rword "Float" >> return MTFloat) <|>
-  (rword "Char" >> return MTChar) <|>
-  (rword "String" >> return MTString) <|>
-  (MTUVar . UTypeVar <$> identifier) <|>
-  (MTGADT <$> upperIdentifier <*> pure []) <|>
-  mtProduct <|>
-  mtNat
-
-mtGADT :: Parser MonotypeTemplate
-mtGADT = do
-  name <- upperIdentifier
-  args <- some mtSimple
-  return $ MTGADT name args
+propTemplateParser = cross MTMono MTMono <$> propParser
 
 binOpParser :: String -> Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
 binOpParser x = do
@@ -348,7 +297,7 @@ consParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
 consParser = do
   pos <- getSourcePos
   (lexeme . try) (char ':' *> notFollowedBy (char ':'))
-  return $ ECons pos
+  return $ (.)(.)(.) (EConstr pos ":") (curry (uncurry (++) . cross return return))
 
 plusParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
 plusParser = do
@@ -491,7 +440,7 @@ eVec :: Parser (Expr SourcePos)
 eVec = do
   pos <- getSourcePos
   es <- brackets (sepBy expr comma)
-  return $ foldr (ECons pos) (ENil pos) es
+  return $ foldr ((.)(.)(.) (EConstr pos ":") (curry (uncurry (++) . cross return return))) (EConstr pos "[]" []) es
 
 eLet :: Parser (Expr SourcePos)
 eLet = do
@@ -507,9 +456,14 @@ eLet = do
     Nothing -> return $ ELet pos x e1 e2
     Just t -> return $ ELet pos x (EAnnot (getPos e1) e1 t) e2
 
+consPtrnParser :: Parser (Pattern SourcePos -> Pattern SourcePos -> Pattern SourcePos)
+consPtrnParser = do
+  pos <- getSourcePos
+  void $ symbol ":"
+  return $ (.)(.)(.) (PConstr pos ":") (curry (uncurry (++) . cross return return))
 
 patternParser :: Parser (Pattern SourcePos)
-patternParser = makeExprParser pTerm [[InfixR (PCons <$> getSourcePos <* symbol ":")]]
+patternParser = makeExprParser pTerm [[InfixR consPtrnParser]]
 
 pTerm :: Parser (Pattern SourcePos)
 pTerm =
@@ -550,7 +504,7 @@ pVec :: Parser (Pattern SourcePos)
 pVec = do
   pos <- getSourcePos
   es <- brackets (sepBy patternParser comma)
-  return $ foldr (PCons pos) (PNil pos) es
+  return $ foldr ((.)(.)(.) (PConstr pos ":") (curry (uncurry (++) . cross return return))) (PConstr pos "[]" []) es
 
 functionName :: Parser (SourcePos, String)
 functionName = (,) <$> getSourcePos <*> (rword "def" >> identifier)

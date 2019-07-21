@@ -10,19 +10,19 @@ import Control.Monad.Trans.Maybe
 
 import Control.Lens hiding (Context)
 
-checkedIntroductionForm :: Expr p -> Type -> Either (TypeError p) ()
-checkedIntroductionForm EUnit {}   _ = return ()
-checkedIntroductionForm EBool {}   _ = return ()
-checkedIntroductionForm EInt {}    _ = return ()
-checkedIntroductionForm EFloat {}  _ = return ()
-checkedIntroductionForm EChar {}   _ = return ()
-checkedIntroductionForm EString {} _ = return ()
-checkedIntroductionForm ELambda {} _ = return ()
-checkedIntroductionForm ETuple {}  _ = return ()
-checkedIntroductionForm EConstr {} _ = return ()
-checkedIntroductionForm ENil {}    _ = return ()
-checkedIntroductionForm ECons {}   _ = return ()
-checkedIntroductionForm e t = Left $ ExprNotCheckedIntroductionFormError e t
+checkedIntroductionForm :: Expr p -> Bool
+checkedIntroductionForm EUnit {}   = True
+checkedIntroductionForm EBool {}   = True
+checkedIntroductionForm EInt {}    = True
+checkedIntroductionForm EFloat {}  = True
+checkedIntroductionForm EChar {}   = True
+checkedIntroductionForm EString {} = True
+checkedIntroductionForm ELambda {} = True
+checkedIntroductionForm ETuple {}  = True
+--checkedIntroductionForm EConstr {} = True
+checkedIntroductionForm ENil {}    = True
+checkedIntroductionForm ECons {}   = True
+checkedIntroductionForm _ = False --Left $ ExprNotCheckedIntroductionFormError e t
 
 checkBranchWellFormedness :: Branch p -> Either (TypeError p) ()
 checkBranchWellFormedness b @ (branchPtrns, _, _) = do
@@ -94,7 +94,7 @@ checkTypeWellFormedness p c (TUVar x) =
   case typeVarContextLookup c $ uTypeVarName x of
     Just (CTypeVar (U _) KStar) -> return ()
     Just (CTypeVar (U _) KNat) -> lift . Left $ TypeHasWrongKindError p (TUVar x) KStar KNat
-    _ -> lift . Left $ UndeclaredUTypeVarError p x c
+    _ -> lift . Left $ UndeclaredUTypeVarError p x
 
 checkPropWellFormedness :: p -> Context -> Proposition -> StateT TypecheckerState (Either (TypeError p)) ()
 checkPropWellFormedness p c (m1, m2) = inferMonotypeKind p c m1 >>= checkMonotypeHasKind p c m2
@@ -137,7 +137,7 @@ inferMonotypeKind p c (MEVar x) =
 inferMonotypeKind p c (MUVar x) =
   case typeVarContextLookup c $ uTypeVarName x of
     Just (CTypeVar (U _) k) -> return k
-    _ -> lift . Left $ UndeclaredUTypeVarError p x c
+    _ -> lift . Left $ UndeclaredUTypeVarError p x
 
 subtype :: Context -> Type -> Polarity -> Type -> p -> StateT TypecheckerState (Either (TypeError p)) Context
 subtype c t1 pol t2 p
@@ -504,7 +504,7 @@ inferSpine c (e : s) (TEVar a) NotPrincipal = do
   let (a1, a2) = generateSubETypeVars a
   c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] $ getPos e
   inferSpine c2 (e : s) (TArrow (TEVar a1) (TEVar a2)) NotPrincipal
-inferSpine _ (e : _) t _ = lift . Left $ SpineInferenceError (getPos e) t
+inferSpine _ (e : _) t _ = lift . Left $ SpineInferenceError e t
 
 inferSpineRecoverPrnc ::
   Context -> Spine p -> Type -> Principality
@@ -517,133 +517,131 @@ inferSpineRecoverPrnc c s t pr = do
     return (t2, pr2, c2)
 
 checkExpr :: Context -> Expr p -> Type -> Principality -> StateT TypecheckerState (Either (TypeError p)) Context
-checkExpr c (EUnit _)     TUnit _   = return c
-checkExpr c (EBool _ _)   TBool _   = return c
-checkExpr c (EInt _ _)    TInt _    = return c
-checkExpr c (EFloat _ _)  TFloat _  = return c
-checkExpr c (EChar _ _)   TChar _   = return c
-checkExpr c (EString _ _) TString _ = return c
-checkExpr c (EUnit p)     (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MUnit   [] p
-checkExpr c (EBool p _)   (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MBool   [] p
-checkExpr c (EInt p _)    (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MInt    [] p
-checkExpr c (EFloat p _)  (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MFloat  [] p
-checkExpr c (EChar p _)   (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MChar   [] p
-checkExpr c (EString p _) (TEVar a) NotPrincipal = lift $ eTypeVarContextReplace c a KStar MString [] p
-checkExpr c (EIf p e1 e2 e3) t pr = do
-  c2 <- checkExpr c e1 TBool pr
-  t' <- lift $ applyContextToType p c2 t
-  c3 <- checkExpr c2 e2 t' pr
-  t'' <- lift $ applyContextToType p c3 t'
-  checkExpr c3 e3 t'' pr
-checkExpr c (ELet p x e1 e2) t pr1 = do
-  (t2, pr2, c2) <- inferExpr c e1
-  t' <- lift $ applyContextToType p c2 t
-  dropContextToMarker <$> checkExpr (CVar x t2 pr2 : CMarker : c2) e2 t' pr1
-checkExpr c (EBinOp p (BinOp opr) e1 e2) t pr =
-  checkExpr c (ESpine p (EVar p opr) [e1, e2]) t pr
-checkExpr c (EUnOp p UnOpPlus e) t pr =
-  checkExpr c (ESpine p (EVar p "+u") [e]) t pr
-checkExpr c (EUnOp p UnOpMinus e) t pr =
-  checkExpr c (ESpine p (EVar p "-u") [e]) t pr
-checkExpr c (EUnOp p UnOpPlusFloat e) t pr =
-  checkExpr c (ESpine p (EVar p "+.u") [e]) t pr
-checkExpr c (EUnOp p UnOpMinusFloat e) t pr =
-  checkExpr c (ESpine p (EVar p "-.u") [e]) t pr
-checkExpr c (EUnOp p UnOpNot e) t pr =
-  checkExpr c (ESpine p (EVar p "!u") [e]) t pr
-checkExpr c (ECase p e bs) t1 pr1 = do
-  (t2, pr2, c2) <- inferExpr c e
-  t1' <- lift $ applyContextToType p c2 t1
-  t2' <- lift $ applyContextToType p c2 t2
-  c3 <- checkBranches c2 bs [t2'] pr2 t1' pr1
-  t2'' <- lift $ applyContextToType p c3 t2'
-  checkCoverage p c3 bs [t2''] pr2
-  return c3
-checkExpr c e (TUniversal a k t) pr = do
-  lift $ checkedIntroductionForm e (TUniversal a k t)
-  dropContextToMarker <$> checkExpr (CTypeVar (U a) k : CMarker : c) e t pr
-checkExpr c e (TExistential a k t) _ = do
-  lift $ checkedIntroductionForm e (TExistential a k t)
-  a' <- ETypeVar <$> generateFreshTypeVarName "checkExpr" (uTypeVarName a)
-  checkExpr (CTypeVar (E  a') k : c) e (substituteUVarInType a (E a') t) NotPrincipal
-checkExpr c e (TImp prop t) Principal = do
-  lift $ checkedIntroductionForm e (TImp prop t)
-  contextOrContradiction <- runMaybeT $ eliminatePropEquation (CMarker : c) prop $ getPos e
-  case contextOrContradiction of
-    Nothing -> return c
-    Just c2 -> do
+checkExpr context expression checkedType principality =
+  case (context, expression, checkedType, principality) of
+    (c, EUnit _,     TUnit, _)   -> return c
+    (c, EBool _ _,   TBool, _)   -> return c
+    (c, EInt _ _,    TInt, _)    -> return c
+    (c, EFloat _ _,  TFloat, _)  -> return c
+    (c, EChar _ _,   TChar, _)   -> return c
+    (c, EString _ _, TString, _) -> return c
+    (c, EUnit p,     TEVar a, NotPrincipal) -> lift $ eTypeVarContextReplace c a KStar MUnit   [] p
+    (c, EBool p _,   TEVar a, NotPrincipal) -> lift $ eTypeVarContextReplace c a KStar MBool   [] p
+    (c, EInt p _,    TEVar a, NotPrincipal) -> lift $ eTypeVarContextReplace c a KStar MInt    [] p
+    (c, EFloat p _,  TEVar a, NotPrincipal) -> lift $ eTypeVarContextReplace c a KStar MFloat  [] p
+    (c, EChar p _,   TEVar a, NotPrincipal) -> lift $ eTypeVarContextReplace c a KStar MChar   [] p
+    (c, EString p _, TEVar a, NotPrincipal) -> lift $ eTypeVarContextReplace c a KStar MString [] p
+    (c, EIf p e1 e2 e3, t, pr) -> do
+      c2 <- checkExpr c e1 TBool pr
+      t' <- lift $ applyContextToType p c2 t
+      c3 <- checkExpr c2 e2 t' pr
+      t'' <- lift $ applyContextToType p c3 t'
+      checkExpr c3 e3 t'' pr
+    (c, ELet p x e1 e2, t, pr1) -> do
+      (t2, pr2, c2) <- inferExpr c e1
+      t' <- lift $ applyContextToType p c2 t
+      dropContextToMarker <$> checkExpr (CVar x t2 pr2 : CMarker : c2) e2 t' pr1
+    (c, EBinOp p (BinOp opr) e1 e2, t, pr) ->
+      checkExpr c (ESpine p (EVar p opr) [e1, e2]) t pr
+    (c, EUnOp p UnOpPlus e, t, pr) ->
+      checkExpr c (ESpine p (EVar p "+u") [e]) t pr
+    (c, EUnOp p UnOpMinus e, t, pr) ->
+      checkExpr c (ESpine p (EVar p "-u") [e]) t pr
+    (c, EUnOp p UnOpPlusFloat e, t, pr) ->
+      checkExpr c (ESpine p (EVar p "+.u") [e]) t pr
+    (c, EUnOp p UnOpMinusFloat e, t, pr) ->
+      checkExpr c (ESpine p (EVar p "-.u") [e]) t pr
+    (c, EUnOp p UnOpNot e, t, pr) ->
+      checkExpr c (ESpine p (EVar p "!u") [e]) t pr
+    (c, ECase p e bs, t1, pr1) -> do
+      (t2, pr2, c2) <- inferExpr c e
+      t1' <- lift $ applyContextToType p c2 t1
+      t2' <- lift $ applyContextToType p c2 t2
+      c3 <- checkBranches c2 bs [t2'] pr2 t1' pr1
+      t2'' <- lift $ applyContextToType p c3 t2'
+      checkCoverage p c3 bs [t2''] pr2
+      return c3
+    (c, e, TUniversal a k t, pr) | checkedIntroductionForm e ->
+      dropContextToMarker <$> checkExpr (CTypeVar (U a) k : CMarker : c) e t pr
+    (c, e, TExistential a k t, _) | checkedIntroductionForm e -> do
+      a' <- ETypeVar <$> generateFreshTypeVarName "checkExpr" (uTypeVarName a)
+      checkExpr (CTypeVar (E  a') k : c) e (substituteUVarInType a (E a') t) NotPrincipal
+    (c, e, TImp prop t, Principal) | checkedIntroductionForm e -> do
+      contextOrContradiction <- runMaybeT $ eliminatePropEquation (CMarker : c) prop $ getPos e
+      case contextOrContradiction of
+        Nothing -> return c
+        Just c2 -> do
+          t' <- lift $ applyContextToType (getPos e) c2 t
+          dropContextToMarker <$> checkExpr c2 e t' Principal
+    (c, e, TAnd t prop, pr) | exprIsNotACase e -> do
+      c2 <- checkPropTrue c prop $ getPos e
       t' <- lift $ applyContextToType (getPos e) c2 t
-      dropContextToMarker <$> checkExpr c2 e t' Principal
-checkExpr c e (TAnd t prop) pr = do
-  lift $ exprIsNotACase e
-  c2 <- checkPropTrue c prop $ getPos e
-  t' <- lift $ applyContextToType (getPos e) c2 t
-  checkExpr c2 e t' pr
-checkExpr c (ELambda _ x e) (TArrow t1 t2) pr = do
-  c2 <- checkExpr (CVar x t1 pr : CMarker : c) e t2 pr
-  return $ dropContextToMarker c2
-checkExpr c (ELambda p x e) (TEVar a) NotPrincipal = do
-  let (a1, a2) = generateSubETypeVars a
-  c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
-  c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
-  return $ dropContextToMarker c3
-checkExpr c (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2) pr =
-  if n1 /= n2 then
-    lift . Left $ TypecheckingError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2)
-  else do
-    c2 <- checkExpr c e1 t1 pr
-    foldM aux c2 $ zip es ts
-  where
-    aux _c (e, t) = do
-      t' <- lift $ applyContextToType p _c t
-      checkExpr _c e t' pr
-checkExpr c (ETuple p (e1 : es) n) (TEVar a) NotPrincipal = do
-  let a1 : as = generateSubETypeVarsList a n
-  c2 <- lift $ eTypeVarContextReplace c a KStar (MProduct (map MEVar (a1 : as)) n) (map (flip CTypeVar KStar . E) $ a1 : as) p
-  c3 <- checkExpr c2 e1 (TEVar a1) NotPrincipal
-  foldM aux c3 $ zip es $ map TEVar as
-  where
-    aux _c (e, t) = do
-      t' <- lift $ applyContextToType p _c t
-      checkExpr _c e t' NotPrincipal
-checkExpr c (EConstr p constrName es) (TGADT typeName ts) pr = do
-  lookupRes <- Map.lookup constrName . view constrContext <$> get
-  case lookupRes of
-    Nothing -> lift . Left $ UndeclaredConstructorError $ EConstr p constrName es
-    Just constr
-      | constrTypeName constr /= typeName ->
-        lift . Left $ MismatchedConstructorError (EConstr p constrName es) (constrTypeName constr) typeName
-      | length (constrArgsTemplates constr) /= length es ->
-        lift . Left $ MismatchedConstructorArityError (EConstr p constrName es) (length $ constrArgsTemplates constr) (length es)
-      | otherwise -> do
-        evars <- generateFreshTypeVars (E . ETypeVar) "checkExpr" (map (uTypeVarName . fst) (constrUVars constr))
-        let tsMap = Map.fromList (zip (constrTypeParmsTemplate constr) ts)
-        let uvarsToFreshEvars = zip (map fst (constrUVars constr)) evars
-        let tArgs = map (flip (foldl (flip $ uncurry substituteUVarInTypeTemplate)) uvarsToFreshEvars) $ constrArgsTemplates constr
-        let tProps = map (flip (foldl (flip $ uncurry substituteUVarInPropTemplate)) uvarsToFreshEvars) $ constrProps constr
-        args <- lift $ mapM (typeFromTemplate tsMap p) tArgs
-        props <- lift $ mapM (propositionFromTemplate tsMap p) tProps
-        let c2 = zipWith CTypeVar evars (map snd $ constrUVars constr) ++ CMarker : c
-        c3 <- foldM auxProp c2 props
-        dropContextToMarker <$> foldM auxType c3 (zip es args)
-  where
-    auxProp _c prop = do
-      prop' <- lift $ applyContextToProposition p _c prop
-      checkPropTrue _c prop' p
-    auxType _c (e, t) = do
-      t' <- lift $ applyContextToType p _c t
-      checkExpr _c e t' pr
-checkExpr c (ENil p) (TVec n _) _ = checkPropTrue c (n, MZero) p
-checkExpr c (ECons p e1 e2) (TVec n t) pr = do
-  a <- ETypeVar <$> generateFreshTypeVarName "checkExpr" ""
-  c2 <- checkPropTrue (CTypeVar (E a) KNat : CMarker : c) (n, MSucc (MEVar a)) p
-  t' <- lift $ applyContextToType p c2 t
-  c3 <- checkExpr c2 e1 t' pr
-  t'' <- lift $ applyContextToType p c2 (TVec (MEVar a) t)
-  dropContextToMarker <$> checkExpr c3 e2 t'' pr
-checkExpr c e t _ = do
-  (t2, _, c2) <- inferExpr c e
-  subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t $ getPos e
+      checkExpr c2 e t' pr
+    (c, ELambda _ x e, TArrow t1 t2, pr) -> do
+      c2 <- checkExpr (CVar x t1 pr : CMarker : c) e t2 pr
+      return $ dropContextToMarker c2
+    (c, ELambda p x e, TEVar a, NotPrincipal) -> do
+      let (a1, a2) = generateSubETypeVars a
+      c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
+      c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
+      return $ dropContextToMarker c3
+    (c, ETuple p (e1 : es) n1, TProduct (t1 : ts) n2, pr) ->
+      if n1 /= n2 then
+        lift . Left $ ProductArityError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2)
+      else do
+        c2 <- checkExpr c e1 t1 pr
+        foldM aux c2 $ zip es ts
+      where
+        aux _c (e, t) = do
+          t' <- lift $ applyContextToType p _c t
+          checkExpr _c e t' pr
+    (c, ETuple p (e1 : es) n, TEVar a, NotPrincipal) -> do
+      let a1 : as = generateSubETypeVarsList a n
+      c2 <- lift $ eTypeVarContextReplace c a KStar (MProduct (map MEVar (a1 : as)) n) (map (flip CTypeVar KStar . E) $ a1 : as) p
+      c3 <- checkExpr c2 e1 (TEVar a1) NotPrincipal
+      foldM aux c3 $ zip es $ map TEVar as
+      where
+        aux _c (e, t) = do
+          t' <- lift $ applyContextToType p _c t
+          checkExpr _c e t' NotPrincipal
+    (c, EConstr p constrName es, TGADT typeName ts, pr) -> do
+      lookupRes <- Map.lookup constrName . view constrContext <$> get
+      case lookupRes of
+        Nothing -> lift . Left $ UndeclaredConstructorError (EConstr p constrName es) constrName
+        Just constr
+          | constrTypeName constr /= typeName ->
+            lift . Left $ MismatchedConstructorError (EConstr p constrName es) (constrTypeName constr) typeName
+          | length (constrArgsTemplates constr) /= length es ->
+            lift . Left $ MismatchedConstructorArityError (EConstr p constrName es) constrName (length $ constrArgsTemplates constr) (length es)
+          | otherwise -> do
+            evars <- generateFreshTypeVars (E . ETypeVar) "checkExpr" (map (uTypeVarName . fst) (constrUVars constr))
+            let tsMap = Map.fromList (zip (constrTypeParmsTemplate constr) ts)
+            let uvarsToFreshEvars = zip (map fst (constrUVars constr)) evars
+            let tArgs = map (flip (foldl (flip $ uncurry substituteUVarInTypeTemplate)) uvarsToFreshEvars) $ constrArgsTemplates constr
+            let tProps = map (flip (foldl (flip $ uncurry substituteUVarInPropTemplate)) uvarsToFreshEvars) $ constrProps constr
+            args <- lift $ mapM (typeFromTemplate tsMap p) tArgs
+            props <- lift $ mapM (propositionFromTemplate tsMap p) tProps
+            let c2 = zipWith CTypeVar evars (map snd $ constrUVars constr) ++ CMarker : c
+            c3 <- foldM auxProp c2 props
+            dropContextToMarker <$> foldM auxType c3 (zip es args)
+      where
+        auxProp _c prop = do
+          prop' <- lift $ applyContextToProposition p _c prop
+          checkPropTrue _c prop' p
+        auxType _c (e, t) = do
+          t' <- lift $ applyContextToType p _c t
+          checkExpr _c e t' pr
+    (c, ENil p, TVec n _, _) -> checkPropTrue c (n, MZero) p
+    (c, ECons p e1 e2, TVec n t, pr) -> do
+      a <- ETypeVar <$> generateFreshTypeVarName "checkExpr" ""
+      c2 <- checkPropTrue (CTypeVar (E a) KNat : CMarker : c) (n, MSucc (MEVar a)) p
+      t' <- lift $ applyContextToType p c2 t
+      c3 <- checkExpr c2 e1 t' pr
+      t'' <- lift $ applyContextToType p c2 (TVec (MEVar a) t)
+      dropContextToMarker <$> checkExpr c3 e2 t'' pr
+    (c, e, t, _) -> do
+      (t2, _, c2) <- inferExpr c e
+      subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t $ getPos e
 
 inferExpr :: Context -> Expr p -> StateT TypecheckerState (Either (TypeError p)) (Type, Principality, Context)
 inferExpr c (ERec _ _ e) = inferExpr c e
@@ -666,6 +664,11 @@ inferExpr c (EAnnot p e t) = do
   c2 <- checkExpr c e t2 Principal
   t3 <- lift $ applyContextToType p c2 t2
   return (t3, Principal, c2)
+inferExpr c (EConstr p constrName es) = do
+    lookupRes <- Map.lookup constrName . view constrContext <$> get
+    case lookupRes of
+      Nothing -> lift . Left $ UndeclaredConstructorError (EConstr p constrName es) constrName
+      Just constr -> inferSpineRecoverPrnc c es (constrFunVersion constr) Principal
 inferExpr c (ESpine _ e s) = do
   (t, pr, c2) <- inferExpr c e
   inferSpineRecoverPrnc c2 s t pr
@@ -687,6 +690,11 @@ checkBranch ::
 checkBranch c ([], e, _) [] _ te pr = checkExpr c e te pr
 checkBranch _ ([], _, p) _ _ _ _ = lift . Left $ TooShortPatternError p
 checkBranch _ (_, _, p) [] _ _ _ = lift . Left $ TooLongPatternError p
+checkBranch c b (TAnd t _ : ts) NotPrincipal te pr = checkBranch c b (t : ts) NotPrincipal te pr
+checkBranch c b (TAnd t prop : ts) Principal te pr =
+  checkBranchIncorporatingProps (getPosFromBranch b) c [prop] b (t : ts) Principal te pr
+checkBranch c b (TExistential u k t : ts) pr1 te pr2 =
+  dropContextToMarker <$> checkBranch (CTypeVar (U u) k : CMarker : c) b (t : ts) pr1 te pr2
 checkBranch c (PUnit   _   : ptrns, e, p) (TUnit : ts)   pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
 checkBranch c (PBool   _ _ : ptrns, e, p) (TBool : ts)   pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
 checkBranch c (PInt    _ _ : ptrns, e, p) (TInt  : ts)   pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
@@ -696,17 +704,9 @@ checkBranch c (PString _ _ : ptrns, e, p) (TString : ts) pr1 te pr2 = checkBranc
 checkBranch c (PTuple p1 pargs n1 : ptrns, e, p2) (TProduct targs n2 : ts) pr1 te pr2
   | n1 /= n2 = lift . Left $ MismatchedProductArityInPatternError (PTuple p1 pargs n1) (TProduct targs n2)
   | otherwise = checkBranch c (pargs ++ ptrns, e, p2) (targs ++ ts) pr1 te pr2
-checkBranch c (PWild p1 : ptrns, e, p2) (t : ts) pr1 te pr2
-  | headedByExistential t || headedByAnd t = lift . Left $ VarPatternHeadedByExistsOrAndError (PWild p1) t
-  | otherwise = checkBranch c (ptrns, e, p2) ts pr1 te pr2
-checkBranch c (PVar p1 x : ptrns, e, p2) (t : ts) pr1 te pr2
-  | headedByExistential t || headedByAnd t = lift . Left $ VarPatternHeadedByExistsOrAndError (PVar p1 x) t
-  | otherwise = dropContextToMarker <$> checkBranch (CVar x t Principal : CMarker : c) (ptrns, e, p2) ts pr1 te pr2
-checkBranch c b (TAnd t _ : ts) NotPrincipal te pr = checkBranch c b (t : ts) NotPrincipal te pr
-checkBranch c b (TAnd t prop : ts) Principal te pr =
-  checkBranchIncorporatingProps (getPosFromBranch b) c [prop] b (t : ts) Principal te pr
-checkBranch c b (TExistential u k t : ts) pr1 te pr2 =
-  dropContextToMarker <$> checkBranch (CTypeVar (U u) k : CMarker : c) b (t : ts) pr1 te pr2
+checkBranch c (PWild _ : ptrns, e, p) (_ : ts) pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
+checkBranch c (PVar _ x : ptrns, e, p) (t : ts) pr1 te pr2 =
+  dropContextToMarker <$> checkBranch (CVar x t Principal : CMarker : c) (ptrns, e, p) ts pr1 te pr2
 checkBranch c (PNil _ : ptrns, e, p) (TVec {} : ts) NotPrincipal te pr =
   checkBranch c (ptrns, e, p) ts NotPrincipal te pr
 checkBranch c (PCons _ x xs : ptrns, e, p) (TVec _ t : ts) NotPrincipal te pr = do
@@ -725,13 +725,13 @@ checkBranch c (PCons p1 x xs : ptrns, e, p2) (TVec n1 t : ts) Principal te pr = 
 checkBranch c (PConstr p1 constrName pargs : ptrns, e, p2) (TGADT typeName params : ts) pr1 te pr2 = do
   lookupRes <- Map.lookup constrName . view constrContext <$> get
   case lookupRes of
-    Nothing -> lift . Left $ UndeclaredConstructorInPatternError $ PConstr p1 constrName pargs
+    Nothing -> lift . Left $ UndeclaredConstructorInPatternError (PConstr p1 constrName pargs) constrName
     Just constr
       | constrTypeName constr /= typeName ->
         lift . Left $ MismatchedConstructorInPatternError (PConstr p1 constrName pargs) (constrTypeName constr) typeName
       | length (constrArgsTemplates constr) /= length pargs ->
         lift . Left $ MismatchedConstructorArityInPatternError
-        (PConstr p1 constrName pargs)
+        (PConstr p1 constrName pargs) constrName
         (length $ constrArgsTemplates constr) (length pargs)
       | otherwise -> do
         uvars <- generateFreshTypeVars (U . UTypeVar) "checkBranch" (map (uTypeVarName . fst) (constrUVars constr))
@@ -759,7 +759,7 @@ checkBranchIncorporatingProps p c (prop : props) b ts Principal te pr = do
     Just c2 -> do
       ts' <- mapM (lift . applyContextToType (getPosFromBranch b) c2) ts
       dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts' Principal te pr
-checkBranchIncorporatingProps _ _ _ b _ NotPrincipal _ _ = lift . Left $ ExpectedPrincipalTypeInPatternError b
+checkBranchIncorporatingProps p _ _ _ _ NotPrincipal _ _ = lift . Left $ InternalCompilerTypeError p "checkBranchIncorporatingProps"
 
 checkCoverage ::
   p -> Context -> [Branch p] -> [Type] -> Principality
@@ -821,7 +821,7 @@ checkCoverage p c bs (TGADT typeName params : ts) pr = do
 checkCoverage p c bs (_ : ts) pr = do
   bs' <- expandVarPatterns bs
   checkCoverage p c bs' ts pr
-checkCoverage p _ _ _ _ = lift . Left $ PatternMatchingNonExhaustive p
+checkCoverage p _ _ _ _ = lift . Left $ PatternMatchingNonExhaustiveError p
 
 checkConstrCoverage ::
   p -> Context -> [GADTParameter] -> [Type] -> Principality
@@ -856,4 +856,4 @@ checkCoverageAssumingProps p c ((m1, m2) : props) bs ts Principal = do
     Just c2 -> do
       ts' <- mapM (lift . applyContextToType p c2) ts
       checkCoverageAssumingProps p c2 props bs ts' Principal
-checkCoverageAssumingProps p _ _ _ _ NotPrincipal = lift . Left $ ExpectedPrincipalTypeInCoverageError p
+checkCoverageAssumingProps p _ _ _ _ NotPrincipal = lift . Left $ InternalCompilerTypeError p "checkCoverageAssumingProps"

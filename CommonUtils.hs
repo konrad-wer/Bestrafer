@@ -9,3 +9,6 @@ cross f g = pair (f . fst, g . snd)
 
 iterM :: Monad m => (a -> m ()) -> [a] -> m ()
 iterM = (.)(.)(.) void mapM
+
+addQuotes :: String -> String
+addQuotes = ("'" ++) . (++ "'")

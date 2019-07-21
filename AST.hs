@@ -116,7 +116,11 @@ data GADTParameter
 data GADTParameterTemplate
   = ParameterTypeT TypeTemplate
   | ParameterMonotypeT Monotype
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show GADTParameterTemplate where
+  show (ParameterTypeT tt) = show tt
+  show (ParameterMonotypeT m) = show m
 
 data Type
   = TUnit
@@ -155,7 +159,27 @@ data TypeTemplate
   | TTAnd TypeTemplate PropositionTemplate
   | TTVec Monotype TypeTemplate
   | TTParam String
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show TypeTemplate where
+  show TTUnit   = "()"
+  show TTBool   = "Bool"
+  show TTInt    = "Int"
+  show TTFloat  = "Float"
+  show TTChar   = "Char"
+  show TTString = "String"
+  show (TTArrow t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
+  show (TTGADT name args) = "(" ++ name ++ (args >>= (' ' :) . show) ++ ")"
+  show (TTProduct [] _) = "()"
+  show (TTProduct (t : ts) _) = "(" ++ show t ++ (ts >>= (", " ++) . show) ++ ")"
+  show (TTUVar u) = show u
+  show (TTEVar e) = show e
+  show (TTUniversal u k t) = "(∀ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
+  show (TTExistential u k t) = "(∃ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
+  show (TTImp prop t) = "(" ++ show prop ++ " => " ++ show t ++  ")"
+  show (TTAnd t prop) = "(" ++ show t ++ " ^ " ++ show prop ++ ")"
+  show TTVec {}  = "asdasd"
+  show (TTParam name) = name
 
 type Proposition = (Monotype, Monotype)
 
@@ -194,7 +218,8 @@ data Constructor = Constructor { constrTypeName :: String,
                                  constrTypeParmsTemplate :: [String],
                                  constrUVars :: [(UTypeVar, Kind)],
                                  constrProps :: [PropositionTemplate],
-                                 constrArgsTemplates :: [TypeTemplate]
+                                 constrArgsTemplates :: [TypeTemplate],
+                                 constrFunVersion :: Type
                                } deriving (Show)
 
 type ConstructorsContext = Map.Map String Constructor
@@ -203,7 +228,11 @@ type FunTypeContext = Map.Map Var Type
 data GADTDefParameter
   = GADTDefParamType String
   | GADTDefParamMonotype Kind
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord)
+
+instance Show GADTDefParameter where
+  show (GADTDefParamType pname) = pname
+  show (GADTDefParamMonotype k) = show k
 
 type GADTDefs = Map.Map String [GADTDefParameter]
 
@@ -305,8 +334,8 @@ instance Show Type where
   show (TProduct (t : ts) _) = "(" ++ show t ++ (ts >>= (", " ++) . show) ++ ")"
   show (TUVar u) = show u
   show (TEVar e) = show e
-  show (TUniversal u k t) = "(∀ " ++ show u ++ show k ++ " . " ++ show t ++ ")"
-  show (TExistential u k t) = "(∃ " ++ show u ++ show k ++ " . " ++ show t ++ ")"
+  show (TUniversal u k t) = "(∀ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
+  show (TExistential u k t) = "(∃ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
   show (TImp prop t) = "(" ++ show prop ++ " => " ++ show t ++  ")"
   show (TAnd t prop) = "(" ++ show t ++ " ^ " ++ show prop ++ ")"
   show TVec {}  = "asdasd"
@@ -328,7 +357,7 @@ instance Show Monotype where
   show (MProduct (m : ms) _) = "(" ++ show m ++ (ms >>= (", " ++) . show) ++ ")"
   show (MUVar u) = show u
   show (MEVar e) = show e
-  show (MSucc x) = fromMaybe "" $ (show <$> tryGetInt (MSucc x)) `mplus` return ("(S" ++ show x ++ ")")
+  show (MSucc x) = fromMaybe "" $ (show <$> tryGetInt (MSucc x)) `mplus` return ("(S " ++ show x ++ ")")
     where
       tryGetInt :: Monotype -> Maybe Integer
       tryGetInt (MSucc m) = (1 +) <$> tryGetInt m

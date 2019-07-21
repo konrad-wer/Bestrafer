@@ -1,8 +1,12 @@
+{-# LANGUAGE GADTs #-}
+
 module ASTBuilder (buildAST) where
 
 import AST
+import Data.Char (toLower)
 import Control.Monad
 import Control.Monad.State
+import Text.Megaparsec.Pos
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import CommonUtils
@@ -13,18 +17,39 @@ data ASTBuilderError p
   = ConstrFormednessError (ConstrDef p)
   | WrongConstrResultTypeError (ConstrDef p)
   | WrongConstrResultTypeParamsNumberError (ConstrDef p)
-  | WrongConstrResultTypeParameter (ConstrDef p) String GADTParameterTemplate
-  | GADTDuplicateParamError p String [GADTDefParameter]
+  | WrongConstrResultTypeParameter (ConstrDef p) String
+  | GADTDuplicateParamError p String [String]
   | MoreThanOneGADTDefinition String
   | ConstrFormednessTypeError (TypeError p)
   | TypeParamIsNotMonotypeError p GADTDefParameter GADTParameterTemplate
   | FunctionLacksAnnotationError p Var
   | FunctionLacksImplementationError p Var
   | MoreThanOneTypeAnnotationError p Var
-  | FunDuplicateArgumentError p Var
-  | FunDifferentNumberOfArgs p Var
+  | FunDifferentNumberOfArgsError p Var
   | InternalCompilerASTBuilderError p String
-  deriving (Show)
+ -- deriving(Show)
+
+instance SourcePos ~ p => Show (ASTBuilderError p) where
+  show (ConstrFormednessError (ConstrDef p name _)) = sourcePosPretty p ++ " - Constructor " ++ addQuotes name ++ " is ill-formed"
+  show (WrongConstrResultTypeError (ConstrDef p name _)) = sourcePosPretty p ++ " - Constructor " ++ addQuotes name ++ " has a wrong result type"
+  show (WrongConstrResultTypeParamsNumberError (ConstrDef p name _)) = sourcePosPretty p ++ " - Result type of constructor "
+    ++ addQuotes name ++ " has a wrong number of parameters"
+  show (WrongConstrResultTypeParameter (ConstrDef p name _) pname) = sourcePosPretty p ++ " - Paramter " ++ addQuotes pname ++
+    " has a wrong position in the result type of constructor " ++ addQuotes name
+  show (GADTDuplicateParamError p typeName params) = sourcePosPretty p ++ " - Type " ++ addQuotes (typeName ++ " " ++ unwords params) ++
+    " has a duplicate parameter"
+  show (MoreThanOneGADTDefinition typeName) = "Multiple declarations of type " ++ addQuotes typeName
+  show (ConstrFormednessTypeError err) = show err
+  show (TypeParamIsNotMonotypeError p defParam param) = sourcePosPretty p ++ " - Couldn't convert type " ++  addQuotes (show param) ++
+    " to monotype, while trying to match it with " ++ addQuotes (show defParam) ++ " parameter"
+  show (FunctionLacksAnnotationError p name) = sourcePosPretty p ++ " - Top-level binding with no type signature: " ++ addQuotes name
+  show (FunctionLacksImplementationError p name) = sourcePosPretty p ++ " - The type signature for " ++ addQuotes name ++
+    " lacks an accompanying binding"
+  show (MoreThanOneTypeAnnotationError p name) = sourcePosPretty p ++ " - Duplicate type signatures for " ++ addQuotes name
+  show (FunDifferentNumberOfArgsError p name) = sourcePosPretty p ++  " - Equations for " ++ addQuotes name ++
+    " have different numbers of arguments"
+  show (InternalCompilerASTBuilderError p trace) = sourcePosPretty p ++ " - Internal interpreter error while typechecking " ++
+    addQuotes trace ++ ".\nThat should not have happened. Please contact language creator."
 
 operatorsTypeContext :: FunTypeContext
 operatorsTypeContext = Map.fromList
@@ -68,9 +93,13 @@ vecGADTDef = ("Vec", [GADTDefParamMonotype KNat, GADTDefParamType "`A"])
 vecConstructorsContext :: ConstructorsContext
 vecConstructorsContext = Map.fromList
   [
-    ("[]", Constructor "Vec" ["`#0", "`A"] [] [(MTParam "`#0", MTMono MZero)] []),
-    (":", Constructor "Vec" ["`#0", "`A"] [(UTypeVar "a", KNat)] [(MTParam "`#0", MTMono $ MSucc . MUVar $ UTypeVar "a")]
-    [TTParam "`A", TTGADT "Vec" [ParameterMonotypeT . MUVar $ UTypeVar "a", ParameterTypeT $ TTParam "`A"]])
+    ("[]", Constructor "Vec" ["`#0", "`A"] [] [(MTParam "`#0", MTMono MZero)] [] $
+     TUniversal (UTypeVar "'a") KStar (TGADT "Vec" [ParameterMonotype MZero, ParameterType $ TUVar $ UTypeVar "'a"])),
+    (":", Constructor "Vec" ["`#0", "`A"] [(UTypeVar "n", KNat)] [(MTParam "`#0", MTMono $ MSucc . MUVar $ UTypeVar "n")]
+    [TTParam "`A", TTGADT "Vec" [ParameterMonotypeT . MUVar $ UTypeVar "n", ParameterTypeT $ TTParam "`A"]] $
+    TUniversal (UTypeVar "'a") KStar $ TUniversal (UTypeVar "n") KNat $ TArrow (TUVar (UTypeVar "'a"))
+    (TArrow (TGADT "Vec" [ParameterMonotype (MUVar $ UTypeVar "n"), ParameterType (TUVar $ UTypeVar "'a")])
+    (TGADT "Vec" [ParameterMonotype (MSucc . MUVar $ UTypeVar "n"), ParameterType (TUVar $ UTypeVar "'a")]) ))
   ]
 
 isBlockGADTDef :: ProgramBlock p -> Bool
@@ -101,7 +130,7 @@ checkGADTDefParams (GADTDef p name params _) =
   if (Set.size . Set.fromList $ typeParams) == length typeParams then
     return ()
   else
-    Left $ GADTDuplicateParamError p name params
+    Left $ GADTDuplicateParamError p name $ map show params
   where
     isGADTDefParamType GADTDefParamType {} = True
     isGADTDefParamType _ = False
@@ -121,7 +150,13 @@ buildConstructor ::
 buildConstructor g typeName typeParams (ConstrDef p cname pt) = do
   checkTypeTemplateWellFormedness p [] g pt
   (uvars, props, args) <- buildForall pt ([], [] ,[])
-  return $ Constructor typeName (buildTypeParmsTemplate typeParams (0 :: Integer)) uvars props args
+  let namedTypeParams = map gadtDefParamTypeName $ filter isGADTDefParamType typeParams
+  let namedTypeParamsUVars = map (UTypeVar . map toLower) namedTypeParams
+  case typeFromTemplate (Map.fromList $ zip namedTypeParams (map (ParameterType . TUVar) namedTypeParamsUVars)) p pt of
+    Left err -> Left . ConstrFormednessTypeError $ err
+    Right preFunVersion -> do
+      let funVersion = foldr (uncurry TUniversal) preFunVersion $ zip namedTypeParamsUVars (map (const KStar) namedTypeParams)
+      return $ Constructor typeName (buildTypeParmsTemplate typeParams (0 :: Integer)) uvars props args funVersion
   where
     buildForall (TTUniversal x k t) (uvars, props, args) = buildForall t ((x, k) : uvars, props, args)
     buildForall t (uvars, props, args) = buildArrow t (uvars, props, args)
@@ -140,14 +175,18 @@ buildConstructor g typeName typeParams (ConstrDef p cname pt) = do
     checkParamsPositionsAndBuildProps [] _ props _ = return props
     checkParamsPositionsAndBuildProps _ [] props _ = return props
     checkParamsPositionsAndBuildProps (GADTDefParamType x : tps)  (ParameterTypeT (TTParam y) : ps) props n
-      | x /= y = Left $ WrongConstrResultTypeParameter (ConstrDef p cname pt) x (ParameterTypeT (TTParam y))
+      | x /= y = Left $ WrongConstrResultTypeParameter (ConstrDef p cname pt) x
       | otherwise = checkParamsPositionsAndBuildProps tps ps props (n + 1)
-    checkParamsPositionsAndBuildProps (GADTDefParamType x : _) (prm : _) _ _ =
-      Left $ WrongConstrResultTypeParameter (ConstrDef p cname pt) x prm
+    checkParamsPositionsAndBuildProps (GADTDefParamType x : _) (_ : _) _ _ =
+      Left $ WrongConstrResultTypeParameter (ConstrDef p cname pt) x
     checkParamsPositionsAndBuildProps (GADTDefParamMonotype _ : tps) (ParameterMonotypeT m : ps) props n =
       checkParamsPositionsAndBuildProps tps ps ((MTParam . ("`#" ++ ) . show $ n, MTMono m) : props) (n + 1)
     checkParamsPositionsAndBuildProps (_ : tps) (_: ps) props n =
       checkParamsPositionsAndBuildProps tps ps props (n + 1)
+    isGADTDefParamType GADTDefParamType {} = True
+    isGADTDefParamType _ = False
+    gadtDefParamTypeName (GADTDefParamType name) = name
+    gadtDefParamTypeName _ = ""
 
 runTypecheckerFun :: StateT TypecheckerState (Either (TypeError p)) a -> GADTDefs -> (Either (ASTBuilderError p)) a
 runTypecheckerFun res g =
@@ -207,7 +246,7 @@ checkTypeTemplateWellFormedness p c _ (TTUVar x) =
   case typeVarContextLookup c $ uTypeVarName x of
     Just (CTypeVar (U _) KStar) -> return ()
     Just (CTypeVar (U _) KNat) -> Left . ConstrFormednessTypeError $ TypeHasWrongKindError p (TUVar x) KStar KNat
-    _ -> Left . ConstrFormednessTypeError $ UndeclaredUTypeVarError p x c
+    _ -> Left . ConstrFormednessTypeError $ UndeclaredUTypeVarError p x
 
 buildFunctions :: [ProgramBlock p] -> Either (ASTBuilderError p) ([Expr p], FunTypeContext)
 buildFunctions programBlocks = do
@@ -239,7 +278,7 @@ buildFunction (erecs, funCntxt) ([FunTypeAnnot annotPos name t], defs) = do
   return (ERec annotPos name (EAnnot annotPos lambdasExpr t) : erecs, Map.insert name t funCntxt)
   where
     getBranch numArgs (FunDefCase p _ ptrns e)
-      | numArgs /= length ptrns = Left $ FunDifferentNumberOfArgs annotPos name
+      | numArgs /= length ptrns = Left $ FunDifferentNumberOfArgsError annotPos name
       | otherwise = return ([PTuple p ptrns $ length ptrns], e, p)
     getBranch _ (FunTypeAnnot p _ _) = Left $ InternalCompilerASTBuilderError p "getBranch"
     getBranch _ (GADTDef p _ _ _) = Left $ InternalCompilerASTBuilderError p "getBranch"

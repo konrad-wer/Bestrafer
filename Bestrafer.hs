@@ -29,7 +29,7 @@ main = do
             let startState = TypecheckerState { _freshVarNum = 0, _constrContext = cContext, _gadtDefs = gDefs, _funContext = fContext } in
             case iterM (void . flip evalStateT startState . inferExpr []) prog of
               Right () -> putStrLn "Deine Größe macht mich klein\nDu darfst mein Bestrafer sein"
-              err -> print  err-- print err
+              Left err -> print  err-- print err
 
 depth :: Expr p -> Integer
 depth (EBinOp _ _ e1 e2) = max (depth e1) (depth e2) + 1

@@ -1,57 +1,134 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE GADTs #-}
 
 module TypecheckerUtils where
 
 import AST
+import Text.Megaparsec.Pos
 import CommonUtils
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Control.Lens hiding (Context)
 import Control.Monad.State
+import Data.List (intercalate)
+
+--data ErrorClue deriving (Show)
 
 data TypeError p
   = UndeclaredVariableError p Var
   | UndeclaredGADTError p String
-  | UndeclaredConstructorError (Expr p)
+  | UndeclaredConstructorError (Expr p) String
   | MismatchedGADTArityError p String Int Int
   | MismatchedConstructorError (Expr p) String String
-  | MismatchedConstructorArityError (Expr p) Int Int
+  | MismatchedConstructorArityError (Expr p) String Int Int
   | InternalCompilerTypeError p String
   | ETypeVarTypeMismatchError p ETypeVar Monotype Monotype
   | ETypeVarKindMismatchError p ETypeVar Kind Kind
   | UndeclaredETypeVarError p ETypeVar
-  | UndeclaredUTypeVarError p UTypeVar Context
+  | UndeclaredUTypeVarError p UTypeVar --Tu być może więcej info zebrać
   | TypeHasWrongKindError p Type Kind Kind
   | MonotypeHasWrongKindError p Monotype Kind Kind
   | MonotypeIsNotTypeError p Monotype
   | TypeIsNotMonotypeError p Type
   | TypeFormednessPrcFEVError p [ETypeVar]
   | TypesNotEquivalentError p Type Type
-  | EquationFalseError p Monotype Monotype Kind
+  | EquationFalseError p Monotype Monotype Kind --Tu być może więcej info zebrać
   | NotSubtypeError p Type Type
-  | TypecheckingError (Expr p) Type
-  | InjIndexOutOfBoundError (Expr p) Type
-  | SpineInferenceError p Type
+  | ProductArityError (Expr p) Type
+  | SpineInferenceError (Expr p) Type
   | TypeInferenceError (Expr p)
   | EquationAlreadyExistsError p UTypeVar Monotype Monotype
   | EliminateEquationError p Monotype Monotype Kind
-  | ExprNotCheckedIntroductionFormError (Expr p) Type
-  | ExprIsACaseError (Expr p)
   | DuplicateVarsInBranchError (Branch p)
   | TooLongPatternError p
   | TooShortPatternError p
   | MismatchedProductArityInPatternError (Pattern p) Type
-  | VarPatternHeadedByExistsOrAndError (Pattern p) Type
-  | ExpectedPrincipalTypeInPatternError (Branch p)
-  | UndeclaredConstructorInPatternError (Pattern p)
+  | UndeclaredConstructorInPatternError (Pattern p) String
   | MismatchedConstructorInPatternError (Pattern p) String String
-  | MismatchedConstructorArityInPatternError (Pattern p) Int Int
+  | MismatchedConstructorArityInPatternError (Pattern p) String Int Int
   | PatternMatchingTypecheckingError (Pattern p) Type
   | PatternTypeError String (Pattern p)
-  | NotConstructorOfError (Pattern p) String
-  | ExpectedPrincipalTypeInCoverageError p
-  | PatternMatchingNonExhaustive p
-  deriving (Show)
+  | NotConstructorOfError (Pattern p) String String
+  | PatternMatchingNonExhaustiveError p
+--  deriving(Show)
+
+instance SourcePos ~ p => Show (TypeError p) where
+  show (UndeclaredVariableError p x) = sourcePosPretty p ++ " - Variable not in scope: " ++ addQuotes x
+  show (UndeclaredGADTError p name) = sourcePosPretty p ++ " - Not in scope: type constructor " ++ addQuotes name
+  show (UndeclaredConstructorError e name) = sourcePosPretty (getPos e) ++ " - Data constructor not in scope: " ++ addQuotes name ++
+    "\nIn the expression: " ++ show e
+  show (MismatchedGADTArityError p name expectedArity actualArity)
+    | expectedArity == 1 = sourcePosPretty p ++ " - Expecting " ++ show expectedArity ++ " argument to " ++
+      addQuotes name ++ "' but found " ++ show actualArity
+    | otherwise = sourcePosPretty p ++ " - Expecting " ++ show expectedArity ++ " arguments to " ++
+      addQuotes name ++ " but found " ++ show actualArity
+  show (MismatchedConstructorError e expectedType actualType) = sourcePosPretty (getPos e) ++
+    " - Couldn't match expected type " ++ addQuotes expectedType ++ " with actual type " ++
+    addQuotes actualType ++ "\nIn the expression: " ++ show e
+  show (MismatchedConstructorArityError e name expectedArity actualArity)
+    | expectedArity == 1 = sourcePosPretty (getPos e) ++  " - Expecting " ++ show expectedArity ++ " argument to " ++
+      addQuotes name ++ " but found " ++ show actualArity
+    | otherwise = sourcePosPretty (getPos e) ++  " - Expecting " ++ show expectedArity ++ " arguments to " ++
+      addQuotes name ++ " but found " ++ show actualArity
+  show (InternalCompilerTypeError p trace) = sourcePosPretty p ++  " - Internal interpreter error while typechecking " ++ addQuotes trace
+    ++ ".\nThat should not have happened. Please contact language creator."
+  show (ETypeVarTypeMismatchError p a m1 m2) = sourcePosPretty p ++ " - Existential variable type mismatch: variable " ++
+    addQuotes (show a) ++ " has a type " ++ addQuotes (show m1) ++ ",\nbut tried to unify it with type " ++ addQuotes (show m2)
+  show (ETypeVarKindMismatchError p a k1 k2) = sourcePosPretty p ++ " - Existential variable kind mismatch: variable " ++
+    addQuotes (show a) ++ " has a kind " ++ addQuotes (show k1) ++ ",\nbut tried to unify it with type of kind " ++ addQuotes (show k2)
+  show (UndeclaredETypeVarError p e) = sourcePosPretty p ++ " - Existential type variable not in scope: " ++ addQuotes (show e) ++
+    ".\nThis is probably an interpreter error. Please contact language creator."
+  show (UndeclaredUTypeVarError p u) = sourcePosPretty p ++ " - Type variable not in scope: " ++ addQuotes (show u)
+  show (TypeHasWrongKindError p t expectedKind actualKind) = sourcePosPretty p ++ " - Type " ++ addQuotes (show t) ++ " has a wrong kind" ++
+    "\nExpected kind: " ++ addQuotes (show expectedKind) ++ "\nActual kind: " ++ addQuotes (show actualKind)
+  show (MonotypeHasWrongKindError p m expectedKind actualKind) = sourcePosPretty p ++ " - Monotype " ++ addQuotes (show m) ++ " has a wrong kind" ++
+    "\nExpected kind: " ++ addQuotes (show expectedKind) ++ "\nActual kind: " ++ addQuotes (show actualKind)
+  show (MonotypeIsNotTypeError p m) = sourcePosPretty p ++ " - Couldn't convert monotype " ++ addQuotes (show m) ++ " to type"
+  show (TypeIsNotMonotypeError p t) = sourcePosPretty p ++ " - Couldn't convert type " ++ addQuotes (show t) ++ " to monotype"
+  show (TypeFormednessPrcFEVError p es) = sourcePosPretty p ++ " - Free existential type variables in type annotation: " ++
+    intercalate ", " (map (addQuotes . show) es)
+  show (TypesNotEquivalentError p t1 t2) = sourcePosPretty p ++ " - Couldn't match expected type " ++ addQuotes (show t2) ++
+    " with actual type " ++ addQuotes (show t1)
+  show (EquationFalseError p m1 m2 k) = sourcePosPretty p ++ " - Monotypes " ++ addQuotes (show m1) ++ " and " ++ addQuotes (show m2) ++
+    " of kind " ++ addQuotes (show k) ++ " are not equal"
+  show (NotSubtypeError p t1 t2) = sourcePosPretty p ++ " - Type " ++ addQuotes (show t1) ++ " is not a subtype of type " ++
+    addQuotes (show t2)
+  show (ProductArityError e t) = sourcePosPretty (getPos e) ++ " - Tuple " ++ addQuotes (show e) ++ " has a different arity than its type " ++
+    addQuotes (show t)
+  show (SpineInferenceError e t) = sourcePosPretty (getPos e) ++ " - Couldn't apply expresion " ++ addQuotes (show e) ++
+    " to an expresion of type " ++ addQuotes (show t)
+  show (TypeInferenceError e)  = sourcePosPretty (getPos e) ++ " - Couldn't infer type of expresion " ++ addQuotes (show e) ++
+    ",\ntry providing a type annotation"
+  show (EquationAlreadyExistsError p u m1 m2) = sourcePosPretty p ++ " - Conflicting equation for " ++ addQuotes (show u) ++
+    " exists in the context (namely: " ++ addQuotes (show u ++ " = " ++ show m1) ++ "),\nwhile trying to add equation " ++
+    addQuotes (show u ++ " = " ++ show m2) ++ " to the context"
+  show (EliminateEquationError p m1 m2 k) = sourcePosPretty p ++ " - Couldn't eliminate equation " ++ addQuotes (show m1 ++ " = " ++ show m2) ++
+    " of kind " ++ addQuotes (show k)
+  show (DuplicateVarsInBranchError b) = sourcePosPretty (getPosFromBranch b) ++ " - Conflicting definitions for variable in branch " ++
+    addQuotes (showBranch b)
+  show (TooLongPatternError p) = sourcePosPretty p ++
+    " - Pattern does not type check, probable cause: some constructors are applied to too many arguments"
+  show (TooShortPatternError p) = sourcePosPretty p ++
+    " - Pattern does not type check, probable cause: some constructors are applied to too few arguments"
+  show (MismatchedProductArityInPatternError ptrn t) = sourcePosPretty (getPosFromPattern ptrn) ++ " - Tuple " ++ addQuotes (show ptrn) ++
+    " has a different arity than its type " ++ addQuotes (show t)
+  show (UndeclaredConstructorInPatternError ptrn name) = sourcePosPretty (getPosFromPattern ptrn) ++
+    " - Data constructor not in scope: " ++ addQuotes name ++ "\nIn the pattern: " ++ show ptrn
+  show (MismatchedConstructorInPatternError ptrn expectedType actualType) = sourcePosPretty (getPosFromPattern ptrn) ++
+    " - Couldn't match expected type " ++ addQuotes expectedType ++ " with actual type " ++
+    addQuotes actualType ++ "\nIn the pattern: " ++ show ptrn
+  show (MismatchedConstructorArityInPatternError ptrn name expectedArity actualArity)
+    | expectedArity == 1 = sourcePosPretty (getPosFromPattern ptrn) ++  " - Expecting " ++ show expectedArity ++ " argument to " ++
+      addQuotes name ++ " but found " ++ show actualArity
+    | otherwise = sourcePosPretty (getPosFromPattern ptrn) ++  " - Expecting " ++ show expectedArity ++ " arguments to " ++
+      addQuotes name ++ " but found " ++ show actualArity
+  show (PatternMatchingTypecheckingError ptrn t) = sourcePosPretty (getPosFromPattern ptrn) ++  " - Couldn't check pattern " ++
+    addQuotes (show ptrn) ++ " against expected type " ++ addQuotes (show t)
+  show (PatternTypeError t ptrn) =  sourcePosPretty (getPosFromPattern ptrn) ++  " - Couldn't check pattern " ++
+    addQuotes (show ptrn) ++ " against expected type " ++ addQuotes t
+  show (NotConstructorOfError ptrn name t) = sourcePosPretty (getPosFromPattern ptrn) ++  " - " ++ addQuotes name ++
+    " is not a constructor of type " ++ addQuotes t ++ "\nIn the pattern: " ++ show ptrn
+  show (PatternMatchingNonExhaustiveError p) = sourcePosPretty p ++ " - Pattern match(es) are non-exhaustive"
 
 data TypecheckerState = TypecheckerState
   {
@@ -86,9 +163,10 @@ generateFreshTypeVarName trace name = do
 
 --exprUtils---------------------------------------------------------------------
 
-exprIsNotACase :: Expr p -> Either (TypeError p) ()
-exprIsNotACase e @ ECase {} = Left $ ExprIsACaseError e
-exprIsNotACase _ = return ()
+exprIsNotACase :: Expr p -> Bool
+exprIsNotACase ECase {} = False
+exprIsNotACase EIf {} = False
+exprIsNotACase _ = True
 
 --polarity utils----------------------------------------------------------------
 
@@ -325,15 +403,15 @@ takeContextToUTypeVar :: UTypeVar -> Context -> p -> Either (TypeError p) Contex
 takeContextToUTypeVar x c p =
   tc c []
   where
-    tc [] _ = Left $ UndeclaredUTypeVarError p x []
+    tc [] _ = Left $ UndeclaredUTypeVarError p x
     tc (entry @ (CTypeVar (U y) _) : cx) a
       | x == y = return $ reverse a
       | otherwise = tc cx (entry : a)
     tc (entry @ (CETypeVar y _ _) : cx) a
-      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x (entry : cx)
+      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x
       | otherwise = tc cx (entry : a)
     tc (entry @ (CTypeVar (E y) _) : cx) a
-      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x (entry : cx)
+      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x
       | otherwise = tc cx (entry : a)
     tc (entry : cx) a = tc cx (entry : a)
 
@@ -591,7 +669,7 @@ expandTuplePatterns n ((PWild p1 : ptrns, e, p2) : bs) =
   ((map (const (PWild p1)) [1..n] ++ ptrns, e, p2) :) <$> expandTuplePatterns n bs
 expandTuplePatterns n ((PVar p1 _ : ptrns, e, p2) : bs) =
   ((map (const (PWild p1)) [1..n] ++ ptrns, e, p2) :) <$> expandTuplePatterns n bs
-expandTuplePatterns n ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError ("Tuple" ++ show n) ptrn
+expandTuplePatterns n ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError ("Tuple of arity:" ++ show n) ptrn
 
 expandVecPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) ([Branch p], [Branch p])
 expandVecPatterns [] = return ([], [])
@@ -625,7 +703,7 @@ expandGADTPatterns typeName ((PConstr p1 constrName args : ptrns, e, p2) : bs) =
   if Map.member constrName bs' then
     return $ Map.adjust ((args ++ ptrns, e, p2) :) constrName bs'
   else
-    lift . Left $ NotConstructorOfError (PConstr p1 constrName args) typeName
+    lift . Left $ NotConstructorOfError (PConstr p1 constrName args) constrName typeName
 expandGADTPatterns typeName ((PWild p1 : ptrns, e, p2) : bs) =
   expandGADTVarPatterns typeName p1 ptrns e p2 bs
 expandGADTPatterns typeName ((PVar p1 _ : ptrns, e, p2) : bs) =
@@ -646,13 +724,13 @@ gadtPatternsGuarded _ [] = return False
 gadtPatternsGuarded typeName ((PConstr p constrName args : _, _, _) : _) = do
   lookupRes <- Map.lookup constrName . view constrContext <$> get
   case lookupRes of
-    Nothing -> lift . Left $ UndeclaredConstructorInPatternError $ PConstr p constrName args
+    Nothing -> lift . Left $ UndeclaredConstructorInPatternError (PConstr p constrName args) constrName
     Just constr
       | constrTypeName constr /= typeName ->
         lift . Left $ MismatchedConstructorInPatternError (PConstr p constrName args) (constrTypeName constr) typeName
       | length (constrArgsTemplates constr) /= length args ->
         lift . Left $ MismatchedConstructorArityInPatternError
-        (PConstr p constrName args)
+        (PConstr p constrName args) constrName
         (length $ constrArgsTemplates constr) (length args)
       | otherwise -> return True
 gadtPatternsGuarded typeName ((PWild _ : _, _, _) : bs) = gadtPatternsGuarded typeName bs

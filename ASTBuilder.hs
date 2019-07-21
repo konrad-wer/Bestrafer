@@ -198,15 +198,15 @@ checkGADTParameterTemplateWellFormedness ::
   -> Either (ASTBuilderError p) ()
 checkGADTParameterTemplateWellFormedness p c g (GADTDefParamType _, ParameterTypeT pt) = checkTypeTemplateWellFormedness p c g pt
 checkGADTParameterTemplateWellFormedness p c g (GADTDefParamMonotype k, ParameterMonotypeT m) =
-  runTypecheckerFun (checkMonotypeHasKind p c m k) g
+  runTypecheckerFun (checkMonotypeHasKind p NoClue c m k) g
 checkGADTParameterTemplateWellFormedness p c g (GADTDefParamType _, ParameterMonotypeT m) =
-  runTypecheckerFun (checkMonotypeHasKind p c m KStar) g
+  runTypecheckerFun (checkMonotypeHasKind p NoClue c m KStar) g
 checkGADTParameterTemplateWellFormedness p _ _ (GADTDefParamMonotype m, ParameterTypeT pt) =
   Left $ TypeParamIsNotMonotypeError p (GADTDefParamMonotype m) (ParameterTypeT pt)
 
 checkPropTemplateWellFormedness :: p -> Context -> GADTDefs -> PropositionTemplate ->  Either (ASTBuilderError p) ()
 checkPropTemplateWellFormedness p c g (MTMono m1, MTMono m2) =
-  runTypecheckerFun (inferMonotypeKind p c m1 >>= checkMonotypeHasKind p c m2) g
+  runTypecheckerFun (inferMonotypeKind p NoClue c m1 >>= checkMonotypeHasKind p NoClue c m2) g
 checkPropTemplateWellFormedness p _ _ _ = Left $ InternalCompilerASTBuilderError p "checkPropTemplateWellFormedness"
 
 checkTypeTemplateWellFormedness :: p -> Context -> GADTDefs -> TypeTemplate -> Either (ASTBuilderError p) ()
@@ -242,7 +242,7 @@ checkTypeTemplateWellFormedness p c _ (TTUVar x) =
   case typeVarContextLookup c $ uTypeVarName x of
     Just (CTypeVar (U _) KStar) -> return ()
     Just (CTypeVar (U _) KNat) -> Left . ConstrFormednessTypeError $ TypeHasWrongKindError p (TUVar x) KStar KNat
-    _ -> Left . ConstrFormednessTypeError $ UndeclaredUTypeVarError p x
+    _ -> Left . ConstrFormednessTypeError $ UndeclaredUTypeVarError p x NoClue
 
 buildFunctions :: [ProgramBlock p] -> Either (ASTBuilderError p) ([Expr p], FunTypeContext)
 buildFunctions programBlocks = do

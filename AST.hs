@@ -261,18 +261,25 @@ instance Show (Pattern p) where
   show (PFloat  _ d) = show d
   show (PChar   _ c) = show c
   show (PString _ s) = show s
-  show (PConstr _ c args) = "(" ++ c ++ (args >>= (", " ++) . show) ++ ")"
+  show (PConstr _ c args) = "(" ++ c ++ (args >>= (" " ++) . show) ++ ")"
 
 showBranch :: Branch p -> String
-showBranch ([], e, _)= "| -> " ++ show e
-showBranch ([p], e, _)= "| " ++ show p ++ " -> " ++ show e
-showBranch (p : ps, e, _)= "| " ++ show p ++ (ps >>= ("; " ++). show) ++ " -> " ++ show e
+showBranch ([], e, _)= "-> " ++ show e
+showBranch ([p], e, _)=  show p ++ " -> " ++ show e
+showBranch (p : ps, e, _) = show p ++ (ps >>= ("; " ++). show) ++ " -> " ++ show e
+
+unmangleTypeVarName :: String -> String
+unmangleTypeVarName = unmangle []
+  where
+    unmangle acc [] = reverse acc
+    unmangle acc ('#' : _) = reverse acc
+    unmangle acc (x : xs) = unmangle (x : acc) xs
 
 instance Show UTypeVar where
-  show (UTypeVar u) = u
+  show (UTypeVar u) = unmangleTypeVarName u
 
 instance Show ETypeVar where
-  show (ETypeVar e) = "(existential variable: " ++ e ++ ")"
+  show (ETypeVar e) = unmangleTypeVarName e ++ "~"
 
 instance Show TypeVar where
   show (U u) = show u

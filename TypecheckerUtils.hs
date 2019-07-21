@@ -12,11 +12,27 @@ import Control.Lens hiding (Context)
 import Control.Monad.State
 import Data.List (intercalate)
 
-data ErrorClue
-  = CheckingTypeWellFormednessClue
-  | KindInferenceClue
-  | EliminatingEquationClue
-  deriving (Show)
+data ErrorClue p
+  = NoClue
+  | CheckBranchClue (Branch p) [Type]
+  | SubtypingClue Type Type
+  | InferSpineClue Type
+  | CheckExprClue (Expr p) Type
+
+instance SourcePos ~ p => Show (ErrorClue p) where
+  show NoClue = ""
+  show (SubtypingClue t1 t2) = "\nWhile trying to subtype: " ++ addQuotes (show t1) ++ " < " ++ addQuotes (show t2) ++
+    case (t1, t2) of
+      (_, TUniversal {}) -> "\nHint: if you are defining a function, try eta-expanding it"
+      (TExistential {}, _) -> "\nHint: try using let to unpack " ++ addQuotes (show t1) ++
+        " before using it in expression of type " ++ addQuotes (show t2)
+      _ -> ""
+  show (CheckExprClue e t) = "\nWhile trying to check expression " ++ addQuotes (show e) ++ " against type " ++ addQuotes (show t)
+  show (CheckBranchClue _ []) = ""
+  show (CheckBranchClue b [t]) = "\nWhile trying to check branch " ++ addQuotes (show b) ++ " against type " ++ addQuotes (show t)
+  show (CheckBranchClue b ts) = "\nWhile trying to check branch " ++ addQuotes (show b) ++
+    " against types" ++ ((" " ++) .  addQuotes . show) ts
+  show (InferSpineClue t)  = "\nWhile trying to check type " ++ addQuotes (show t) ++ " during type-checking application"
 
 data TypeError p
   = UndeclaredVariableError p Var
@@ -29,14 +45,14 @@ data TypeError p
   | ETypeVarTypeMismatchError p ETypeVar Monotype Monotype
   | ETypeVarKindMismatchError p ETypeVar Kind Kind
   | UndeclaredETypeVarError p ETypeVar
-  | UndeclaredUTypeVarError p UTypeVar --ErrorClue --Tu być może więcej info zebrać
+  | UndeclaredUTypeVarError p UTypeVar (ErrorClue p)
   | TypeHasWrongKindError p Type Kind Kind
   | MonotypeHasWrongKindError p Monotype Kind Kind
   | MonotypeIsNotTypeError p Monotype
   | TypeIsNotMonotypeError p Type
   | TypeFormednessPrcFEVError p [ETypeVar]
   | TypesNotEquivalentError p Type Type
-  | EquationFalseError p Monotype Monotype Kind --Tu być może więcej info zebrać
+  | EquationFalseError p Monotype Monotype Kind (ErrorClue p)
   | NotSubtypeError p Type Type
   | ProductArityError (Expr p) Type
   | SpineInferenceError (Expr p) Type
@@ -81,7 +97,7 @@ instance SourcePos ~ p => Show (TypeError p) where
     addQuotes (show a) ++ " has a kind " ++ addQuotes (show k1) ++ ",\nbut tried to unify it with type of kind " ++ addQuotes (show k2)
   show (UndeclaredETypeVarError p e) = sourcePosPretty p ++ " - Existential type variable not in scope: " ++ addQuotes (show e) ++
     ".\nThis is probably an interpreter error. Please contact language creator."
-  show (UndeclaredUTypeVarError p u) = sourcePosPretty p ++ " - Type variable not in scope: " ++ addQuotes (show u)
+  show (UndeclaredUTypeVarError p u clue) = sourcePosPretty p ++ " - Type variable not in scope: " ++ addQuotes (show u) ++ show clue
   show (TypeHasWrongKindError p t expectedKind actualKind) = sourcePosPretty p ++ " - Type " ++ addQuotes (show t) ++ " has a wrong kind" ++
     "\nExpected kind: " ++ addQuotes (show expectedKind) ++ "\nActual kind: " ++ addQuotes (show actualKind)
   show (MonotypeHasWrongKindError p m expectedKind actualKind) = sourcePosPretty p ++ " - Monotype " ++ addQuotes (show m) ++ " has a wrong kind" ++
@@ -92,8 +108,8 @@ instance SourcePos ~ p => Show (TypeError p) where
     intercalate ", " (map (addQuotes . show) es)
   show (TypesNotEquivalentError p t1 t2) = sourcePosPretty p ++ " - Couldn't match expected type " ++ addQuotes (show t2) ++
     " with actual type " ++ addQuotes (show t1)
-  show (EquationFalseError p m1 m2 k) = sourcePosPretty p ++ " - Monotypes " ++ addQuotes (show m1) ++ " and " ++ addQuotes (show m2) ++
-    " of kind " ++ addQuotes (show k) ++ " are not equal"
+  show (EquationFalseError p m1 m2 k clue) = sourcePosPretty p ++ " - Monotypes " ++ addQuotes (show m1) ++ " and " ++ addQuotes (show m2) ++
+    " of kind " ++ addQuotes (show k) ++ " are not equal" ++ show clue
   show (NotSubtypeError p t1 t2) = sourcePosPretty p ++ " - Type " ++ addQuotes (show t1) ++ " is not a subtype of type " ++
     addQuotes (show t2)
   show (ProductArityError e t) = sourcePosPretty (getPos e) ++ " - Tuple " ++ addQuotes (show e) ++ " has a different arity than its type " ++
@@ -169,6 +185,7 @@ generateFreshTypeVarName trace name = do
 exprIsNotACase :: Expr p -> Bool
 exprIsNotACase ECase {} = False
 exprIsNotACase EIf {} = False
+exprIsNotACase ELet {} = False
 exprIsNotACase _ = True
 
 --polarity utils----------------------------------------------------------------
@@ -201,6 +218,8 @@ joinPolarity Neutral Positive = Positive
 joinPolarity Neutral Negative = Negative
 joinPolarity Neutral Neutral = Negative
 
+--Type utils--------------------------------------------------------------------
+
 headedByUniversal :: Type -> Bool
 headedByUniversal TUniversal {} = True
 headedByUniversal _ = False
@@ -212,6 +231,10 @@ headedByExistential _ = False
 headedByAnd :: Type -> Bool
 headedByAnd TAnd {} = True
 headedByAnd _ = False
+
+unpack :: Context -> Type -> (Context, Type)
+unpack c (TExistential u k t) = unpack (CTypeVar (U u) k : c) t
+unpack c t = (c, t)
 
 --TemplateUtils-----------------------------------------------------------------
 
@@ -400,19 +423,19 @@ takeContextToETypeVar x c p =
       | otherwise = tc cx (entry : a)
     tc (entry : cx) a = tc cx (entry : a)
 
-takeContextToUTypeVar :: UTypeVar -> Context -> p -> Either (TypeError p) Context
-takeContextToUTypeVar x c p =
+takeContextToUTypeVar :: UTypeVar -> Context -> p -> ErrorClue p -> Either (TypeError p) Context
+takeContextToUTypeVar x c p clue =
   tc c []
   where
-    tc [] _ = Left $ UndeclaredUTypeVarError p x
+    tc [] _ = Left $ UndeclaredUTypeVarError p x clue
     tc (entry @ (CTypeVar (U y) _) : cx) a
       | x == y = return $ reverse a
       | otherwise = tc cx (entry : a)
     tc (entry @ (CETypeVar y _ _) : cx) a
-      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x
+      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x clue
       | otherwise = tc cx (entry : a)
     tc (entry @ (CTypeVar (E y) _) : cx) a
-      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x
+      | uTypeVarName x == eTypeVarName y = Left $ UndeclaredUTypeVarError p x clue
       | otherwise = tc cx (entry : a)
     tc (entry : cx) a = tc cx (entry : a)
 
@@ -600,6 +623,8 @@ applyContextToProposition p c (m1, m2) = do
   m1' <- applyContextToMonotype p c m1
   m2' <- applyContextToMonotype p c m2
   return (m1', m2')
+
+--Expanding patterns------------------------------------------------------------
 
 expandUnitPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
 expandUnitPatterns [] = return []

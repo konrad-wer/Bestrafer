@@ -12,7 +12,11 @@ import Control.Lens hiding (Context)
 import Control.Monad.State
 import Data.List (intercalate)
 
---data ErrorClue deriving (Show)
+data ErrorClue
+  = CheckingTypeWellFormednessClue
+  | KindInferenceClue
+  | EliminatingEquationClue
+  deriving (Show)
 
 data TypeError p
   = UndeclaredVariableError p Var
@@ -25,7 +29,7 @@ data TypeError p
   | ETypeVarTypeMismatchError p ETypeVar Monotype Monotype
   | ETypeVarKindMismatchError p ETypeVar Kind Kind
   | UndeclaredETypeVarError p ETypeVar
-  | UndeclaredUTypeVarError p UTypeVar --Tu być może więcej info zebrać
+  | UndeclaredUTypeVarError p UTypeVar --ErrorClue --Tu być może więcej info zebrać
   | TypeHasWrongKindError p Type Kind Kind
   | MonotypeHasWrongKindError p Monotype Kind Kind
   | MonotypeIsNotTypeError p Monotype
@@ -50,7 +54,6 @@ data TypeError p
   | PatternTypeError String (Pattern p)
   | NotConstructorOfError (Pattern p) String String
   | PatternMatchingNonExhaustiveError p
---  deriving(Show)
 
 instance SourcePos ~ p => Show (TypeError p) where
   show (UndeclaredVariableError p x) = sourcePosPretty p ++ " - Variable not in scope: " ++ addQuotes x
@@ -59,7 +62,7 @@ instance SourcePos ~ p => Show (TypeError p) where
     "\nIn the expression: " ++ show e
   show (MismatchedGADTArityError p name expectedArity actualArity)
     | expectedArity == 1 = sourcePosPretty p ++ " - Expecting " ++ show expectedArity ++ " argument to " ++
-      addQuotes name ++ "' but found " ++ show actualArity
+      addQuotes name ++ " but found " ++ show actualArity
     | otherwise = sourcePosPretty p ++ " - Expecting " ++ show expectedArity ++ " arguments to " ++
       addQuotes name ++ " but found " ++ show actualArity
   show (MismatchedConstructorError e expectedType actualType) = sourcePosPretty (getPos e) ++
@@ -232,7 +235,6 @@ typeFromTemplate prms p (TTUniversal u k tt)   = TUniversal u k    <$> typeFromT
 typeFromTemplate prms p (TTExistential u k tt) = TExistential u k  <$> typeFromTemplate prms p tt
 typeFromTemplate prms p (TTImp pt tt) = TImp <$> propositionFromTemplate prms p pt <*> typeFromTemplate prms p tt
 typeFromTemplate prms p (TTAnd tt pt) = TAnd <$> typeFromTemplate prms p tt <*> propositionFromTemplate prms p pt
-typeFromTemplate prms p (TTVec n tt) = TVec n <$> typeFromTemplate prms p tt
 typeFromTemplate prms p (TTParam name) =
   case Map.lookup name prms of
     Just (ParameterType t) -> return t
@@ -275,7 +277,6 @@ freeExistentialVariables (TUniversal _ _ t) = freeExistentialVariables t
 freeExistentialVariables (TExistential x _ t) = Set.delete (ETypeVar $ uTypeVarName x) $ freeExistentialVariables t
 freeExistentialVariables (TImp p t) = Set.union (freeExistentialVariablesOfProp p) (freeExistentialVariables t)
 freeExistentialVariables (TAnd t p) = Set.union (freeExistentialVariables t) (freeExistentialVariablesOfProp p)
-freeExistentialVariables (TVec n t) = Set.union (freeExistentialVariablesOfMonotype n) (freeExistentialVariables t)
 
 freeExistentialVariablesOfProp :: Proposition -> Set.Set ETypeVar
 freeExistentialVariablesOfProp (m1, m2) = Set.union (freeExistentialVariablesOfMonotype m1) (freeExistentialVariablesOfMonotype m2)
@@ -445,7 +446,6 @@ substituteUVarInType u x t @ (TExistential a k t1)
   | otherwise = t
 substituteUVarInType u x (TImp p t) = TImp (substituteUVarInProp u x p) (substituteUVarInType u x t)
 substituteUVarInType u x (TAnd t p) = TAnd (substituteUVarInType u x t) (substituteUVarInProp u x p)
-substituteUVarInType u x (TVec n t) = TVec (substituteUVarInMonotype u x n) (substituteUVarInType u x t)
 
 substituteUVarInProp :: UTypeVar -> TypeVar -> Proposition -> Proposition
 substituteUVarInProp u x (m1, m2) = (substituteUVarInMonotype u x m1, substituteUVarInMonotype u x m2)
@@ -498,7 +498,6 @@ substituteUVarInTypeTemplate u x t @ (TTExistential a k t1)
   | otherwise = t
 substituteUVarInTypeTemplate u x (TTImp p t) = TTImp (substituteUVarInPropTemplate u x p) (substituteUVarInTypeTemplate u x t)
 substituteUVarInTypeTemplate u x (TTAnd t p) = TTAnd (substituteUVarInTypeTemplate u x t) (substituteUVarInPropTemplate u x p)
-substituteUVarInTypeTemplate u x (TTVec n t) = TTVec (substituteUVarInMonotype u x n) (substituteUVarInTypeTemplate u x t)
 
 substituteUVarInPropTemplate :: UTypeVar -> TypeVar -> PropositionTemplate -> PropositionTemplate
 substituteUVarInPropTemplate u x (m1, m2) = (substituteUVarInMonotypeTemplate u x m1, substituteUVarInMonotypeTemplate u x m2)
@@ -558,7 +557,6 @@ applyContextToType p c (TAnd t pr) = TAnd <$> applyContextToType p c t <*> apply
 applyContextToType p c (TArrow t1 t2)  = TArrow   <$> applyContextToType p c t1 <*> applyContextToType p c t2
 applyContextToType p c (TGADT n ts)    = TGADT n  <$> mapM (applyContextToGADTParameter p c) ts
 applyContextToType p c (TProduct ts n) = TProduct <$> mapM (applyContextToType p c) ts <*> return n
-applyContextToType p c (TVec n t) = TVec <$> applyContextToMonotype p c n <*> applyContextToType p c t
 applyContextToType p c (TEVar e) =
   case typeVarContextLookup c $ eTypeVarName e of
     Just (CETypeVar _ KStar tau) -> applyContextToMonotype p c tau >>= monotypeToType p
@@ -566,7 +564,7 @@ applyContextToType p c (TEVar e) =
     Just (CETypeVar _ KNat _) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
     Just (CTypeVar (E _) KNat) -> Left $ TypeHasWrongKindError p (TEVar e) KStar KNat
     _ -> Left $ UndeclaredETypeVarError p e
-applyContextToType p c (TUniversal a k t) = TUniversal a k <$> applyContextToType p (CTypeVar (U a) k  : c) t --TODO przemyśleć / zapytać
+applyContextToType p c (TUniversal a k t) = TUniversal a k <$> applyContextToType p (CTypeVar (U a) k  : c) t
 applyContextToType p c (TExistential a k t) = TExistential a k <$> applyContextToType p (CTypeVar (U a) k : c) t
 applyContextToType _ _ TUnit   = return TUnit
 applyContextToType _ _ TBool   = return TBool
@@ -674,8 +672,6 @@ expandTuplePatterns n ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError (
 expandVecPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) ([Branch p], [Branch p])
 expandVecPatterns [] = return ([], [])
 expandVecPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
-expandVecPatterns ((PNil _ : ptrns, e, p) : bs) = cross ((ptrns, e, p) :) id <$> expandVecPatterns bs
-expandVecPatterns ((PCons _ x xs : ptrns, e, p) : bs) = cross id ((x : xs : ptrns, e, p) :) <$> expandVecPatterns bs
 expandVecPatterns ((PWild p1 : ptrns, e, p2) : bs) =
   cross ((ptrns, e, p2) :) ((PWild p1 : PWild p1 : ptrns, e, p2) :) <$> expandVecPatterns bs
 expandVecPatterns ((PVar p1 _ : ptrns, e, p2) : bs) =
@@ -710,15 +706,6 @@ expandGADTPatterns typeName ((PVar p1 _ : ptrns, e, p2) : bs) =
   expandGADTVarPatterns typeName p1 ptrns e p2 bs
 expandGADTPatterns _ ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "GADT" ptrn
 
-vecPatternsGuarded :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) Bool
-vecPatternsGuarded [] = return False
-vecPatternsGuarded ((PNil _ : _, _, _) : _) = return True
-vecPatternsGuarded ((PCons {} : _, _, _) : _) = return True
-vecPatternsGuarded ((PWild _ : _, _, _) : bs) = vecPatternsGuarded bs
-vecPatternsGuarded ((PVar {} : _, _, _) : bs) = vecPatternsGuarded bs
-vecPatternsGuarded (([], _, p) : _) = lift . Left $ TooShortPatternError p
-vecPatternsGuarded ((ptrn : _, _, _) : _) = lift . Left $ PatternTypeError "Vec" ptrn
-
 gadtPatternsGuarded :: String -> [Branch p] -> StateT TypecheckerState (Either (TypeError p)) Bool
 gadtPatternsGuarded _ [] = return False
 gadtPatternsGuarded typeName ((PConstr p constrName args : _, _, _) : _) = do
@@ -727,7 +714,7 @@ gadtPatternsGuarded typeName ((PConstr p constrName args : _, _, _) : _) = do
     Nothing -> lift . Left $ UndeclaredConstructorInPatternError (PConstr p constrName args) constrName
     Just constr
       | constrTypeName constr /= typeName ->
-        lift . Left $ MismatchedConstructorInPatternError (PConstr p constrName args) (constrTypeName constr) typeName
+        lift . Left $ MismatchedConstructorInPatternError (PConstr p constrName args) typeName (constrTypeName constr)
       | length (constrArgsTemplates constr) /= length args ->
         lift . Left $ MismatchedConstructorArityInPatternError
         (PConstr p constrName args) constrName

@@ -27,7 +27,6 @@ data ASTBuilderError p
   | MoreThanOneTypeAnnotationError p Var
   | FunDifferentNumberOfArgsError p Var
   | InternalCompilerASTBuilderError p String
- -- deriving(Show)
 
 instance SourcePos ~ p => Show (ASTBuilderError p) where
   show (ConstrFormednessError (ConstrDef p name _)) = sourcePosPretty p ++ " - Constructor " ++ addQuotes name ++ " is ill-formed"
@@ -99,7 +98,7 @@ vecConstructorsContext = Map.fromList
     [TTParam "`A", TTGADT "Vec" [ParameterMonotypeT . MUVar $ UTypeVar "n", ParameterTypeT $ TTParam "`A"]] $
     TUniversal (UTypeVar "'a") KStar $ TUniversal (UTypeVar "n") KNat $ TArrow (TUVar (UTypeVar "'a"))
     (TArrow (TGADT "Vec" [ParameterMonotype (MUVar $ UTypeVar "n"), ParameterType (TUVar $ UTypeVar "'a")])
-    (TGADT "Vec" [ParameterMonotype (MSucc . MUVar $ UTypeVar "n"), ParameterType (TUVar $ UTypeVar "'a")]) ))
+    (TGADT "Vec" [ParameterMonotype (MSucc . MUVar $ UTypeVar "n"), ParameterType (TUVar $ UTypeVar "'a")])))
   ]
 
 isBlockGADTDef :: ProgramBlock p -> Bool
@@ -232,9 +231,6 @@ checkTypeTemplateWellFormedness p c g (TTImp pr t) = checkPropTemplateWellFormed
 checkTypeTemplateWellFormedness p c g (TTAnd t pr) = checkTypeTemplateWellFormedness p c g t >> checkPropTemplateWellFormedness p c g pr
 checkTypeTemplateWellFormedness p c g (TTUniversal x k t) = checkTypeTemplateWellFormedness p (CTypeVar (U x) k : c) g t
 checkTypeTemplateWellFormedness p c g (TTExistential x k t) = checkTypeTemplateWellFormedness p (CTypeVar (U x) k : c) g t
-checkTypeTemplateWellFormedness p c g (TTVec n t) =
-   runTypecheckerFun (checkMonotypeHasKind p c n KNat) g >>
-  checkTypeTemplateWellFormedness p c g t
 checkTypeTemplateWellFormedness p c _ (TTEVar x) =
   case typeVarContextLookup c $ eTypeVarName x of
     Just (CTypeVar (E _) KStar) -> return ()
@@ -287,7 +283,6 @@ buildFunction (erecs, funCntxt) _ = return (erecs, funCntxt)
 mergeUnOpsWithNumConsts :: Expr p -> Expr p
 mergeUnOpsWithNumConsts (EVar    p x) = EVar p x
 mergeUnOpsWithNumConsts (EUnit   p)   = EUnit p
-mergeUnOpsWithNumConsts (ENil    p)   = ENil p
 mergeUnOpsWithNumConsts (EBool   p b) = EBool p b
 mergeUnOpsWithNumConsts (EInt    p x) = EInt p x
 mergeUnOpsWithNumConsts (EFloat  p x) = EFloat p x
@@ -300,7 +295,6 @@ mergeUnOpsWithNumConsts (EAnnot  p e t)  = EAnnot p (mergeUnOpsWithNumConsts e) 
 mergeUnOpsWithNumConsts (ETuple  p es n) = ETuple p (map mergeUnOpsWithNumConsts es) n
 mergeUnOpsWithNumConsts (EConstr p c es) = EConstr p c (map mergeUnOpsWithNumConsts es)
 mergeUnOpsWithNumConsts (ECase   p e bs) = ECase p (mergeUnOpsWithNumConsts e) bs
-mergeUnOpsWithNumConsts (ECons   p e1 e2) = ECons p (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)
 mergeUnOpsWithNumConsts (EIf     p e1 e2 e3) = EIf p (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2) (mergeUnOpsWithNumConsts e3)
 mergeUnOpsWithNumConsts (ELet    p x e1 e2)  = ELet p x (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)
 mergeUnOpsWithNumConsts (EBinOp  p op e1 e2) = EBinOp p op (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)

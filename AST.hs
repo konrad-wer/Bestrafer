@@ -18,7 +18,6 @@ data UnOp
   | UnOpMinusFloat
   | UnOpNot
 
---TODO Arithm ?
 data Expr p
   = EVar    p Var
   | EUnit   p
@@ -34,8 +33,6 @@ data Expr p
   | ETuple  p [Expr p] Int
   | EConstr p String [Expr p]
   | ECase   p (Expr p) [Branch p]
-  | ENil    p
-  | ECons   p (Expr p) (Expr p)
   | EIf     p (Expr p) (Expr p) (Expr p)
   | ELet    p Var (Expr p) (Expr p)
   | EBinOp  p BinOp (Expr p) (Expr p)
@@ -58,8 +55,6 @@ getPos (EAnnot  p _ _) = p
 getPos (ETuple  p _ _) = p
 getPos (EConstr p _ _) = p
 getPos (ECase   p _ _) = p
-getPos (ENil    p) = p
-getPos (ECons   p _ _) = p
 getPos (EIf     p _ _ _) = p
 getPos (ELet    p _ _ _) = p
 getPos (EBinOp  p _ _ _ ) = p
@@ -70,8 +65,6 @@ type Spine p = [Expr p]
 data Pattern p
   = PVar    p Var
   | PTuple  p [Pattern p] Int
-  | PNil    p
-  | PCons   p (Pattern p) (Pattern p)
   | PWild   p
   | PUnit   p
   | PBool   p Bool
@@ -86,8 +79,6 @@ type Branch p = ([Pattern p], Expr p, p)
 getPosFromPattern :: Pattern p -> p
 getPosFromPattern (PVar    p _)   = p
 getPosFromPattern (PTuple  p _ _) = p
-getPosFromPattern (PNil    p)     = p
-getPosFromPattern (PCons   p _ _) = p
 getPosFromPattern (PWild   p)     = p
 getPosFromPattern (PUnit   p)     = p
 getPosFromPattern (PBool   p _)   = p
@@ -138,7 +129,6 @@ data Type
   | TExistential UTypeVar Kind Type
   | TImp Proposition Type
   | TAnd Type Proposition
-  | TVec Monotype Type
   deriving (Eq)
 
 data TypeTemplate
@@ -157,29 +147,8 @@ data TypeTemplate
   | TTExistential UTypeVar Kind TypeTemplate
   | TTImp PropositionTemplate TypeTemplate
   | TTAnd TypeTemplate PropositionTemplate
-  | TTVec Monotype TypeTemplate
   | TTParam String
   deriving (Eq)
-
-instance Show TypeTemplate where
-  show TTUnit   = "()"
-  show TTBool   = "Bool"
-  show TTInt    = "Int"
-  show TTFloat  = "Float"
-  show TTChar   = "Char"
-  show TTString = "String"
-  show (TTArrow t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
-  show (TTGADT name args) = "(" ++ name ++ (args >>= (' ' :) . show) ++ ")"
-  show (TTProduct [] _) = "()"
-  show (TTProduct (t : ts) _) = "(" ++ show t ++ (ts >>= (", " ++) . show) ++ ")"
-  show (TTUVar u) = show u
-  show (TTEVar e) = show e
-  show (TTUniversal u k t) = "(∀ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
-  show (TTExistential u k t) = "(∃ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
-  show (TTImp prop t) = "(" ++ show prop ++ " => " ++ show t ++  ")"
-  show (TTAnd t prop) = "(" ++ show t ++ " ^ " ++ show prop ++ ")"
-  show TTVec {}  = "asdasd"
-  show (TTParam name) = name
 
 type Proposition = (Monotype, Monotype)
 
@@ -276,8 +245,6 @@ instance Show (Expr p) where
   show (ETuple  _ (e : es) _) = "(" ++ show e ++ (es >>= (", " ++) . show) ++ ")"
   show (EConstr _ c args) = "(" ++ c ++ (args >>= (' ' :) . show) ++ ")"
   show (ECase   _ e bs) = "(case " ++ show e ++ " of " ++ (bs >>= showBranch) ++ ")"
-  show (ENil    _) = "[]"
-  show (ECons   _ e1 e2) = "(" ++ show e1 ++ " : " ++ show e2 ++ ")"
   show (EIf     _ e1 e2 e3) = "(if " ++ show e1 ++ " then " ++ show e2 ++ " else " ++ show e3 ++ ")"
   show (ELet    _ x e1 e2) = "(let " ++ x ++ " = " ++ show e1 ++ " = " ++ show e2 ++ ")"
   show (EBinOp  _ op e1 e2) = "(" ++ show e1 ++ " " ++ show op ++ " " ++ show e2 ++ ")"
@@ -287,8 +254,6 @@ instance Show (Pattern p) where
   show (PVar    _ x) = x
   show (PTuple  _ [] _) = "()"
   show (PTuple  _ (p : ps) _) = "(" ++ show p ++ (ps >>= (", " ++) . show) ++ ")"
-  show (PNil    _) = "[]"
-  show (PCons   _ p1 p2) = "(" ++ show p1 ++ " : " ++ show p2 ++ ")"
   show (PWild   _) = "_"
   show (PUnit   _) = "()"
   show (PBool   _ b) = show b
@@ -338,7 +303,6 @@ instance Show Type where
   show (TExistential u k t) = "(∃ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
   show (TImp prop t) = "(" ++ show prop ++ " => " ++ show t ++  ")"
   show (TAnd t prop) = "(" ++ show t ++ " ^ " ++ show prop ++ ")"
-  show TVec {}  = "asdasd"
 
 showProp :: Proposition -> String
 showProp (m1, m2) = show m1 ++ " = " ++ show m2
@@ -363,3 +327,22 @@ instance Show Monotype where
       tryGetInt (MSucc m) = (1 +) <$> tryGetInt m
       tryGetInt MZero = return 0
       tryGetInt _ = Nothing
+
+instance Show TypeTemplate where
+  show TTUnit   = "()"
+  show TTBool   = "Bool"
+  show TTInt    = "Int"
+  show TTFloat  = "Float"
+  show TTChar   = "Char"
+  show TTString = "String"
+  show (TTArrow t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
+  show (TTGADT name args) = "(" ++ name ++ (args >>= (' ' :) . show) ++ ")"
+  show (TTProduct [] _) = "()"
+  show (TTProduct (t : ts) _) = "(" ++ show t ++ (ts >>= (", " ++) . show) ++ ")"
+  show (TTUVar u) = show u
+  show (TTEVar e) = show e
+  show (TTUniversal u k t) = "(∀ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
+  show (TTExistential u k t) = "(∃ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
+  show (TTImp prop t) = "(" ++ show prop ++ " => " ++ show t ++  ")"
+  show (TTAnd t prop) = "(" ++ show t ++ " ^ " ++ show prop ++ ")"
+  show (TTParam name) = name

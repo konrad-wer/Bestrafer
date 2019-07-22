@@ -820,7 +820,7 @@ checkConstrCoverage p c params ts pr (constrName, bs) = do
       let c2 = zipWith CTypeVar uvars (map snd $ constrUVars constr) ++ c
       case pr of
         NotPrincipal -> checkCoverage p c2 bs (args ++ ts) pr
-        Principal -> checkCoverageAssumingProps p c2 props bs(args ++ ts) pr
+        Principal -> checkCoverageAssumingProps p c2 props bs (args ++ ts) pr
 
 checkCoverageAssumingProps ::
    p -> Context -> [Proposition] -> [Branch p] -> [Type] -> Principality

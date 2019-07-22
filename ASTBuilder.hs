@@ -29,25 +29,25 @@ data ASTBuilderError p
   | InternalCompilerASTBuilderError p String
 
 instance SourcePos ~ p => Show (ASTBuilderError p) where
-  show (ConstrFormednessError (ConstrDef p name _)) = sourcePosPretty p ++ " - Constructor " ++ addQuotes name ++ " is ill-formed"
-  show (WrongConstrResultTypeError (ConstrDef p name _)) = sourcePosPretty p ++ " - Constructor " ++ addQuotes name ++ " has a wrong result type"
-  show (WrongConstrResultTypeParamsNumberError (ConstrDef p name _)) = sourcePosPretty p ++ " - Result type of constructor "
+  show (ConstrFormednessError (ConstrDef p name _)) = sourcePosPretty p ++ "\nConstructor " ++ addQuotes name ++ " is ill-formed"
+  show (WrongConstrResultTypeError (ConstrDef p name _)) = sourcePosPretty p ++ "\nConstructor " ++ addQuotes name ++ " has a wrong result type"
+  show (WrongConstrResultTypeParamsNumberError (ConstrDef p name _)) = sourcePosPretty p ++ "\nResult type of constructor "
     ++ addQuotes name ++ " has a wrong number of parameters"
-  show (WrongConstrResultTypeParameter (ConstrDef p name _) pname) = sourcePosPretty p ++ " - Paramter " ++ addQuotes pname ++
+  show (WrongConstrResultTypeParameter (ConstrDef p name _) pname) = sourcePosPretty p ++ "\nParamter " ++ addQuotes pname ++
     " has a wrong position in the result type of constructor " ++ addQuotes name
-  show (GADTDuplicateParamError p typeName params) = sourcePosPretty p ++ " - Type " ++ addQuotes (typeName ++ " " ++ unwords params) ++
+  show (GADTDuplicateParamError p typeName params) = sourcePosPretty p ++ "\nType " ++ addQuotes (typeName ++ " " ++ unwords params) ++
     " has a duplicate parameter"
   show (MoreThanOneGADTDefinition typeName) = "Multiple declarations of type " ++ addQuotes typeName
   show (ConstrFormednessTypeError err) = show err
-  show (TypeParamIsNotMonotypeError p defParam param) = sourcePosPretty p ++ " - Couldn't convert type " ++  addQuotes (show param) ++
+  show (TypeParamIsNotMonotypeError p defParam param) = sourcePosPretty p ++ "\nCouldn't convert type " ++  addQuotes (show param) ++
     " to monotype, while trying to match it with " ++ addQuotes (show defParam) ++ " parameter"
-  show (FunctionLacksAnnotationError p name) = sourcePosPretty p ++ " - Top-level binding with no type signature: " ++ addQuotes name
-  show (FunctionLacksImplementationError p name) = sourcePosPretty p ++ " - The type signature for " ++ addQuotes name ++
+  show (FunctionLacksAnnotationError p name) = sourcePosPretty p ++ "\nTop-level binding with no type signature: " ++ addQuotes name
+  show (FunctionLacksImplementationError p name) = sourcePosPretty p ++ "\nThe type signature for " ++ addQuotes name ++
     " lacks an accompanying binding"
-  show (MoreThanOneTypeAnnotationError p name) = sourcePosPretty p ++ " - Duplicate type signatures for " ++ addQuotes name
-  show (FunDifferentNumberOfArgsError p name) = sourcePosPretty p ++  " - Equations for " ++ addQuotes name ++
+  show (MoreThanOneTypeAnnotationError p name) = sourcePosPretty p ++ "\nDuplicate type signatures for " ++ addQuotes name
+  show (FunDifferentNumberOfArgsError p name) = sourcePosPretty p ++  "\nEquations for " ++ addQuotes name ++
     " have different numbers of arguments"
-  show (InternalCompilerASTBuilderError p trace) = sourcePosPretty p ++ " - Internal interpreter error while typechecking " ++
+  show (InternalCompilerASTBuilderError p trace) = sourcePosPretty p ++ "\nInternal interpreter error while typechecking " ++
     addQuotes trace ++ ".\nThat should not have happened. Please contact language creator."
 
 operatorsTypeContext :: FunTypeContext

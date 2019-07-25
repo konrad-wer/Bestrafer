@@ -6,6 +6,7 @@ import System.Environment
 import Typechecker
 import TypecheckerUtils
 import CommonUtils
+import Eval
 import Control.Monad (void)
 import Control.Monad.State
 
@@ -27,5 +28,7 @@ main = do
           Right (prog, cContext, gDefs, fContext) ->
             let startState = TypecheckerState { _freshVarNum = 0, _constrContext = cContext, _gadtDefs = gDefs, _funContext = fContext } in
             case iterM (void . flip evalStateT startState . inferExpr []) prog of
-              Right () -> putStrLn "Deine Größe macht mich klein\nDu darfst mein Bestrafer sein"
+              Right () -> do
+                          res <- eval prog cContext
+                          print res
               Left err -> print  err-- print err

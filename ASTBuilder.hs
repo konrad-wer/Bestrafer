@@ -86,6 +86,25 @@ operatorsTypeContext = Map.fromList
     TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b")) (TUVar $ UTypeVar "b"))
   ]
 
+ioFunctions :: FunTypeContext
+ioFunctions = Map.fromList
+  [
+    ("readFile", TArrow TString TString),
+    ("writeFile", TArrow TString (TArrow TString TUnit)),
+    ("appendFile", TArrow TString (TArrow TString TUnit)),
+    ("putChar", TArrow TChar TUnit),
+    ("putStr", TArrow TString TUnit),
+    ("putStrLn", TArrow TString TUnit),
+    ("printBool", TArrow TBool TUnit),
+    ("printInt", TArrow TInt TUnit),
+    ("printFloat", TArrow TFloat TUnit),
+    ("getChar", TArrow TUnit TChar),
+    ("getLine", TArrow TUnit TString),
+    ("readLnBool", TArrow TUnit TBool),
+    ("readLnInt", TArrow TUnit TInt),
+    ("readLnFloat", TArrow TUnit TFloat)
+  ]
+
 vecGADTDef :: (String, [GADTDefParameter])
 vecGADTDef = ("Vec", [GADTDefParamMonotype KNat, GADTDefParamType "`A"])
 
@@ -248,7 +267,7 @@ buildFunctions :: [ProgramBlock p] -> Either (ASTBuilderError p) ([Expr p], FunT
 buildFunctions programBlocks = do
   let names = getNames programBlocks Set.empty
   let defs = groupDefinitions programBlocks $ Map.fromSet (const ([], [])) names
-  foldM buildFunction ([], operatorsTypeContext) defs
+  cross reverse id <$> foldM buildFunction ([], Map.union ioFunctions operatorsTypeContext) (orderDefs defs programBlocks [])
   where
     getNames [] acc = acc
     getNames (FunTypeAnnot _ name _ : blocks) acc = getNames blocks $ Set.insert name acc
@@ -260,6 +279,10 @@ buildFunctions programBlocks = do
     groupDefinitions (def @ (FunDefCase _ name _ _) : defs) acc =
       groupDefinitions defs (Map.update (return . cross id (def :)) name acc)
     groupDefinitions (GADTDef {} : defs) acc = groupDefinitions defs acc
+    orderDefs _ [] acc = reverse acc
+    orderDefs defs (FunTypeAnnot _ name _ : blocks) acc = orderDefs defs blocks (defs Map.! name : acc)
+    orderDefs defs (FunDefCase {} : blocks) acc = orderDefs defs blocks acc
+    orderDefs defs (GADTDef {} : blocks) acc = orderDefs defs blocks acc
 
 buildFunction :: ([Expr p], FunTypeContext) -> ([ProgramBlock p], [ProgramBlock p]) -> Either (ASTBuilderError p) ([Expr p], FunTypeContext)
 buildFunction (_, _) ([], FunDefCase p name _ _ : _) = Left $ FunctionLacksAnnotationError p name

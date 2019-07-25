@@ -683,6 +683,19 @@ inferExpr c (EConstr p constrName es) = do
 inferExpr c (ESpine _ e s) = do
   (t, pr, c2) <- inferExpr c e
   inferSpineRecoverPrnc c2 s t pr
+inferExpr c (EBinOp p (BinOp opr) e1 e2) =
+  inferExpr c (ESpine p (EVar p opr) [e1, e2])
+inferExpr c (EUnOp p UnOpPlus e) =
+  inferExpr c (ESpine p (EVar p "+u") [e])
+inferExpr c (EUnOp p UnOpMinus e) =
+  inferExpr c (ESpine p (EVar p "-u") [e])
+inferExpr c (EUnOp p UnOpPlusFloat e) =
+  inferExpr c (ESpine p (EVar p "+.u") [e])
+inferExpr c (EUnOp p UnOpMinusFloat e) =
+  inferExpr c (ESpine p (EVar p "-.u") [e])
+inferExpr c (EUnOp p UnOpNot e) =
+  inferExpr c (ESpine p (EVar p "!u") [e])
+
 inferExpr _ e = lift . Left $ TypeInferenceError e
 
 checkBranches ::

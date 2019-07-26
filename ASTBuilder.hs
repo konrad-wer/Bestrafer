@@ -281,7 +281,10 @@ buildFunctions programBlocks = do
     groupDefinitions (GADTDef {} : defs) acc = groupDefinitions defs acc
     orderDefs _ [] acc = reverse acc
     orderDefs defs (FunTypeAnnot _ name _ : blocks) acc = orderDefs defs blocks (defs Map.! name : acc)
-    orderDefs defs (FunDefCase {} : blocks) acc = orderDefs defs blocks acc
+    orderDefs defs (FunDefCase _ name _ _ : blocks) acc =
+      case defs Map.! name of
+        ([], _) -> orderDefs defs blocks (defs Map.! name : acc)
+        _ -> orderDefs defs blocks acc
     orderDefs defs (GADTDef {} : blocks) acc = orderDefs defs blocks acc
 
 buildFunction :: ([Expr p], FunTypeContext) -> ([ProgramBlock p], [ProgramBlock p]) -> Either (ASTBuilderError p) ([Expr p], FunTypeContext)

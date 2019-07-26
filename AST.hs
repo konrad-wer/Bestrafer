@@ -1,6 +1,5 @@
 module AST where
 
-import Data.Int
 import Data.Maybe
 import Control.Monad
 import qualified Data.Map as Map
@@ -22,7 +21,7 @@ data Expr p
   = EVar    p Var
   | EUnit   p
   | EBool   p Bool
-  | EInt    p Int64
+  | EInt    p Integer
   | EFloat  p Double
   | EChar   p Char
   | EString p String
@@ -68,7 +67,7 @@ data Pattern p
   | PWild   p
   | PUnit   p
   | PBool   p Bool
-  | PInt    p Int64
+  | PInt    p Integer
   | PFloat  p Double
   | PChar   p Char
   | PString p String

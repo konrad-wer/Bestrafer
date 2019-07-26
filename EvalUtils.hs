@@ -3,7 +3,6 @@
 module EvalUtils where
 
 import AST
-import Data.Int
 import Control.Monad.State
 import Data.List (intercalate)
 import qualified Data.Map as Map
@@ -12,7 +11,7 @@ import Control.Lens hiding (Context)
 data Value
   = UnitValue
   | BoolValue Bool
-  | IntValue Int64
+  | IntValue Integer
   | FloatValue Double
   | CharValue Char
   | StringValue String

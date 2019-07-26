@@ -77,7 +77,7 @@ operatorsTypeContext = Map.fromList
     (">",  TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
     ("++", TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "n1") KNat . TUniversal (UTypeVar "n2") KNat $
     TArrow (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n1", ParameterType $ TUVar $ UTypeVar "a"]) $ TArrow
-    (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n1", ParameterType $ TUVar $ UTypeVar "a"])
+    (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n2", ParameterType $ TUVar $ UTypeVar "a"])
     (TExistential (UTypeVar "m") KNat $ TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "m", ParameterType $ TUVar $ UTypeVar "a"])),
     (".", TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TUniversal (UTypeVar "c") KStar $
     TArrow (TArrow (TUVar $ UTypeVar "b") (TUVar $ UTypeVar "c")) $ TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b"))

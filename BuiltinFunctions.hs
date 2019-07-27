@@ -4,6 +4,7 @@ import AST
 import EvalUtils
 import Control.Monad
 import Control.Monad.State
+import Control.Exception
 
 unPlusInt :: Value
 unPlusInt = FunValue return
@@ -30,10 +31,18 @@ multInt :: Value
 multInt = FunValue (\(IntValue x) -> return (FunValue (\(IntValue y) -> return $ IntValue (x * y))))
 
 divInt :: Value
-divInt = FunValue (\(IntValue x) -> return (FunValue (\(IntValue y) -> return $ IntValue (x `div` y))))
+divInt = FunValue (\(IntValue x) -> return (FunValue (\(IntValue y) ->
+  if y /= 0 then
+    return $ IntValue (x `div` y)
+  else
+    liftIO $ throw DivideByZero)))
 
 modInt :: Value
-modInt = FunValue (\(IntValue x) -> return (FunValue (\(IntValue y) -> return $ IntValue (x `mod` y))))
+modInt = FunValue (\(IntValue x) -> return (FunValue (\(IntValue y) ->
+  if y /= 0 then
+    return $ IntValue (x `mod` y)
+    else
+      liftIO $ throw DivideByZero)))
 
 addFloat :: Value
 addFloat = FunValue (\(FloatValue x) -> return (FunValue (\(FloatValue y) -> return $ FloatValue (x + y))))

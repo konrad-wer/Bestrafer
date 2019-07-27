@@ -7,6 +7,14 @@ import Data.Maybe (fromJust)
 import Control.Monad.State
 import qualified Data.Map as Map
 import Control.Lens hiding (Context, op)
+import Control.Exception
+
+catchStateT :: Exception e => StateT EvalState IO a -> (e -> StateT EvalState IO a) ->  StateT EvalState IO a
+catchStateT comp handler = do
+  s1 <- get
+  (res, s2) <- liftIO $ runStateT comp s1 `catch` \e -> runStateT (handler e) s1
+  put s2
+  return res
 
 valueOfGlobalContextEntry :: GlobalContextEntry -> StateT EvalState IO Value
 valueOfGlobalContextEntry (Evaluated v) = return v
@@ -30,7 +38,7 @@ evalExpr c (EVar _ x) = do
 evalExpr _ (ERec _ f e) = do
   gc <- view globalContext <$> get
   case gc Map.! f of
-    InProgres -> error "Trying to read non-evaluated value"
+    InProgres -> return UnitValue
     Evaluated x -> return x
     NotEvaluated _ -> do
       modify $ over globalContext (Map.insert f InProgres)

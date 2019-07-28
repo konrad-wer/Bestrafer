@@ -324,6 +324,7 @@ mergeUnOpsWithNumConsts (ECase   p e bs) = ECase p (mergeUnOpsWithNumConsts e) b
 mergeUnOpsWithNumConsts (ETry    p e cs) = ETry p (mergeUnOpsWithNumConsts e) (map (cross id mergeUnOpsWithNumConsts) cs)
 mergeUnOpsWithNumConsts (EIf     p e1 e2 e3) = EIf p (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2) (mergeUnOpsWithNumConsts e3)
 mergeUnOpsWithNumConsts (ELet    p x e1 e2)  = ELet p x (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)
+mergeUnOpsWithNumConsts (ERec    p t f e1 e2) = ERec p t f (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)
 mergeUnOpsWithNumConsts (EBinOp  p op e1 e2) = EBinOp p op (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)
 mergeUnOpsWithNumConsts (EUnOp   p UnOpPlus (EInt _ x))         = EInt p x
 mergeUnOpsWithNumConsts (EUnOp   p UnOpPlus (EFloat _ x))       = EFloat p x

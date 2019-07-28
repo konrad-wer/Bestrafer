@@ -182,6 +182,18 @@ generateFreshTypeVarName trace name = do
   modify $ over freshVarNum (+ 1)
   return a
 
+argsAndPropsFromConstrTemplate
+ :: p -> [GADTParameter] -> [TypeVar] -> Constructor
+ -> StateT TypecheckerState (Either (TypeError p)) ([Type], [Proposition])
+argsAndPropsFromConstrTemplate p params vars constr = do
+  let paramsMap = Map.fromList (zip (constrTypeParmsTemplate constr) params)
+  let uvarsToFreshUvars = zip (map fst (constrUVars constr)) vars
+  let tArgs = map (flip (foldl (flip $ uncurry substituteUVarInTypeTemplate)) uvarsToFreshUvars) $ constrArgsTemplates constr
+  let tProps = map (flip (foldl (flip $ uncurry substituteUVarInPropTemplate)) uvarsToFreshUvars) $ constrProps constr
+  args <- lift $ mapM (typeFromTemplate paramsMap p) tArgs
+  props <- lift $ mapM (propositionFromTemplate paramsMap p) tProps
+  return (args, props)
+
 --exprUtils---------------------------------------------------------------------
 
 exprIsNotACase :: Expr p -> Bool

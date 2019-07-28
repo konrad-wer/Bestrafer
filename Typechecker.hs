@@ -652,12 +652,7 @@ checkExpr context expression checkedType principality = do
             lift . Left $ MismatchedConstructorArityError (EConstr p constrName es) constrName (length $ constrArgsTemplates constr) (length es)
           | otherwise -> do
             evars <- generateFreshTypeVars (E . ETypeVar) "checkExpr" (map (uTypeVarName . fst) (constrUVars constr))
-            let tsMap = Map.fromList (zip (constrTypeParmsTemplate constr) ts)
-            let uvarsToFreshEvars = zip (map fst (constrUVars constr)) evars
-            let tArgs = map (flip (foldl (flip $ uncurry substituteUVarInTypeTemplate)) uvarsToFreshEvars) $ constrArgsTemplates constr
-            let tProps = map (flip (foldl (flip $ uncurry substituteUVarInPropTemplate)) uvarsToFreshEvars) $ constrProps constr
-            args <- lift $ mapM (typeFromTemplate tsMap p) tArgs
-            props <- lift $ mapM (propositionFromTemplate tsMap p) tProps
+            (args, props) <- argsAndPropsFromConstrTemplate p ts evars constr
             let c2 = zipWith CTypeVar evars (map snd $ constrUVars constr) ++ CMarker : c
             c3 <- foldM auxProp c2 props
             dropContextToMarker <$> foldM auxType c3 (zip es args)
@@ -762,12 +757,7 @@ checkBranch c (PConstr p1 constrName pargs : ptrns, e, p2) (TGADT typeName param
         (length $ constrArgsTemplates constr) (length pargs)
       | otherwise -> do
         uvars <- generateFreshTypeVars (U . UTypeVar) "checkBranch" (map (uTypeVarName . fst) (constrUVars constr))
-        let paramsMap = Map.fromList (zip (constrTypeParmsTemplate constr) params)
-        let uvarsToFreshUvars = zip (map fst (constrUVars constr)) uvars
-        let tArgs = map (flip (foldl (flip $ uncurry substituteUVarInTypeTemplate)) uvarsToFreshUvars) $ constrArgsTemplates constr
-        let tProps = map (flip (foldl (flip $ uncurry substituteUVarInPropTemplate)) uvarsToFreshUvars) $ constrProps constr
-        args <- lift $ mapM (typeFromTemplate paramsMap p1) tArgs
-        props <- lift $ mapM (propositionFromTemplate paramsMap p1) tProps
+        (args, props) <- argsAndPropsFromConstrTemplate p1 params uvars constr
         let c2 = zipWith CTypeVar uvars (map snd $ constrUVars constr) ++ CMarker : c
         case pr1 of
           NotPrincipal -> dropContextToMarker <$> checkBranch c2 (pargs ++ ptrns, e, p2) (args ++ ts) pr1 te pr2
@@ -842,12 +832,7 @@ checkConstrCoverage p c params ts pr (constrName, bs) = do
     Nothing -> lift . Left $ InternalCompilerTypeError p "checkConstrCoverage"
     Just constr -> do
       uvars <- generateFreshTypeVars (U . UTypeVar) "checkConstrCoverage" (map (uTypeVarName . fst) (constrUVars constr))
-      let paramsMap = Map.fromList (zip (constrTypeParmsTemplate constr) params)
-      let uvarsToFreshUvars = zip (map fst (constrUVars constr)) uvars
-      let tArgs = map (flip (foldl (flip $ uncurry substituteUVarInTypeTemplate)) uvarsToFreshUvars) $ constrArgsTemplates constr
-      let tProps = map (flip (foldl (flip $ uncurry substituteUVarInPropTemplate)) uvarsToFreshUvars) $ constrProps constr
-      args <- lift $ mapM (typeFromTemplate paramsMap p) tArgs
-      props <- lift $ mapM (propositionFromTemplate paramsMap p) tProps
+      (args, props) <- argsAndPropsFromConstrTemplate p params uvars constr
       let c2 = zipWith CTypeVar uvars (map snd $ constrUVars constr) ++ c
       case pr of
         NotPrincipal -> checkCoverage p c2 bs (args ++ ts) pr

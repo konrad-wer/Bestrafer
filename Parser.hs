@@ -65,6 +65,9 @@ parens = between (symbol "(") (symbol ")")
 brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")
 
+braces :: Parser a -> Parser a
+braces = between (symbol "{") (symbol "}")
+
 rword :: String -> Parser ()
 rword w = (lexeme . try) (string w *> notFollowedBy alphaNumChar)
 
@@ -299,6 +302,12 @@ consParser = do
   (lexeme . try) (char ':' *> notFollowedBy (char ':'))
   return $ (.)(.)(.) (EConstr pos ":") (curry (uncurry (++) . cross return return))
 
+consListParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
+consListParser = do
+  pos <- getSourcePos
+  void $ symbol ";"
+  return $ (.)(.)(.) (EConstr pos ";") (curry (uncurry (++) . cross return return))
+
 plusParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
 plusParser = do
   pos <- getSourcePos
@@ -330,7 +339,10 @@ operators =
     InfixL plusParser,
     InfixL (binOpParser "-")],
    [InfixR consParser,
-    InfixR (binOpParser "++")],
+    InfixR consListParser,
+    InfixR (binOpParser "++"),
+    InfixR (binOpParser "@"),
+    InfixR (binOpParser "^")],
    [InfixN (binOpParser "=="),
     InfixN (binOpParser "!="),
     InfixN (binOpParser "<="),
@@ -394,6 +406,7 @@ eSimple =
   EConstr <$> getSourcePos <*> upperIdentifier <*> pure [] <|>
   try eTuple <|>
   eVec <|>
+  eList <|>
   eAnnot
 
 eTuple :: Parser (Expr SourcePos)
@@ -480,6 +493,12 @@ eVec = do
   es <- brackets (sepBy expr comma)
   return $ foldr ((.)(.)(.) (EConstr pos ":") (curry (uncurry (++) . cross return return))) (EConstr pos "[]" []) es
 
+eList :: Parser (Expr SourcePos)
+eList = do
+  pos <- getSourcePos
+  es <- braces (sepBy expr comma)
+  return $ foldr ((.)(.)(.) (EConstr pos ";") (curry (uncurry (++) . cross return return))) (EConstr pos "{}" []) es
+
 eLet :: Parser (Expr SourcePos)
 eLet = do
   pos <- getSourcePos
@@ -500,8 +519,14 @@ consPtrnParser = do
   void $ symbol ":"
   return $ (.)(.)(.) (PConstr pos ":") (curry (uncurry (++) . cross return return))
 
+consListPtrnParser :: Parser (Pattern SourcePos -> Pattern SourcePos -> Pattern SourcePos)
+consListPtrnParser = do
+  pos <- getSourcePos
+  void $ symbol ";"
+  return $ (.)(.)(.) (PConstr pos ";") (curry (uncurry (++) . cross return return))
+
 patternParser :: Parser (Pattern SourcePos)
-patternParser = makeExprParser pTerm [[InfixR consPtrnParser]]
+patternParser = makeExprParser pTerm [[InfixR consPtrnParser, InfixR consListPtrnParser]]
 
 pTerm :: Parser (Pattern SourcePos)
 pTerm =
@@ -528,7 +553,8 @@ pSimple =
   PVar    <$> getSourcePos <*> identifier <|>
   PConstr <$> getSourcePos <*> upperIdentifier <*> pure [] <|>
   pTuple <|>
-  pVec
+  pVec <|>
+  pList
 
 pTuple :: Parser (Pattern SourcePos)
 pTuple = parens (do
@@ -543,6 +569,12 @@ pVec = do
   pos <- getSourcePos
   es <- brackets (sepBy patternParser comma)
   return $ foldr ((.)(.)(.) (PConstr pos ":") (curry (uncurry (++) . cross return return))) (PConstr pos "[]" []) es
+
+pList :: Parser (Pattern SourcePos)
+pList = do
+  pos <- getSourcePos
+  es <- braces (sepBy patternParser comma)
+  return $ foldr ((.)(.)(.) (PConstr pos ";") (curry (uncurry (++) . cross return return))) (PConstr pos "{}" []) es
 
 functionName :: Parser (SourcePos, String)
 functionName = (,) <$> getSourcePos <*> (rword "def" >> identifier)

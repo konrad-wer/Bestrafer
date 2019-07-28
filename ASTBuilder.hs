@@ -69,12 +69,15 @@ operatorsTypeContext = Map.fromList
     ("/.", TArrow TFloat $ TArrow TFloat TFloat),
     ("&&", TArrow TBool $ TArrow TBool TBool),
     ("||", TArrow TBool $ TArrow TBool TBool),
+    ("^",  TArrow TString $ TArrow TString TString),
     ("==", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
     ("!=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
     ("<=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
     (">=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
     ("<",  TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
     (">",  TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
+    ("@", TUniversal (UTypeVar "a") KStar $ TArrow (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"]) $ TArrow
+    (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"]) (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"])),
     ("++", TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "n1") KNat . TUniversal (UTypeVar "n2") KNat $
     TArrow (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n1", ParameterType $ TUVar $ UTypeVar "a"]) $ TArrow
     (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n2", ParameterType $ TUVar $ UTypeVar "a"])
@@ -105,11 +108,11 @@ ioFunctions = Map.fromList
     ("readLnFloat", TArrow TUnit TFloat)
   ]
 
-vecGADTDef :: (String, [GADTDefParameter])
-vecGADTDef = ("Vec", [GADTDefParamMonotype KNat, GADTDefParamType "`A"])
+vecAndListGADTDef :: [(String, [GADTDefParameter])]
+vecAndListGADTDef = [("Vec", [GADTDefParamMonotype KNat, GADTDefParamType "`A"]), ("List", [GADTDefParamType "`A"])]
 
-vecConstructorsContext :: ConstructorsContext
-vecConstructorsContext = Map.fromList
+vecAndListConstructorsContext :: ConstructorsContext
+vecAndListConstructorsContext = Map.fromList
   [
     ("[]", Constructor "Vec" ["`#0", "`A"] [] [(MTParam "`#0", MTMono MZero)] [] $
      TUniversal (UTypeVar "'a") KStar (TGADT "Vec" [ParameterMonotype MZero, ParameterType $ TUVar $ UTypeVar "'a"])),
@@ -117,7 +120,14 @@ vecConstructorsContext = Map.fromList
     [TTParam "`A", TTGADT "Vec" [ParameterMonotypeT . MUVar $ UTypeVar "n", ParameterTypeT $ TTParam "`A"]] $
     TUniversal (UTypeVar "'a") KStar $ TUniversal (UTypeVar "n") KNat $ TArrow (TUVar (UTypeVar "'a"))
     (TArrow (TGADT "Vec" [ParameterMonotype (MUVar $ UTypeVar "n"), ParameterType (TUVar $ UTypeVar "'a")])
-    (TGADT "Vec" [ParameterMonotype (MSucc . MUVar $ UTypeVar "n"), ParameterType (TUVar $ UTypeVar "'a")])))
+    (TGADT "Vec" [ParameterMonotype (MSucc . MUVar $ UTypeVar "n"), ParameterType (TUVar $ UTypeVar "'a")]))),
+    ("{}", Constructor "List" ["`A"] [] [] [] $
+     TUniversal (UTypeVar "'a") KStar (TGADT "List" [ParameterType $ TUVar $ UTypeVar "'a"])),
+    (";", Constructor "List" ["`A"] [] []
+    [TTParam "`A", TTGADT "List" [ParameterTypeT $ TTParam "`A"]] $
+    TUniversal (UTypeVar "'a") KStar $ TArrow (TUVar (UTypeVar "'a"))
+    (TArrow (TGADT "List" [ParameterType (TUVar $ UTypeVar "'a")])
+    (TGADT "List" [ParameterType (TUVar $ UTypeVar "'a")])))
   ]
 
 isBlockGADTDef :: ProgramBlock p -> Bool
@@ -135,8 +145,8 @@ buildGADTContexts blocks = do
     let duplicateName = fst . head . filter ((> 1) . snd) . Map.toList $ countedNames in
     Left $ MoreThanOneGADTDefinition duplicateName
   else do
-    let gDefs = Map.fromList $ vecGADTDef : gDefsList
-    contstrContext <- foldM (buildGADTDef gDefs) vecConstructorsContext gadtDefBlocks
+    let gDefs = Map.fromList $ vecAndListGADTDef ++ gDefsList
+    contstrContext <- foldM (buildGADTDef gDefs) vecAndListConstructorsContext gadtDefBlocks
     return (contstrContext, gDefs)
     where
       unpackNameAndParams (GADTDef _ name params _) = (name, params)

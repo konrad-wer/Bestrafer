@@ -21,6 +21,7 @@ data Value
   | StringValue String
   | TupleValue [Value]
   | VecValue [Value]
+  | ListValue [Value]
   | FunValue (Value -> StateT EvalState IO Value)
   | ConstrValue String [Value]
 
@@ -33,6 +34,7 @@ instance Show Value where
   show (StringValue s) = show s
   show (TupleValue vs) = "(" ++ intercalate  ", " (map show vs) ++ ")"
   show (VecValue vs) = "[" ++ intercalate  ", " (map show vs) ++ "]"
+  show (ListValue vs) = "{" ++ intercalate  ", " (map show vs) ++ "}"
   show (FunValue _) = "function"
   show (ConstrValue name vs) = name ++ (vs >>= (" " ++) . show)
 
@@ -45,6 +47,7 @@ instance Eq Value where
   (==) (StringValue s1) (StringValue s2) = s1 == s2
   (==) (TupleValue xs) (TupleValue ys) = xs == ys
   (==) (VecValue xs) (VecValue ys) = xs == ys
+  (==) (ListValue xs) (ListValue ys) = xs == ys
   (==) (ConstrValue name1 xs) (ConstrValue name2 ys) = name1 == name2 && xs == ys
   (==) _ _ = False
 
@@ -56,6 +59,8 @@ instance Ord Value where
   (<=) (CharValue c1) (CharValue c2) = c1 <= c2
   (<=) (StringValue s1) (StringValue s2) = s1 <= s2
   (<=) (TupleValue xs) (TupleValue ys) = xs <= ys
+  (<=) (VecValue xs) (VecValue ys) = xs <= ys
+  (<=) (ListValue xs) (ListValue ys) = xs <= ys
   (<=) (ConstrValue name1 xs) (ConstrValue name2 ys) = name1 == name2 && xs <= ys
   (<=) _ _ = False
 

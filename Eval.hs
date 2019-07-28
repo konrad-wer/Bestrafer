@@ -89,6 +89,11 @@ evalExpr c (EConstr _ ":" [x, xs]) = do
   v <- evalExpr c x
   VecValue vs <- evalExpr c xs
   return $ VecValue (v : vs)
+evalExpr _ (EConstr _ "{}" []) = return $ ListValue []
+evalExpr c (EConstr _ ";" [x, xs]) = do
+  v <- evalExpr c x
+  ListValue vs <- evalExpr c xs
+  return $ ListValue (v : vs)
 evalExpr c (EConstr p name args) = do
   ca <- view constrArities <$> get
   if ca Map.! name == length args then do
@@ -119,6 +124,9 @@ evalExpr c (ECase _ e bs) = do
         (cb, VecValue [] : vs, (PConstr _ "[]" [] : ptrns, eb, p)) -> match cb vs (ptrns, eb, p)
         (cb, VecValue (x : xs) : vs, (PConstr _ ":" [y, ys] : ptrns, eb, p)) ->
           match cb (x : VecValue xs : vs) (y : ys : ptrns, eb, p)
+        (cb, ListValue [] : vs, (PConstr _ "{}" [] : ptrns, eb, p)) -> match cb vs (ptrns, eb, p)
+        (cb, ListValue (x : xs) : vs, (PConstr _ ";" [y, ys] : ptrns, eb, p)) ->
+          match cb (x : ListValue xs : vs) (y : ys : ptrns, eb, p)
         (cb, TupleValue xs : vs, (PTuple _ ys n : ptrns, eb, p)) | length xs == n ->
           match cb (xs ++ vs) (ys ++ ptrns, eb, p)
         (cb, ConstrValue name1 xs : vs, (PConstr _ name2 ys : ptrns, eb, p)) | name1 == name2 ->

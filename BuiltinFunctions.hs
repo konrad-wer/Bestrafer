@@ -80,8 +80,14 @@ lessOrEqual = FunValue (\x -> return (FunValue (\y -> return $ BoolValue (x <= y
 greaterOrEqual :: Value
 greaterOrEqual = FunValue (\x -> return (FunValue (\y -> return $ BoolValue (x >= y))))
 
+concatStr :: Value
+concatStr = FunValue (\(StringValue x) -> return (FunValue (\(StringValue y) -> return $ StringValue (x ++ y))))
+
 concatVec :: Value
 concatVec = FunValue (\(VecValue x) -> return (FunValue (\(VecValue y) -> return $ VecValue (x ++ y))))
+
+concatList :: Value
+concatList = FunValue (\(ListValue x) -> return (FunValue (\(ListValue y) -> return $ ListValue (x ++ y))))
 
 compose :: Value
 compose = FunValue (\(FunValue f) -> return (FunValue (\(FunValue g) -> return $ FunValue (f <=< g))))
@@ -144,12 +150,14 @@ builtinFunctions =
     ("/.", Evaluated divFloat),
     ("&&", Evaluated andBool),
     ("||", Evaluated orBool),
+    ("^",  Evaluated concatStr),
     ("==", Evaluated equal),
     ("!=", Evaluated notEqual),
     ("<=", Evaluated lessOrEqual),
     (">=", Evaluated greaterOrEqual),
     ("<",  Evaluated less),
     (">",  Evaluated greater),
+    ("@",  Evaluated concatList),
     ("++", Evaluated concatVec),
     (".",  Evaluated compose),
     ("|>", Evaluated pipe),

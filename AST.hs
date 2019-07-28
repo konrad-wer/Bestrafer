@@ -8,6 +8,9 @@ type Var = String
 
 --Source Syntax-----------------------------------------------------------------
 
+data BestraferException p = BestraferException p String
+type Catch p = (BestraferException p, Expr p)
+
 newtype BinOp = BinOp String
 
 data UnOp
@@ -27,7 +30,8 @@ data Expr p
   | EString p String
   | ELambda p Var (Expr p)
   | ESpine  p (Expr p) (Spine p)
-  | ERec    p Var (Expr p)
+  | EDef    p Var (Expr p)
+  | ERec    p Type Var (Expr p) (Expr p)
   | EAnnot  p (Expr p) Type
   | ETuple  p [Expr p] Int
   | EConstr p String [Expr p]
@@ -36,6 +40,7 @@ data Expr p
   | ELet    p Var (Expr p) (Expr p)
   | EBinOp  p BinOp (Expr p) (Expr p)
   | EUnOp   p UnOp (Expr p)
+  | ETry    p (Expr p) [Catch p]
 
 type Program p = [Expr p]
 
@@ -49,7 +54,8 @@ getPos (EChar   p _) = p
 getPos (EString p _) = p
 getPos (ELambda p _ _) = p
 getPos (ESpine  p _ _) = p
-getPos (ERec    p _ _) = p
+getPos (EDef    p _ _) = p
+getPos (ERec    p _ _ _ _) = p
 getPos (EAnnot  p _ _) = p
 getPos (ETuple  p _ _) = p
 getPos (EConstr p _ _) = p
@@ -58,6 +64,7 @@ getPos (EIf     p _ _ _) = p
 getPos (ELet    p _ _ _) = p
 getPos (EBinOp  p _ _ _ ) = p
 getPos (EUnOp   p _ _) = p
+getPos (ETry    p _ _) = p
 
 type Spine p = [Expr p]
 
@@ -238,16 +245,24 @@ instance Show (Expr p) where
   show (EString _ s) = show s
   show (ELambda _ x e) = "(" ++ "λ " ++ x ++ " -> " ++ show e ++ ")"
   show (ESpine  _ e s) = "(" ++ show e ++ (s >>= (' ' :) . show) ++ ")"
-  show (ERec    _ f e) = f ++ " = " ++ show e
+  show (EDef    _ f e) = f ++ " = " ++ show e
   show (EAnnot  _ e t) = "(" ++ show e ++ " :: " ++ show t ++ ")"
   show (ETuple  _ [] _) = "()"
   show (ETuple  _ (e : es) _) = "(" ++ show e ++ (es >>= (", " ++) . show) ++ ")"
   show (EConstr _ c args) = "(" ++ c ++ (args >>= (' ' :) . show) ++ ")"
-  show (ECase   _ e bs) = "(case " ++ show e ++ " of " ++ (bs >>= showBranch) ++ ")"
+  show (ECase   _ e bs) = "(case " ++ show e ++ " of" ++ (bs >>= (" " ++) . showBranch) ++ ")"
   show (EIf     _ e1 e2 e3) = "(if " ++ show e1 ++ " then " ++ show e2 ++ " else " ++ show e3 ++ ")"
-  show (ELet    _ x e1 e2) = "(let " ++ x ++ " = " ++ show e1 ++ " = " ++ show e2 ++ ")"
+  show (ELet    _ x e1 e2) = "(let " ++ x ++ " = " ++ show e1 ++ " in " ++ show e2 ++ ")"
+  show (ERec    _ _ x e1 e2) = "(rec " ++ x ++ " = " ++ show e1 ++ " in " ++ show e2 ++ ")"
   show (EBinOp  _ op e1 e2) = "(" ++ show e1 ++ " " ++ show op ++ " " ++ show e2 ++ ")"
   show (EUnOp   _ op e) = "(" ++ show op ++ " " ++ show e ++ ")"
+  show (ETry    _ e cs) = "(try: " ++ show e ++ " catch:" ++ (cs >>= (" " ++) . showCatch) ++ ")"
+
+instance Show (BestraferException p) where
+  show (BestraferException _ ex) = ex
+
+showCatch :: Catch e -> String
+showCatch (ex, e) = show ex ++ " -> " ++ show e
 
 instance Show (Pattern p) where
   show (PVar    _ x) = x

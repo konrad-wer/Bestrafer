@@ -26,6 +26,12 @@ checkedIntroductionForm (EConstr p constrName es) = do
     Just constr -> return (length (constrArgsTemplates constr) == length es)
 checkedIntroductionForm _ = return False
 
+checkExceptionWellFormedness :: BestraferException p -> Either (TypeError p) ()
+checkExceptionWellFormedness (BestraferException p exc)
+  | exc `elem` ["DivideByZeroException", "IOException", "Exception"] = return ()
+  | otherwise = Left . UndeclaredExceptionError $ BestraferException p exc
+
+
 checkBranchWellFormedness :: Branch p -> Either (TypeError p) ()
 checkBranchWellFormedness b @ (branchPtrns, _, _) = do
   let varList = branchPtrns >>= getVars
@@ -560,6 +566,10 @@ checkExpr context expression checkedType principality = do
       t' <- lift $ applyContextToType p c2 t
       let (c3, t2') = unpack (CMarker : c2) t2
       dropContextToMarker <$> checkExpr (CVar x t2' pr2 : c3) e2 t' pr1
+    (c, ERec p t0 x e1 e2, t, pr) -> do
+      c2 <- checkExpr (CVar x t0 Principal : CMarker : c) e1 t0 Principal
+      t' <- lift $ applyContextToType p c2 t
+      dropContextToMarker <$> checkExpr c2 e2 t' pr
     (c, EBinOp p (BinOp opr) e1 e2, t, pr) ->
       checkExpr c (ESpine p (EVar p opr) [e1, e2]) t pr
     (c, EUnOp p UnOpPlus e, t, pr) ->
@@ -572,6 +582,14 @@ checkExpr context expression checkedType principality = do
       checkExpr c (ESpine p (EVar p "-.u") [e]) t pr
     (c, EUnOp p UnOpNot e, t, pr) ->
       checkExpr c (ESpine p (EVar p "!u") [e]) t pr
+    (c, ETry p e cs, t, pr) -> do
+      mapM_ (lift . checkExceptionWellFormedness . fst) cs
+      c2 <- checkExpr c e t pr
+      foldM (flip (flip aux . snd)) c2 cs
+      where
+        aux _c _e = do
+          t' <- lift $ applyContextToType p _c t
+          checkExpr _c _e t' pr
     (c, ECase p e bs, t1, pr1) -> do
       (t2, pr2, c2) <- inferExpr c e
       t1' <- lift $ applyContextToType p c2 t1
@@ -655,7 +673,7 @@ checkExpr context expression checkedType principality = do
       subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t (getPos e) (SubtypingClue t2 t)
 
 inferExpr :: Context -> Expr p -> StateT TypecheckerState (Either (TypeError p)) (Type, Principality, Context)
-inferExpr c (ERec _ _ e) = inferExpr c e
+inferExpr c (EDef _ _ e) = inferExpr c e
 inferExpr c (ETuple _ es n) = do
   (ts, pr, c') <- foldM aux ([], Principal, c) es
   return (TProduct (reverse ts) n, pr, c')

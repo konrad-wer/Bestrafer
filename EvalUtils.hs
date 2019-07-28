@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell,
+    ExistentialQuantification #-}
 
 module EvalUtils where
 
@@ -7,6 +8,9 @@ import Control.Monad.State
 import Data.List (intercalate)
 import qualified Data.Map as Map
 import Control.Lens hiding (Context)
+import Control.Exception
+
+data HandlerT a = forall e . Exception e => HandlerT (e -> StateT EvalState IO a)
 
 data Value
   = UnitValue
@@ -58,7 +62,6 @@ instance Ord Value where
 data GlobalContextEntry
   = Evaluated Value
   | NotEvaluated (() -> StateT EvalState IO Value)
-  | InProgres
 
 
 type EvalContext = Map.Map Var Value

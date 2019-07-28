@@ -36,6 +36,7 @@ instance SourcePos ~ p => Show (ErrorClue p) where
 
 data TypeError p
   = UndeclaredVariableError p Var
+  | UndeclaredExceptionError (BestraferException p)
   | UndeclaredGADTError p String
   | UndeclaredConstructorError (Expr p) String
   | MismatchedGADTArityError p String Int Int
@@ -73,6 +74,7 @@ data TypeError p
 
 instance SourcePos ~ p => Show (TypeError p) where
   show (UndeclaredVariableError p x) = sourcePosPretty p ++ "\nVariable not in scope: " ++ addQuotes x
+  show (UndeclaredExceptionError (BestraferException p e)) = sourcePosPretty p ++ "\nNot in scope: exception " ++ addQuotes e
   show (UndeclaredGADTError p name) = sourcePosPretty p ++ "\nNot in scope: type constructor " ++ addQuotes name
   show (UndeclaredConstructorError e name) = sourcePosPretty (getPos e) ++ "\nData constructor not in scope: " ++ addQuotes name ++
     "\nIn the expression: " ++ show e
@@ -186,6 +188,7 @@ exprIsNotACase :: Expr p -> Bool
 exprIsNotACase ECase {} = False
 exprIsNotACase EIf {} = False
 exprIsNotACase ELet {} = False
+exprIsNotACase ETry {} = False
 exprIsNotACase _ = True
 
 --polarity utils----------------------------------------------------------------

@@ -9,17 +9,24 @@ import qualified Data.Map as Map
 import Control.Lens hiding (Context, op)
 import Control.Exception
 
-catchStateT :: Exception e => StateT EvalState IO a -> (e -> StateT EvalState IO a) ->  StateT EvalState IO a
-catchStateT comp handler = do
+catchStateT :: StateT EvalState IO a -> [HandlerT a] ->  StateT EvalState IO a
+catchStateT comp handlers = do
   s1 <- get
-  (res, s2) <- liftIO $ runStateT comp s1 `catch` \e -> runStateT (handler e) s1
+  (res, s2) <- liftIO $ runStateT comp s1 `catches` map (\(HandlerT f) -> Handler (flip runStateT s1 . f)) handlers
   put s2
   return res
+
+makeExceptionHandler :: EvalContext -> Catch p -> HandlerT Value
+makeExceptionHandler c (BestraferException _ "DivideByZeroException", expr) =
+  HandlerT (\DivideByZero -> evalExpr c expr)
+makeExceptionHandler c (BestraferException _ "IOException", expr) =
+  HandlerT ((\_ -> evalExpr c expr) :: IOException -> StateT EvalState IO Value)
+makeExceptionHandler c (BestraferException _ _, expr) =
+  HandlerT ((\_ -> evalExpr c expr) :: SomeException -> StateT EvalState IO Value)
 
 valueOfGlobalContextEntry :: GlobalContextEntry -> StateT EvalState IO Value
 valueOfGlobalContextEntry (Evaluated v) = return v
 valueOfGlobalContextEntry (NotEvaluated e) = e ()
-valueOfGlobalContextEntry InProgres = error "Trying to read non-evaluated value"
 
 evalExpr :: EvalContext -> Expr p -> StateT EvalState IO Value
 evalExpr c (EAnnot _ e _) = evalExpr c e
@@ -32,16 +39,20 @@ evalExpr _ (EString _ s) = return $ StringValue s
 evalExpr c (ELambda _ arg e) = return $ FunValue (\val -> evalExpr (addToEnv arg val c) e)
 evalExpr c (ETuple _ es _) = TupleValue <$> mapM (evalExpr c) es
 evalExpr c (ELet _ x e1 e2) = (addToEnv x <$> evalExpr c e1 <*> pure c) >>= flip evalExpr e2
+evalExpr c (ERec _ _ f e1 e2) = do
+  gc <- view globalContext <$> get
+  modify $ over globalContext (Map.insert f (NotEvaluated (\() -> evalExpr c e1)))
+  v <- evalExpr c e2
+  modify $ set globalContext gc
+  return v
 evalExpr c (EVar _ x) = do
   gc <- view globalContext <$> get
   fromJust ((return <$> Map.lookup x c) `mplus` (valueOfGlobalContextEntry <$> Map.lookup x gc))
-evalExpr _ (ERec _ f e) = do
+evalExpr _ (EDef _ f e) = do
   gc <- view globalContext <$> get
   case gc Map.! f of
-    InProgres -> return UnitValue
     Evaluated x -> return x
     NotEvaluated _ -> do
-      modify $ over globalContext (Map.insert f InProgres)
       v <- evalExpr Map.empty e
       modify $ over globalContext (Map.insert f (Evaluated v))
       return v
@@ -113,12 +124,14 @@ evalExpr c (ECase _ e bs) = do
         (cb, ConstrValue name1 xs : vs, (PConstr _ name2 ys : ptrns, eb, p)) | name1 == name2 ->
           match cb (xs ++ vs) (ys ++ ptrns, eb, p)
         _ -> Nothing
+evalExpr c (ETry _ e cs) =
+  evalExpr c e `catchStateT` map (makeExceptionHandler c) cs
 
 eval :: Program p -> ConstructorsContext -> IO [Value]
 eval program constrs = do
-  let userFunctions = map (\(ERec p name e) -> (name, NotEvaluated (\() -> evalExpr Map.empty (ERec p name e)))) program
+  let userFunctions = map (\(EDef p name e) -> (name, NotEvaluated (\() -> evalExpr Map.empty (EDef p name e)))) program
   let gc = Map.fromList $ builtinFunctions ++ userFunctions
   let ca = Map.map  (length . constrArgsTemplates) constrs
   let startState = EvalState {_constrArities = ca, _globalContext = gc, _freshVarNum = 0}
-  print $ map (\(ERec _ name _) -> name) program
+  print $ map (\(EDef _ name _) -> name) program
   evalStateT (mapM (evalExpr Map.empty) program) startState

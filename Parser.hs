@@ -70,7 +70,7 @@ rword w = (lexeme . try) (string w *> notFollowedBy alphaNumChar)
 
 rws :: [String]
 rws = ["let", "def", "data", "where", "if", "then", "else", "in",
-       "False", "True", "exists", "forall", "try", "catch", "of",
+       "False", "True", "exists", "forall", "try", "catch", "of", "rec",
        "Bool", "Int", "Float", "Char", "String", "N", "S", "λ", "case"]
 
 identifier :: Parser String
@@ -351,7 +351,25 @@ eTerm =
   eIf <|>
   eLet <|>
   eLambda <|>
-  eCase
+  eCase <|>
+  eTry <|>
+  eRec
+
+eRec :: Parser (Expr SourcePos)
+eRec = do
+  pos <- getSourcePos
+  rword "rec"
+  void $ symbol "::"
+  annot <- typeParser
+  void $ symbol ":"
+  x <- identifier
+  args <- some identifier
+  void $ symbol "="
+  body <- expr
+  rword "in"
+  e2 <- expr
+  let e1 = buildLambda pos args body
+  return $ ERec pos annot x e1 e2
 
 eApp :: Parser (Expr SourcePos)
 eApp = do
@@ -431,6 +449,26 @@ branch = do
   void $ symbol "->"
   e <- expr
   return ([pat], e, pos)
+
+eTry :: Parser (Expr SourcePos)
+eTry = do
+  pos <- getSourcePos
+  rword "try"
+  void $ symbol ":"
+  e <- expr
+  rword "catch"
+  void $ symbol ":"
+  bs <- some catch
+  return $ ETry pos e bs
+
+catch :: Parser (Catch SourcePos)
+catch = do
+  void $ symbol "|"
+  pos <- getSourcePos
+  exception <- upperIdentifier
+  void $ symbol "->"
+  e <- expr
+  return (BestraferException pos exception, e)
 
 buildLambda :: p -> [Var] -> Expr p -> Expr p
 buildLambda _ [] e = e

@@ -297,7 +297,7 @@ buildFunction (erecs, funCntxt) ([FunTypeAnnot annotPos name t], defs) = do
   let args = zipWith (++) (map (const "_x") argsExample) $ map show [1 .. length argsExample]
   let caseExpr = ECase annotPos (ETuple annotPos (map (EVar annotPos) args) $ length argsExample) branches
   let lambdasExpr = foldr (ELambda annotPos) caseExpr args
-  return (ERec annotPos name (EAnnot annotPos lambdasExpr t) : erecs, Map.insert name t funCntxt)
+  return (EDef annotPos name (EAnnot annotPos lambdasExpr t) : erecs, Map.insert name t funCntxt)
   where
     getBranch numArgs (FunDefCase p _ ptrns e)
       | numArgs /= length ptrns = Left $ FunDifferentNumberOfArgsError annotPos name
@@ -316,11 +316,12 @@ mergeUnOpsWithNumConsts (EChar p c)   = EChar p c
 mergeUnOpsWithNumConsts (EString p s) = EString p s
 mergeUnOpsWithNumConsts (ELambda p x e)  = ELambda p x $ mergeUnOpsWithNumConsts e
 mergeUnOpsWithNumConsts (ESpine  p e s)  = ESpine p (mergeUnOpsWithNumConsts e) $ map mergeUnOpsWithNumConsts s
-mergeUnOpsWithNumConsts (ERec    p f e)  = ERec p f $ mergeUnOpsWithNumConsts e
+mergeUnOpsWithNumConsts (EDef    p f e)  = EDef p f $ mergeUnOpsWithNumConsts e
 mergeUnOpsWithNumConsts (EAnnot  p e t)  = EAnnot p (mergeUnOpsWithNumConsts e) t
 mergeUnOpsWithNumConsts (ETuple  p es n) = ETuple p (map mergeUnOpsWithNumConsts es) n
 mergeUnOpsWithNumConsts (EConstr p c es) = EConstr p c (map mergeUnOpsWithNumConsts es)
 mergeUnOpsWithNumConsts (ECase   p e bs) = ECase p (mergeUnOpsWithNumConsts e) bs
+mergeUnOpsWithNumConsts (ETry    p e cs) = ETry p (mergeUnOpsWithNumConsts e) (map (cross id mergeUnOpsWithNumConsts) cs)
 mergeUnOpsWithNumConsts (EIf     p e1 e2 e3) = EIf p (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2) (mergeUnOpsWithNumConsts e3)
 mergeUnOpsWithNumConsts (ELet    p x e1 e2)  = ELet p x (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)
 mergeUnOpsWithNumConsts (EBinOp  p op e1 e2) = EBinOp p op (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)

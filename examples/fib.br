@@ -1,10 +1,10 @@
 
 def mult :: Vec 2 (Vec 2 Int) -> Vec 2 (Vec 2 Int) -> Vec 2 (Vec 2 Int)
-def mult 
-  [[x11, x12], 
-   [x21, x22]] 
+def mult
+  [[x11, x12],
+   [x21, x22]]
 
-  [[y11, y12], 
+  [[y11, y12],
    [y21, y22]]
   =
   [[x11 * y11 + x12 * y21, x11 * y12 + x12 * y22],
@@ -35,5 +35,4 @@ def main =
     let n = readLnInt () in
     printInt (fib n)
   catch:
-    | IOException m -> putStrLn (m)
-
+    | IOException -> putStrLn "Please provide number!"

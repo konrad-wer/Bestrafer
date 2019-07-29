@@ -8,7 +8,7 @@ type Var = String
 
 --Source Syntax-----------------------------------------------------------------
 
-data BestraferException p = BestraferException p String
+data BestraferException p = BestraferException p String (Maybe Var)
 type Catch p = (BestraferException p, Expr p)
 
 newtype BinOp = BinOp String
@@ -259,10 +259,12 @@ instance Show (Expr p) where
   show (ETry    _ e cs) = "(try: " ++ show e ++ " catch:" ++ (cs >>= (" " ++) . showCatch) ++ ")"
 
 instance Show (BestraferException p) where
-  show (BestraferException _ ex) = ex
+  show (BestraferException _ ex Nothing) = ex
+  show (BestraferException _ ex (Just v)) = ex ++ " " ++ v
 
 showCatch :: Catch e -> String
 showCatch (ex, e) = show ex ++ " -> " ++ show e
+
 
 instance Show (Pattern p) where
   show (PVar    _ x) = x

@@ -479,9 +479,10 @@ catch = do
   void $ symbol "|"
   pos <- getSourcePos
   exception <- upperIdentifier
+  var <- optional identifier
   void $ symbol "->"
   e <- expr
-  return (BestraferException pos exception, e)
+  return (BestraferException pos exception var, e)
 
 buildLambda :: p -> [Var] -> Expr p -> Expr p
 buildLambda _ [] e = e

@@ -17,12 +17,18 @@ catchStateT comp handlers = do
   return res
 
 makeExceptionHandler :: EvalContext -> Catch p -> HandlerT Value
-makeExceptionHandler c (BestraferException _ "DivideByZeroException", expr) =
-  HandlerT (\DivideByZero -> evalExpr c expr)
-makeExceptionHandler c (BestraferException _ "IOException", expr) =
+makeExceptionHandler c (BestraferException _ "ArithmeticException" Nothing, expr) =
+  HandlerT ((\_ -> evalExpr c expr) :: ArithException -> StateT EvalState IO Value)
+makeExceptionHandler c (BestraferException _ "IOException" Nothing, expr) =
   HandlerT ((\_ -> evalExpr c expr) :: IOException -> StateT EvalState IO Value)
-makeExceptionHandler c (BestraferException _ _, expr) =
+makeExceptionHandler c (BestraferException _ _ Nothing, expr) =
   HandlerT ((\_ -> evalExpr c expr) :: SomeException -> StateT EvalState IO Value)
+makeExceptionHandler c (BestraferException _ "DivideByZeroException" (Just v), expr) =
+  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: ArithException -> StateT EvalState IO Value)
+makeExceptionHandler c (BestraferException _ "IOException" (Just v), expr) =
+  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: IOException -> StateT EvalState IO Value)
+makeExceptionHandler c (BestraferException _ _ (Just v), expr) =
+  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: SomeException -> StateT EvalState IO Value)
 
 valueOfGlobalContextEntry :: DefinitionValue -> StateT EvalState IO Value
 valueOfGlobalContextEntry (Evaluated v) = return v

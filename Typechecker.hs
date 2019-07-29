@@ -27,10 +27,9 @@ checkedIntroductionForm (EConstr p constrName es) = do
 checkedIntroductionForm _ = return False
 
 checkExceptionWellFormedness :: BestraferException p -> Either (TypeError p) ()
-checkExceptionWellFormedness (BestraferException p exc)
-  | exc `elem` ["DivideByZeroException", "IOException", "Exception"] = return ()
-  | otherwise = Left . UndeclaredExceptionError $ BestraferException p exc
-
+checkExceptionWellFormedness (BestraferException p exc v)
+  | exc `elem` ["ArithmeticException", "IOException", "Exception"] = return ()
+  | otherwise = Left . UndeclaredExceptionError $ BestraferException p exc v
 
 checkBranchWellFormedness :: Branch p -> Either (TypeError p) ()
 checkBranchWellFormedness b @ (branchPtrns, _, _) = do
@@ -585,11 +584,14 @@ checkExpr context expression checkedType principality = do
     (c, ETry p e cs, t, pr) -> do
       mapM_ (lift . checkExceptionWellFormedness . fst) cs
       c2 <- checkExpr c e t pr
-      foldM (flip (flip aux . snd)) c2 cs
+      foldM (flip (flip aux)) c2 cs
       where
-        aux _c _e = do
+        aux _c (BestraferException _ _ Nothing, _e) = do
           t' <- lift $ applyContextToType p _c t
           checkExpr _c _e t' pr
+        aux _c (BestraferException _ _ (Just v), _e) = do
+          t' <- lift $ applyContextToType p _c t
+          dropContextToMarker <$> checkExpr (CVar v TString Principal : CMarker : _c) _e t' pr
     (c, ECase p e bs, t1, pr1) -> do
       (t2, pr2, c2) <- inferExpr c e
       t1' <- lift $ applyContextToType p c2 t1

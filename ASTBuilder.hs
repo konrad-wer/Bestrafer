@@ -3,6 +3,7 @@
 module ASTBuilder (buildAST) where
 
 import AST
+import BuiltinFunctions
 import Data.Char (toLower)
 import Control.Monad
 import Control.Monad.State
@@ -50,63 +51,6 @@ instance SourcePos ~ p => Show (ASTBuilderError p) where
   show (InternalCompilerASTBuilderError p trace) = sourcePosPretty p ++ "\nInternal interpreter error while typechecking " ++
     addQuotes trace ++ ".\nThat should not have happened. Please contact language creator."
 
-operatorsTypeContext :: FunTypeContext
-operatorsTypeContext = Map.fromList
-  [
-    ("!u", TArrow TBool TBool),
-    ("+u", TArrow TInt TInt),
-    ("-u", TArrow TInt TInt),
-    ("+.u", TArrow TFloat TFloat),
-    ("-.u", TArrow TFloat TFloat),
-    ("+", TArrow TInt $ TArrow TInt TInt),
-    ("-", TArrow TInt $ TArrow TInt TInt),
-    ("*", TArrow TInt $ TArrow TInt TInt),
-    ("/", TArrow TInt $ TArrow TInt TInt),
-    ("%", TArrow TInt $ TArrow TInt TInt),
-    ("+.", TArrow TFloat $ TArrow TFloat TFloat),
-    ("-.", TArrow TFloat $ TArrow TFloat TFloat),
-    ("*.", TArrow TFloat $ TArrow TFloat TFloat),
-    ("/.", TArrow TFloat $ TArrow TFloat TFloat),
-    ("&&", TArrow TBool $ TArrow TBool TBool),
-    ("||", TArrow TBool $ TArrow TBool TBool),
-    ("^",  TArrow TString $ TArrow TString TString),
-    ("==", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
-    ("!=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
-    ("<=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
-    (">=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
-    ("<",  TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
-    (">",  TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
-    ("@", TUniversal (UTypeVar "a") KStar $ TArrow (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"]) $ TArrow
-    (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"]) (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"])),
-    ("++", TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "n1") KNat . TUniversal (UTypeVar "n2") KNat $
-    TArrow (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n1", ParameterType $ TUVar $ UTypeVar "a"]) $ TArrow
-    (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n2", ParameterType $ TUVar $ UTypeVar "a"])
-    (TExistential (UTypeVar "m") KNat $ TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "m", ParameterType $ TUVar $ UTypeVar "a"])),
-    (".", TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TUniversal (UTypeVar "c") KStar $
-    TArrow (TArrow (TUVar $ UTypeVar "b") (TUVar $ UTypeVar "c")) $ TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b"))
-    (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "c"))),
-    ("|>",  TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TArrow (TUVar $ UTypeVar "a") $
-    TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b")) (TUVar $ UTypeVar "b"))
-  ]
-
-ioFunctions :: FunTypeContext
-ioFunctions = Map.fromList
-  [
-    ("readFile", TArrow TString TString),
-    ("writeFile", TArrow TString (TArrow TString TUnit)),
-    ("appendFile", TArrow TString (TArrow TString TUnit)),
-    ("putChar", TArrow TChar TUnit),
-    ("putStr", TArrow TString TUnit),
-    ("putStrLn", TArrow TString TUnit),
-    ("printBool", TArrow TBool TUnit),
-    ("printInt", TArrow TInt TUnit),
-    ("printFloat", TArrow TFloat TUnit),
-    ("getChar", TArrow TUnit TChar),
-    ("getLine", TArrow TUnit TString),
-    ("readLnBool", TArrow TUnit TBool),
-    ("readLnInt", TArrow TUnit TInt),
-    ("readLnFloat", TArrow TUnit TFloat)
-  ]
 
 vecAndListGADTDef :: [(String, [GADTDefParameter])]
 vecAndListGADTDef = [("Vec", [GADTDefParamMonotype KNat, GADTDefParamType "`A"]), ("List", [GADTDefParamType "`A"])]
@@ -277,7 +221,7 @@ buildFunctions :: [ProgramBlock p] -> Either (ASTBuilderError p) ([Expr p], FunT
 buildFunctions programBlocks = do
   let names = getNames programBlocks Set.empty
   let defs = groupDefinitions programBlocks $ Map.fromSet (const ([], [])) names
-  cross reverse id <$> foldM buildFunction ([], Map.union ioFunctions operatorsTypeContext) (orderDefs defs programBlocks [])
+  cross reverse id <$> foldM buildFunction ([], Map.fromList builtinFunctionsTypes) (orderDefs defs programBlocks [])
   where
     getNames [] acc = acc
     getNames (FunTypeAnnot _ name _ : blocks) acc = getNames blocks $ Set.insert name acc

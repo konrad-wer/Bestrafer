@@ -1,10 +1,83 @@
-module BuiltinFunctions where
+module BuiltinFunctions (builtinFunctions, builtinFunctionsTypes) where
 
 import AST
 import EvalUtils
 import Control.Monad
 import Control.Monad.State
 import Control.Exception
+
+operatorsTypes :: [(Var, Type)]
+operatorsTypes =
+  [
+    ("!u", TArrow TBool TBool),
+    ("+u", TArrow TInt TInt),
+    ("-u", TArrow TInt TInt),
+    ("+.u", TArrow TFloat TFloat),
+    ("-.u", TArrow TFloat TFloat),
+    ("+", TArrow TInt $ TArrow TInt TInt),
+    ("-", TArrow TInt $ TArrow TInt TInt),
+    ("*", TArrow TInt $ TArrow TInt TInt),
+    ("/", TArrow TInt $ TArrow TInt TInt),
+    ("%", TArrow TInt $ TArrow TInt TInt),
+    ("+.", TArrow TFloat $ TArrow TFloat TFloat),
+    ("-.", TArrow TFloat $ TArrow TFloat TFloat),
+    ("*.", TArrow TFloat $ TArrow TFloat TFloat),
+    ("/.", TArrow TFloat $ TArrow TFloat TFloat),
+    ("&&", TArrow TBool $ TArrow TBool TBool),
+    ("||", TArrow TBool $ TArrow TBool TBool),
+    ("^",  TArrow TString $ TArrow TString TString),
+    ("==", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
+    ("!=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
+    ("<=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
+    (">=", TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
+    ("<",  TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
+    (">",  TUniversal (UTypeVar "a") KStar (TArrow (TUVar $ UTypeVar "a") $ TArrow (TUVar $ UTypeVar "a") TBool)),
+    ("@", TUniversal (UTypeVar "a") KStar $ TArrow (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"]) $ TArrow
+    (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"]) (TGADT "List" [ParameterType $ TUVar $ UTypeVar "a"])),
+    ("++", TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "n1") KNat . TUniversal (UTypeVar "n2") KNat $
+    TArrow (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n1", ParameterType $ TUVar $ UTypeVar "a"]) $ TArrow
+    (TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "n2", ParameterType $ TUVar $ UTypeVar "a"])
+    (TExistential (UTypeVar "m") KNat $ TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "m", ParameterType $ TUVar $ UTypeVar "a"])),
+    (".", TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TUniversal (UTypeVar "c") KStar $
+    TArrow (TArrow (TUVar $ UTypeVar "b") (TUVar $ UTypeVar "c")) $ TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b"))
+    (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "c"))),
+    ("|>",  TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TArrow (TUVar $ UTypeVar "a") $
+    TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b")) (TUVar $ UTypeVar "b"))
+  ]
+
+ioFunctionsTypes :: [(Var, Type)]
+ioFunctionsTypes =
+  [
+    ("readFile", TArrow TString TString),
+    ("writeFile", TArrow TString (TArrow TString TUnit)),
+    ("appendFile", TArrow TString (TArrow TString TUnit)),
+    ("putChar", TArrow TChar TUnit),
+    ("putStr", TArrow TString TUnit),
+    ("putStrLn", TArrow TString TUnit),
+    ("printBool", TArrow TBool TUnit),
+    ("printInt", TArrow TInt TUnit),
+    ("printFloat", TArrow TFloat TUnit),
+    ("getChar", TArrow TUnit TChar),
+    ("getLine", TArrow TUnit TString),
+    ("readLnBool", TArrow TUnit TBool),
+    ("readLnInt", TArrow TUnit TInt),
+    ("readLnFloat", TArrow TUnit TFloat)
+  ]
+
+conversionFunctionsTypes :: [(Var, Type)]
+conversionFunctionsTypes =
+  [
+    ("stringToList", TArrow TString (TGADT "List" [ParameterType TChar])),
+    ("stringOfList", TArrow (TGADT "List" [ParameterType TChar]) TString),
+    ("intToFloat", TArrow TInt TFloat),
+    ("floatToInt", TArrow TFloat TInt),
+    ("intToString", TArrow TInt TString),
+    ("floatToString", TArrow TFloat TString),
+    ("boolToString", TArrow TBool TString)
+  ]
+
+builtinFunctionsTypes :: [(Var, Type)]
+builtinFunctionsTypes = operatorsTypes ++ ioFunctionsTypes ++ conversionFunctionsTypes
 
 unPlusInt :: Value
 unPlusInt = FunValue return
@@ -131,8 +204,8 @@ bfrReadLnInt = FunValue (\UnitValue -> lift (IntValue <$> readLn))
 bfrReadLnFloat :: Value
 bfrReadLnFloat = FunValue (\UnitValue -> lift (FloatValue <$> readLn))
 
-builtinFunctions :: [(Var, DefinitionValue)]
-builtinFunctions =
+operators :: [(Var, DefinitionValue)]
+operators =
   [
     ("!u", Evaluated notBool),
     ("+u", Evaluated unPlusInt),
@@ -160,7 +233,12 @@ builtinFunctions =
     ("@",  Evaluated concatList),
     ("++", Evaluated concatVec),
     (".",  Evaluated compose),
-    ("|>", Evaluated pipe),
+    ("|>", Evaluated pipe)
+  ]
+
+ioFunctions :: [(Var, DefinitionValue)]
+ioFunctions =
+  [
     ("readFile", Evaluated bfrReadFile),
     ("writeFile", Evaluated bfrWriteFile),
     ("appendFile", Evaluated bfrAppendFile),
@@ -176,3 +254,18 @@ builtinFunctions =
     ("readLnInt", Evaluated bfrReadLnInt),
     ("readLnFloat", Evaluated bfrReadLnFloat)
   ]
+
+conversionFunctions :: [(Var, DefinitionValue)]
+conversionFunctions =
+  [
+    ("stringToList",  Evaluated $ FunValue (\(StringValue s) -> return . ListValue $ map CharValue s)),
+    ("stringOfList",  Evaluated $ FunValue (\(ListValue s)   -> return . StringValue $ map (\(CharValue c) -> c) s)),
+    ("intToFloat",    Evaluated $ FunValue (\(IntValue x)    -> return . FloatValue $ fromInteger x)),
+    ("floatToInt",    Evaluated $ FunValue (\(FloatValue x)  -> return . IntValue $ truncate x)),
+    ("intToString",   Evaluated $ FunValue (\(IntValue x)    -> return . StringValue $ show x)),
+    ("floatToString", Evaluated $ FunValue (\(FloatValue x)  -> return . StringValue $ show x)),
+    ("boolToString",  Evaluated $ FunValue (\(BoolValue x)   -> return . StringValue $ show x))
+  ]
+
+builtinFunctions :: [(Var, DefinitionValue)]
+builtinFunctions = operators ++ ioFunctions ++ conversionFunctions

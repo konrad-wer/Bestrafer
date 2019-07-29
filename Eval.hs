@@ -24,9 +24,14 @@ makeExceptionHandler c (BestraferException _ "IOException", expr) =
 makeExceptionHandler c (BestraferException _ _, expr) =
   HandlerT ((\_ -> evalExpr c expr) :: SomeException -> StateT EvalState IO Value)
 
-valueOfGlobalContextEntry :: GlobalContextEntry -> StateT EvalState IO Value
+valueOfGlobalContextEntry :: DefinitionValue -> StateT EvalState IO Value
 valueOfGlobalContextEntry (Evaluated v) = return v
 valueOfGlobalContextEntry (NotEvaluated e) = e ()
+
+valueOfVar :: Value -> StateT EvalState IO Value
+valueOfVar (DefValue (Evaluated v)) = return v
+valueOfVar (DefValue (NotEvaluated e)) = e ()
+valueOfVar v = return v
 
 evalExpr :: EvalContext -> Expr p -> StateT EvalState IO Value
 evalExpr c (EAnnot _ e _) = evalExpr c e
@@ -40,14 +45,11 @@ evalExpr c (ELambda _ arg e) = return $ FunValue (\val -> evalExpr (addToEnv arg
 evalExpr c (ETuple _ es _) = TupleValue <$> mapM (evalExpr c) es
 evalExpr c (ELet _ x e1 e2) = (addToEnv x <$> evalExpr c e1 <*> pure c) >>= flip evalExpr e2
 evalExpr c (ERec _ _ f e1 e2) = do
-  gc <- view globalContext <$> get
-  modify $ over globalContext (Map.insert f (NotEvaluated (\() -> evalExpr c e1)))
-  v <- evalExpr c e2
-  modify $ set globalContext gc
-  return v
+  let c2 = addToEnv f (DefValue (NotEvaluated (\() -> evalExpr c2 e1))) c
+  evalExpr c2 e2
 evalExpr c (EVar _ x) = do
   gc <- view globalContext <$> get
-  fromJust ((return <$> Map.lookup x c) `mplus` (valueOfGlobalContextEntry <$> Map.lookup x gc))
+  fromJust ((valueOfVar <$> Map.lookup x c) `mplus` (valueOfGlobalContextEntry <$> Map.lookup x gc))
 evalExpr _ (EDef _ f e) = do
   gc <- view globalContext <$> get
   case gc Map.! f of

@@ -24,6 +24,7 @@ data Value
   | ListValue [Value]
   | FunValue (Value -> StateT EvalState IO Value)
   | ConstrValue String [Value]
+  | DefValue DefinitionValue
 
 instance Show Value where
   show UnitValue = "()"
@@ -36,6 +37,7 @@ instance Show Value where
   show (VecValue vs) = "[" ++ intercalate  ", " (map show vs) ++ "]"
   show (ListValue vs) = "{" ++ intercalate  ", " (map show vs) ++ "}"
   show (FunValue _) = "function"
+  show (DefValue _) = "function"
   show (ConstrValue name vs) = name ++ (vs >>= (" " ++) . show)
 
 instance Eq Value where
@@ -64,13 +66,13 @@ instance Ord Value where
   (<=) (ConstrValue name1 xs) (ConstrValue name2 ys) = name1 == name2 && xs <= ys
   (<=) _ _ = False
 
-data GlobalContextEntry
+data DefinitionValue
   = Evaluated Value
   | NotEvaluated (() -> StateT EvalState IO Value)
 
 
 type EvalContext = Map.Map Var Value
-type GlobalContext = Map.Map Var GlobalContextEntry
+type GlobalContext = Map.Map Var DefinitionValue
 type ConstructorsArities = Map.Map String Int
 
 data EvalState = EvalState

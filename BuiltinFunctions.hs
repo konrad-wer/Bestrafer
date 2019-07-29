@@ -131,7 +131,7 @@ bfrReadLnInt = FunValue (\UnitValue -> lift (IntValue <$> readLn))
 bfrReadLnFloat :: Value
 bfrReadLnFloat = FunValue (\UnitValue -> lift (FloatValue <$> readLn))
 
-builtinFunctions :: [(Var, GlobalContextEntry)]
+builtinFunctions :: [(Var, DefinitionValue)]
 builtinFunctions =
   [
     ("!u", Evaluated notBool),

@@ -21,14 +21,19 @@ makeExceptionHandler c (BestraferException _ "ArithmeticException" Nothing, expr
   HandlerT ((\_ -> evalExpr c expr) :: ArithException -> StateT EvalState IO Value)
 makeExceptionHandler c (BestraferException _ "IOException" Nothing, expr) =
   HandlerT ((\_ -> evalExpr c expr) :: IOException -> StateT EvalState IO Value)
+makeExceptionHandler c (BestraferException _ "RuntimeException" Nothing, expr) =
+  HandlerT ((\_ -> evalExpr c expr) :: CustomException -> StateT EvalState IO Value)
 makeExceptionHandler c (BestraferException _ _ Nothing, expr) =
   HandlerT ((\_ -> evalExpr c expr) :: SomeException -> StateT EvalState IO Value)
-makeExceptionHandler c (BestraferException _ "DivideByZeroException" (Just v), expr) =
+makeExceptionHandler c (BestraferException _ "ArithmeticException" (Just v), expr) =
   HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: ArithException -> StateT EvalState IO Value)
 makeExceptionHandler c (BestraferException _ "IOException" (Just v), expr) =
   HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: IOException -> StateT EvalState IO Value)
+makeExceptionHandler c (BestraferException _ "RuntimeException" (Just v), expr) =
+  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: CustomException -> StateT EvalState IO Value)
 makeExceptionHandler c (BestraferException _ _ (Just v), expr) =
   HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: SomeException -> StateT EvalState IO Value)
+
 
 valueOfGlobalContextEntry :: DefinitionValue -> StateT EvalState IO Value
 valueOfGlobalContextEntry (Evaluated v) = return v
@@ -142,6 +147,7 @@ evalExpr c (ECase _ e bs) = do
         _ -> Nothing
 evalExpr c (ETry _ e cs) =
   evalExpr c e `catchStateT` map (makeExceptionHandler c) cs
+evalExpr _ (EError _ message) = liftIO . throw $ CustomException message
 
 eval :: Program p -> ConstructorsContext -> IO [Value]
 eval program constrs = do

@@ -317,6 +317,7 @@ buildFunction (erecs, funCntxt) ([FunTypeAnnot annotPos name t], defs) = do
 buildFunction (erecs, funCntxt) _ = return (erecs, funCntxt)
 
 mergeUnOpsWithNumConsts :: Expr p -> Expr p
+mergeUnOpsWithNumConsts (EError  p e) = EError p e
 mergeUnOpsWithNumConsts (EVar    p x) = EVar p x
 mergeUnOpsWithNumConsts (EUnit   p)   = EUnit p
 mergeUnOpsWithNumConsts (EBool   p b) = EBool p b

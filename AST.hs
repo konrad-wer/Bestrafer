@@ -41,6 +41,7 @@ data Expr p
   | EBinOp  p BinOp (Expr p) (Expr p)
   | EUnOp   p UnOp (Expr p)
   | ETry    p (Expr p) [Catch p]
+  | EError  p String
 
 type Program p = [Expr p]
 
@@ -65,6 +66,7 @@ getPos (ELet    p _ _ _) = p
 getPos (EBinOp  p _ _ _ ) = p
 getPos (EUnOp   p _ _) = p
 getPos (ETry    p _ _) = p
+getPos (EError  p _) = p
 
 type Spine p = [Expr p]
 
@@ -257,6 +259,7 @@ instance Show (Expr p) where
   show (EBinOp  _ op e1 e2) = "(" ++ show e1 ++ " " ++ show op ++ " " ++ show e2 ++ ")"
   show (EUnOp   _ op e) = "(" ++ show op ++ " " ++ show e ++ ")"
   show (ETry    _ e cs) = "(try: " ++ show e ++ " catch:" ++ (cs >>= (" " ++) . showCatch) ++ ")"
+  show (EError  _ e) = "(error: " ++ show e ++ ")"
 
 instance Show (BestraferException p) where
   show (BestraferException _ ex Nothing) = ex

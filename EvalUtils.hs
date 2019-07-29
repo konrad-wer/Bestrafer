@@ -9,8 +9,16 @@ import Data.List (intercalate)
 import qualified Data.Map as Map
 import Control.Lens hiding (Context)
 import Control.Exception
+import Data.Typeable
 
 data HandlerT a = forall e . Exception e => HandlerT (e -> StateT EvalState IO a)
+
+newtype CustomException = CustomException String deriving (Typeable)
+
+instance Show CustomException where
+  show (CustomException message) = message
+
+instance Exception CustomException
 
 data Value
   = UnitValue

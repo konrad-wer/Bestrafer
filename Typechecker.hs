@@ -28,7 +28,7 @@ checkedIntroductionForm _ = return False
 
 checkExceptionWellFormedness :: BestraferException p -> Either (TypeError p) ()
 checkExceptionWellFormedness (BestraferException p exc v)
-  | exc `elem` ["ArithmeticException", "IOException", "Exception"] = return ()
+  | exc `elem` ["ArithmeticException", "IOException", "Exception", "RuntimeException"] = return ()
   | otherwise = Left . UndeclaredExceptionError $ BestraferException p exc v
 
 checkBranchWellFormedness :: Branch p -> Either (TypeError p) ()
@@ -581,6 +581,7 @@ checkExpr context expression checkedType principality = do
       checkExpr c (ESpine p (EVar p "-.u") [e]) t pr
     (c, EUnOp p UnOpNot e, t, pr) ->
       checkExpr c (ESpine p (EVar p "!u") [e]) t pr
+    (c, EError _ _, _, _) -> return c
     (c, ETry p e cs, t, pr) -> do
       mapM_ (lift . checkExceptionWellFormedness . fst) cs
       c2 <- checkExpr c e t pr
@@ -671,6 +672,8 @@ checkExpr context expression checkedType principality = do
 
 inferExpr :: Context -> Expr p -> StateT TypecheckerState (Either (TypeError p)) (Type, Principality, Context)
 inferExpr c (EDef _ _ e) = inferExpr c e
+inferExpr c (EError _ _) =
+  return (TUniversal (UTypeVar "e") KStar (TUVar $ UTypeVar "e"), Principal, c)
 inferExpr c (ETuple _ es n) = do
   (ts, pr, c') <- foldM aux ([], Principal, c) es
   return (TProduct (reverse ts) n, pr, c')

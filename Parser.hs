@@ -72,7 +72,7 @@ rword :: String -> Parser ()
 rword w = (lexeme . try) (string w *> notFollowedBy alphaNumChar)
 
 rws :: [String]
-rws = ["let", "def", "data", "where", "if", "then", "else", "in",
+rws = ["let", "def", "data", "where", "if", "then", "else", "in", "error",
        "False", "True", "exists", "forall", "try", "catch", "of", "rec",
        "Bool", "Int", "Float", "Char", "String", "N", "S", "λ", "case"]
 
@@ -364,8 +364,9 @@ eTerm =
   eLet <|>
   eLambda <|>
   eCase <|>
+  eRec <|>
   eTry <|>
-  eRec
+  eError
 
 eRec :: Parser (Expr SourcePos)
 eRec = do
@@ -462,6 +463,13 @@ branch = do
   void $ symbol "->"
   e <- expr
   return ([pat], e, pos)
+
+eError :: Parser (Expr SourcePos)
+eError = do
+  pos <- getSourcePos
+  rword "error"
+  void $ symbol ":"
+  EError pos <$> stringLiteral
 
 eTry :: Parser (Expr SourcePos)
 eTry = do

@@ -1,0 +1,93 @@
+
+def main :: ()
+def main =
+  rec :: ∀ n : N . Vec n Int -> () :
+    printRow row =
+      case row of
+       | [] -> putStrLn ""
+       | x : xs -> (putStr . intToString) x `seq` putChar ' ' `seq` printRow xs
+  in let res =
+    [[1,  2,  3 ],
+     [42, 42, 42],
+     [44, 44, 44]]
+     `mult`
+    [[1, 2],
+     [2, 3],
+     [3, 4]]
+  in iter printRow res
+
+//Matrix Algebra////////////////////////////////////////////////////////////////
+
+def mult :: ∀ n : N, m : N, k : N.
+  Vec (S n) (Vec (S m) Int) ->
+  Vec (S m) (Vec (S k) Int) ->
+  Vec (S n) (Vec (S k) Int)
+def mult a b = map ((flip multVec) b) a
+
+def multVec :: ∀ n : N, m : N .
+  Vec (S n) Int ->
+  Vec (S n) (Vec (S m) Int) ->
+  Vec (S m) Int
+def multVec v m = map (foldl1 (λ x y -> x + y)) (map (zipWith (λ x y -> x * y) v) (transpose m))
+
+def transpose :: ∀ n : N, m : N .
+  Vec (S n) (Vec (S m) Int) ->
+  Vec (S m) (Vec (S n) Int)
+def transpose matrix =
+  let indices = mapi const (head matrix) in
+  map (flip column matrix) indices
+
+def column :: ∀ n : N, m : N . Int ->
+  Vec (S n) (Vec (S m) Int) ->
+  Vec (S n) Int
+def column i = map (nth i)
+
+def nth :: ∀ n : N, a : * . Int -> Vec (S n) a -> a
+def nth 0 (x : xs) = x
+def nth _ [x] = x
+def nth n (x1 : x2 : xs) = nth (n - 1) (x2 : xs)
+
+//Standard functions////////////////////////////////////////////////////////////
+
+def flip :: ∀ a : *, b : *, c : * . (a -> b -> c) -> b -> a -> c
+def flip f x y = f y x
+
+def mapi :: ∀ n : N, a : *, b : * . (Int -> a -> b) -> Vec n a -> Vec n b
+def mapi f l =
+  rec :: ∀ n : N, a : *, b : * . Int ->  (Int -> a -> b) -> Vec n a -> Vec n b :
+    mapi_ i f l = case l of
+      | [] -> []
+      | x : xs -> f i x : mapi_ (i + 1) f xs
+  in mapi_ 0 f l
+
+def map :: ∀ n : N, a : *, b : * . (a -> b) -> Vec n a -> Vec n b
+def map f l = case l of
+  | [] -> []
+  | x : xs -> f x : map f xs
+
+def foldl1 :: ∀ n : N, a : * . (a -> a -> a) -> Vec (S n) a -> a
+def foldl1 f (x : xs) = foldl f x xs
+
+def foldl :: ∀ n : N, a : *, b : * . (b -> a -> b) -> b -> Vec n a -> b
+def foldl _ a [] = a
+def foldl f a (x : xs) = foldl f (f a x) xs
+
+def zipWith ::
+  ∀ n : N, a : *, b : *, c : * .
+  (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
+def zipWith _ [] [] = []
+def zipWith f (x : xs) (y : ys) = f x y : zipWith f xs ys
+
+def head :: ∀ t : * . ∀ n : N . Vec (S n) t -> t
+def head (a : _) = a
+
+def const :: ∀ a : *, b : * . a -> b -> a
+def const a b = a
+
+def seq :: ∀ a : * . () -> a -> a
+def seq () a = a
+
+def iter :: ∀ n : N, a : *. (a -> ()) -> Vec n a -> ()
+def iter _ [] = ()
+def iter f (x : xs) = f x `seq` iter f xs
+

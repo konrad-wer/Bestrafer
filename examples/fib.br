@@ -1,0 +1,39 @@
+
+def mult :: Vec 2 (Vec 2 Int) -> Vec 2 (Vec 2 Int) -> Vec 2 (Vec 2 Int)
+def mult 
+  [[x11, x12], 
+   [x21, x22]] 
+
+  [[y11, y12], 
+   [y21, y22]]
+  =
+  [[x11 * y11 + x12 * y21, x11 * y12 + x12 * y22],
+   [x21 * y11 + x22 * y21, x21 * y12 + x22 * y22]]
+
+def id :: Vec 2 (Vec 2 Int)
+def id =
+  [[1, 0],
+   [0, 1]]
+
+def pow :: Vec 2 (Vec 2 Int) -> Int -> Vec 2 (Vec 2 Int)
+def pow _ 0 = id
+def pow m n =
+  let m2 = m `pow` (n / 2) in
+  if n % 2 == 1 then
+    m2 `mult` m2 `mult` m
+  else
+    m2 `mult` m2
+
+def fib :: Int -> Int
+def fib n =
+  case pow [[0, 1], [1, 1]] n of
+    | [[_, fn], [_, _]] -> fn
+
+def main :: ()
+def main =
+  try:
+    let n = readLnInt () in
+    printInt (fib n)
+  catch:
+    | IOException m -> putStrLn (m)
+

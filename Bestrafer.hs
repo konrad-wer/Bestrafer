@@ -29,6 +29,6 @@ main = do
             let startState = TypecheckerState { _freshVarNum = 0, _constrContext = cContext, _gadtDefs = gDefs, _funContext = fContext } in
             case iterM (void . flip evalStateT startState . inferExpr []) prog of
               Right () -> do
-                          res <- eval prog cContext
-                          print res
-              Left err -> print  err-- print err
+                          void $ eval prog cContext
+                          return ()
+              Left err -> print  err

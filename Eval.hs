@@ -155,5 +155,4 @@ eval program constrs = do
   let gc = Map.fromList $ builtinFunctions ++ userFunctions
   let ca = Map.map  (length . constrArgsTemplates) constrs
   let startState = EvalState {_constrArities = ca, _globalContext = gc, _freshVarNum = 0}
-  print $ map (\(EDef _ name _) -> name) program
   evalStateT (mapM (evalExpr Map.empty) program) startState

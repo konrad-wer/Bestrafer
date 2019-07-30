@@ -82,14 +82,14 @@ buildGADTContexts :: [ProgramBlock p] -> Either (ASTBuilderError p) (Constructor
 buildGADTContexts blocks = do
   let gadtDefBlocks = filter isBlockGADTDef blocks
   iterM checkGADTDefParams gadtDefBlocks
-  let gDefsList = map unpackNameAndParams gadtDefBlocks
+  let gDefsList = vecAndListGADTDef ++ map unpackNameAndParams gadtDefBlocks
   let gDefsNames = Set.fromList $ map fst gDefsList
   if Set.size gDefsNames /= length gDefsList then
     let countedNames = foldl (flip (Map.update (return . (+ 1)))) (Map.fromSet (const (0 :: Integer)) gDefsNames) $ map fst gDefsList in
     let duplicateName = fst . head . filter ((> 1) . snd) . Map.toList $ countedNames in
     Left $ MoreThanOneGADTDefinition duplicateName
   else do
-    let gDefs = Map.fromList $ vecAndListGADTDef ++ gDefsList
+    let gDefs = Map.fromList gDefsList
     contstrContext <- foldM (buildGADTDef gDefs) vecAndListConstructorsContext gadtDefBlocks
     return (contstrContext, gDefs)
     where

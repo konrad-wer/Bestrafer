@@ -26,8 +26,8 @@ data Either * 'A 'B where
   | Left :: 'A -> Either Fail 'A 'B
   | Right :: 'B -> Either Ok 'A 'B
 
- //this pattern matching is exhaustive because Right
- //is only constructor that produces Either Ok 'A 'B type
+//this pattern matching is exhaustive because Right
+//is only constructor that produces Either Ok 'A 'B type
 
 def getRight :: ∀ a : *, b : *. Either Ok a b -> b
 def getRight (Right x) = x

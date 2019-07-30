@@ -242,6 +242,9 @@ equivalentType c (TGADT n1 (t1 : ts1)) (TGADT n2 (t2 : ts2)) p clue
          tl' <- lift $ applyContextToGADTParameter p _c tl
          tr' <- lift $ applyContextToGADTParameter p _c tr
          equivalentGADTParameter _c tl' tr' p clue
+equivalentType c (TProduct [] n1) (TProduct [] n2) p _
+  | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TProduct [] n1) (TProduct [] n2)
+  | otherwise = return c
 equivalentType c (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2) p clue
    | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2)
    | otherwise = do

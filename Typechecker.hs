@@ -229,8 +229,11 @@ equivalentType c (TArrow a1 a2) (TArrow b1 b2) p clue = do
   a2' <- lift $ applyContextToType p c2 a2
   b2' <- lift $ applyContextToType p c2 b2
   equivalentType c2 a2' b2' p clue
+equivalentType c (TGADT n1 []) (TGADT n2 []) p _
+  | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TGADT n1 []) (TGADT n2 [])
+  | otherwise = return c
 equivalentType c (TGADT n1 (t1 : ts1)) (TGADT n2 (t2 : ts2)) p clue
-   | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TGADT n1 ts1) (TGADT n2 ts2)
+   | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TGADT n1 (t1 : ts1)) (TGADT n2 (t2 : ts2))
    | otherwise = do
      c2 <- equivalentGADTParameter c t1 t2 p clue
      foldM aux c2 $ zip ts1 ts2

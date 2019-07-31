@@ -631,6 +631,7 @@ checkExpr context expression checkedType principality = do
       c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
       c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
       return $ dropContextToMarker c3
+    (c, ETuple _ [] 0, TProduct [] 0, _) -> return c
     (c, ETuple p (e1 : es) n1, TProduct (t1 : ts) n2, pr) ->
       if n1 /= n2 then
         lift . Left $ ProductArityError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2)
@@ -641,6 +642,7 @@ checkExpr context expression checkedType principality = do
         aux _c (e, t) = do
           t' <- lift $ applyContextToType p _c t
           checkExpr _c e t' pr
+    (c, ETuple p [] 0, TEVar a, NotPrincipal) -> lift $ eTypeVarContextReplace c a KStar (MProduct [] 0) [] p
     (c, ETuple p (e1 : es) n, TEVar a, NotPrincipal) -> do
       let a1 : as = generateSubETypeVarsList a n
       c2 <- lift $ eTypeVarContextReplace c a KStar (MProduct (map MEVar (a1 : as)) n) (map (flip CTypeVar KStar . E) $ a1 : as) p

@@ -680,6 +680,12 @@ checkExpr context expression checkedType principality = do
 
 inferExpr :: Context -> Expr p -> StateT TypecheckerState (Either (TypeError p)) (Type, Principality, Context)
 inferExpr c (EDef _ _ e) = inferExpr c e
+inferExpr c (EUnit     _) = return (TUnit, Principal, c)
+inferExpr c (EBool   _ _) = return (TBool, Principal, c)
+inferExpr c (EInt    _ _) = return (TInt, Principal, c)
+inferExpr c (EFloat  _ _) = return (TFloat, Principal, c)
+inferExpr c (EChar   _ _) = return (TChar, Principal, c)
+inferExpr c (EString _ _) = return (TString, Principal, c)
 inferExpr c (EError _ _) =
   return (TUniversal (UTypeVar "e") KStar (TUVar $ UTypeVar "e"), Principal, c)
 inferExpr c (ETuple _ es n) = do

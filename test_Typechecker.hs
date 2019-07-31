@@ -2238,7 +2238,7 @@ inferSpine_test2 =
 inferSpine_test3 :: Test
 inferSpine_test3 =
   case flip evalStateT startState $ inferSpine [] [EString () "KW"] (TArrow TBool TInt) Principal of
-    Left (TypeInferenceError (EString () "KW")) -> True
+    Left (TypesNotEquivalentError () TString TBool) -> True
     _ -> False
 
 inferSpine_test4 :: Test
@@ -2250,7 +2250,7 @@ inferSpine_test4 =
 inferSpine_test5 :: Test
 inferSpine_test5 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, EBool () False] (TArrow TBool (TArrow TChar TString)) NotPrincipal of
-    Left (TypeInferenceError (EBool () False)) -> True
+    Left (TypesNotEquivalentError () TBool TChar) -> True
     _ -> False
 
 inferSpine_test6 :: Test
@@ -2298,7 +2298,7 @@ inferSpine_test11 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
                                     (TUniversal (UTypeVar "a") KStar (TImp (MUVar (UTypeVar "a"), MInt)
                                     (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString)))) NotPrincipal of
-    Left (TypeInferenceError (EChar () 'k')) -> True
+    Left (TypesNotEquivalentError () TChar TInt) -> True
     _ -> False
 
 inferSpine_test12 :: Test
@@ -2314,7 +2314,7 @@ inferSpine_test13 =
   case flip evalStateT startState $ inferSpine [] [EBool () True, EChar  () 'k']
                                     (TUniversal (UTypeVar "a") KStar (TImp (MUVar (UTypeVar "a"), MInt)
                                     (TArrow TBool (TArrow (TUVar (UTypeVar "a")) TString)))) Principal of
-    Left (TypeInferenceError (EChar () 'k')) -> True
+    Left (TypesNotEquivalentError () TChar TInt) -> True
     _ -> False
 
 checkExpr_ESimpleType_test1 :: Test
@@ -2406,7 +2406,7 @@ checkExpr_ETuple_test7 :: Test
 checkExpr_ETuple_test7 =
   case flip evalStateT startState $ checkExpr [CTypeVar (E $ ETypeVar "x") KStar] (ETuple () [ETuple () [ETuple () [EUnit (), EUnit ()] 2, EUnit ()] 2,
                   ETuple () [EUnit (), EUnit ()] 2] 2) (TProduct [TEVar $ ETypeVar "x", TEVar $ ETypeVar "x"] 2) NotPrincipal of
-    Left (TypeInferenceError (EUnit ())) -> True
+    Left (TypesNotEquivalentError () TUnit (TProduct [TUnit, TUnit] 2)) -> True
     _ -> False
 
 checkExpr_ETuple_test8 :: Test

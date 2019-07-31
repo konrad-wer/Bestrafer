@@ -793,8 +793,9 @@ checkBranchIncorporatingProps p c (prop : props) b ts Principal te pr = do
   case unificationResult of
     Nothing -> return c
     Just c2 -> do
+      te' <- lift $ applyContextToType (getPosFromBranch b) c2 te
       ts' <- mapM (lift . applyContextToType (getPosFromBranch b) c2) ts
-      dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts' Principal te pr
+      dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts' Principal te' pr
 checkBranchIncorporatingProps p _ _ _ _ NotPrincipal _ _ = lift . Left $ InternalCompilerTypeError p "checkBranchIncorporatingProps"
 
 checkCoverage ::

@@ -31,6 +31,12 @@ def curry f x y = f (x, y)
 def uncurry :: ∀ a : *, b : *, c : * . (a -> b -> c) -> (a, b) -> c
 def uncurry f (x, y) = f x y
 
+def pair :: ∀ a : *, b : *, c : * . (a -> b, a -> c) -> a -> (b, c)
+def pair (f, g) x = (f x, g x)
+
+def cross :: ∀ a : *, b : *, c : *, d : * . (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+def cross f g = pair (f . fst, g . snd)
+
 //Vec
 
 def elem :: ∀ n : N, a : * . a -> Vec n a -> Bool

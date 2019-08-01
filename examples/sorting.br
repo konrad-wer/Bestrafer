@@ -1,0 +1,37 @@
+
+//quick sort on List
+
+def qsortL :: ∀ a : * . List a -> List a
+def qsortL {} = {}
+def qsortL (x ; xs) = (qsortL . filterL (λ y -> y <= x)) xs @ {x} @ (qsortL . filterL (λ y -> y > x)) xs
+
+//quick sort on Vec, now we have to use 'let'
+//to unpack values from existential type
+
+def qsort :: ∀ n : N, a : * . Vec n a -> ∃ k : N . Vec k a
+def qsort [] = []
+def qsort (x : xs) =
+  let left  = filter (λ y -> y <= x) xs in
+  let right = filter (λ y -> y > x) xs in
+  let left  = qsort left in
+  let right = qsort right in
+  left ++ (x : right)
+
+//insertion sort on Vec, since we are sorting list element by element
+//we can prove that the resulting Vec has a same length as the input one
+
+def insert :: ∀ n : N, a : * . a -> Vec n a -> Vec (S n) a
+def insert a [] = [a]
+def insert a (x : xs) =
+  if a < x then
+    a : x : xs
+  else
+    x : insert a xs
+
+def insertSort :: ∀ n : N, a : * . Vec n a -> Vec n a
+def insertSort [] = []
+def insertSort (x : xs) = insert x (insertSort xs)
+
+def main :: ()
+def main =
+  iter printInt (insertSort [43, 32, 123, 44, 12, 55])

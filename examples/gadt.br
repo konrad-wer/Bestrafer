@@ -14,8 +14,8 @@ data Vector N 'A where
 
 //now we can define head function, that only accepts non-empty Vectors
 
-def head :: ∀ n : N, a : * . Vector (S n) a -> a
-def head (Cons x xs) = x
+def vectorHead :: ∀ n : N, a : * . Vector (S n) a -> a
+def vectorHead (Cons x xs) = x
 
 //using empty types as annotations to Either type
 

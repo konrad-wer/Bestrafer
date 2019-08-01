@@ -10,13 +10,13 @@ def mult
   [[x11 * y11 + x12 * y21, x11 * y12 + x12 * y22],
    [x21 * y11 + x22 * y21, x21 * y12 + x22 * y22]]
 
-def id :: Vec 2 (Vec 2 Int)
-def id =
+def idMatrix :: Vec 2 (Vec 2 Int)
+def idMatrix =
   [[1, 0],
    [0, 1]]
 
 def pow :: Vec 2 (Vec 2 Int) -> Int -> Vec 2 (Vec 2 Int)
-def pow _ 0 = id
+def pow _ 0 = idMatrix
 def pow m n =
   let m2 = m `pow` (n / 2) in
   if n % 2 == 1 then

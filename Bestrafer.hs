@@ -10,22 +10,22 @@ import Eval
 import Control.Monad (void)
 import Control.Monad.State
 
-readArgs :: [a] -> Maybe a
+readArgs :: [a] -> Maybe [a]
 readArgs [] = Nothing
-readArgs (x : _) = return x
+readArgs xs = return xs
 
 main :: IO ()
 main = do
   args <- getArgs
   case readArgs args of
     Nothing -> putStrLn "Please provide input file name!"
-    Just fileName -> do
+    Just fileNames -> do
       stdlib <- readFile "stdlib.br"
       let (Right stdlibBlocks) = parseProgram "stdlib.br" stdlib
-      input <- readFile fileName
-      case parseProgram fileName input of
+      inputs <- mapM readFile fileNames
+      case zipWithM parseProgram fileNames inputs of
         Left err -> putStr $ errorBundlePretty err
-        Right blocks -> case buildAST (stdlibBlocks ++ blocks) of
+        Right blocks -> case buildAST (stdlibBlocks ++ concat blocks) of
           Left err -> print err
           Right (prog, cContext, gDefs, fContext) ->
             let startState = TypecheckerState { _freshVarNum = 0, _constrContext = cContext, _gadtDefs = gDefs, _funContext = fContext } in

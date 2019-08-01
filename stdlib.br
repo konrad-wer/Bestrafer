@@ -1,0 +1,190 @@
+
+//Basic
+
+def flip :: ∀ a : *, b : *, c : * . (a -> b -> c) -> b -> a -> c
+def flip f x y = f y x
+
+def id :: ∀ a : * . a -> a
+def id x = x
+
+def succ :: Int -> Int
+def succ x = x + 1
+
+def pred :: Int -> Int
+def pred x = x - 1
+
+def const :: ∀ a : *, b : * . a -> b -> a
+def const a b = a
+
+def seq :: ∀ a : * . () -> a -> a
+def seq () a = a
+
+def fst :: ∀ a : *, b : * . (a, b) -> a
+def fst (x, _) = x
+
+def snd :: ∀ a : *, b : * . (a, b) -> b
+def snd (_, x) = x
+
+def curry :: ∀ a : *, b : *, c : * . ((a, b) -> c) -> a -> b -> c
+def curry f x y = f (x, y)
+
+def uncurry :: ∀ a : *, b : *, c : * . (a -> b -> c) -> (a, b) -> c
+def uncurry f (x, y) = f x y
+
+//Vec
+
+def elem :: ∀ n : N, a : * . a -> Vec n a -> Bool
+def elem _ [] = False
+def elem a (x : xs) = (a == x) || a `elem` xs
+
+def head :: ∀ n : N, a : * . Vec (S n) a -> a
+def head (x : _) = x
+
+def tail :: ∀ n : N, a : * . Vec (S n) a -> Vec n a
+def tail (_ : xs) = xs
+
+def iter :: ∀ n : N, a : * . (a -> ()) -> Vec n a -> ()
+def iter _ [] = ()
+def iter f (x : xs) = f x `seq` iter f xs
+
+def reverse :: ∀ n : N, a : * . Vec n a -> ∃ k : N . Vec k a
+def reverse xs =
+  rec :: ∀ n : N, a : * . Vec n a -> (∃ m : N . Vec m a) -> ∃ k : N . Vec k a :
+  rev list acc =
+    case list of
+      | [] -> acc
+      | x : xs -> let a = acc in rev xs (x : a)
+  in rev xs []
+
+def filter :: ∀ n : N, a : * . (a -> Bool) -> Vec n a -> ∃ k : N . Vec k a
+def filter _ [] = []
+def filter p (x : xs) =
+  let tail = filter p xs in
+    if p x then
+      x : tail
+    else
+      tail
+
+// -> Maps
+
+def mapi :: ∀ n : N, a : *, b : * . (Int -> a -> b) -> Vec n a -> Vec n b
+def mapi f l =
+  rec :: ∀ n : N, a : *, b : * . Int ->  (Int -> a -> b) -> Vec n a -> Vec n b :
+    mapi_ i f l = case l of
+      | [] -> []
+      | x : xs -> f i x : mapi_ (i + 1) f xs
+  in mapi_ 0 f l
+
+def map :: ∀ n : N, a : *, b : * . (a -> b) -> Vec n a -> Vec n b
+def map _ [] = []
+def map f (x : xs) = f x : map f xs
+
+// -> folds
+
+def foldl :: ∀ n : N, a : *, b : * . (b -> a -> b) -> b -> Vec n a -> b
+def foldl _ a [] = a
+def foldl f a (x : xs) = foldl f (f a x) xs
+
+def foldl1 :: ∀ n : N, a : * . (a -> a -> a) -> Vec (S n) a -> a
+def foldl1 f (x : xs) = foldl f x xs
+
+def foldr :: ∀ n : N, a : *, b : * . (a -> b -> b) -> b -> Vec n a -> b
+def foldr _ a [] = a
+def foldr f a (x : xs) = f x (foldr f a xs)
+
+def foldr1 :: ∀ n : N, a : * . (a -> a -> a) -> Vec (S n) a -> a
+def foldr1 _ [a] = a
+def foldr1 f (x1 : x2 : xs) = f x1 (foldr1 f (x2 : xs))
+
+// -> zips
+
+def zip :: ∀ n : N, a : *, b : * . Vec n a -> Vec n b -> Vec n (a, b)
+def zip [] [] = []
+def zip (x : xs) (y : ys) = (x, y) : zip xs ys
+
+def zipWith :: ∀ n : N, a : *, b : *, c : * .
+  (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
+def zipWith _ [] [] = []
+def zipWith f (x : xs) (y : ys) = f x y : zipWith f xs ys
+
+//List
+
+def elemL :: ∀ a : * . a -> List a -> Bool
+def elemL _ {} = False
+def elemL a (x ; xs) = (a == x) || a `elemL` xs
+
+def headL :: ∀ a : * . List a -> a
+def headL (x ; _) = x
+def headL {} = error: "Head of empty list"
+
+def tailL :: ∀ a : * . List a -> List a
+def tailL (_ ; xs) = xs
+def tailL {} = error: "Tail of empty list"
+
+def iterL :: ∀ a : * . (a -> ()) -> List a -> ()
+def iterL _ {} = ()
+def iterL f (x ; xs) = f x `seq` iterL f xs
+
+def reverseL :: ∀ a : * . List a -> List a
+def reverseL xs =
+  rec :: ∀ a : * . List a -> List a -> List a :
+  rev list acc =
+    case list of
+      | {} -> acc
+      | x ; xs -> let a = acc in rev xs (x ; a)
+  in rev xs {}
+
+def filterL :: ∀ a : * . (a -> Bool) -> List a -> List a
+def filterL _ {} = {}
+def filterL p (x ; xs) =
+  let tail = filterL p xs in
+    if p x then
+      x ; tail
+    else
+      tail
+
+// -> Maps
+
+def mapiL :: ∀ a : *, b : * . (Int -> a -> b) -> List a -> List b
+def mapiL f l =
+  rec :: ∀ n : N, a : *, b : * . Int ->  (Int -> a -> b) -> List a -> List b :
+    mapi_ i f l = case l of
+      | {} -> {}
+      | x ; xs -> f i x ; mapi_ (i + 1) f xs
+  in mapi_ 0 f l
+
+def mapL :: ∀ n : N, a : *, b : * . (a -> b) -> List a -> List b
+def mapL _ {} = {}
+def mapL f (x ; xs) = f x ; mapL f xs
+
+// -> folds
+
+def foldlL :: ∀ a : *, b : * . (b -> a -> b) -> b -> List a -> b
+def foldlL _ a {} = a
+def foldlL f a (x ; xs) = foldlL f (f a x) xs
+
+def foldl1L :: ∀ a : * . (a -> a -> a) -> List a -> a
+def foldl1L f (x ; xs) = foldlL f x xs
+def foldl1L _ {} = error: "foldl1 of empty list"
+
+def foldrL :: ∀ a : *, b : * . (a -> b -> b) -> b -> List a -> b
+def foldrL _ a {} = a
+def foldrL f a (x ; xs) = f x (foldrL f a xs)
+
+def foldr1L :: ∀ n : N, a : * . (a -> a -> a) -> List a -> a
+def foldr1L _ {a} = a
+def foldr1L f (x ; xs) = f x (foldr1L f xs)
+def foldr1L _ {} = error: "foldr1 of empty list"
+
+// -> zips
+
+def zipL :: ∀ a : *, b : * . List a -> List b -> List (a, b)
+def zipL {} _ = {}
+def zipL _ {} = {}
+def zipL (x ; xs) (y ; ys) = (x, y) ; zipL xs ys
+
+def zipWithL :: ∀ a : *, b : *, c : * .
+  (a -> b -> c) -> List a -> List b -> List c
+def zipWithL _ {} _ = {}
+def zipWithL _ _ {} = {}
+def zipWithL f (x ; xs) (y ; ys) = f x y ; zipWithL f xs ys

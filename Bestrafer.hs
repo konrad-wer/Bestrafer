@@ -20,10 +20,12 @@ main = do
   case readArgs args of
     Nothing -> putStrLn "Please provide input file name!"
     Just fileName -> do
+      stdlib <- readFile "stdlib.br"
+      let (Right stdlibBlocks) = parseProgram "stdlib.br" stdlib
       input <- readFile fileName
       case parseProgram fileName input of
         Left err -> putStr $ errorBundlePretty err
-        Right blocks -> case buildAST blocks of
+        Right blocks -> case buildAST (stdlibBlocks ++ blocks) of
           Left err -> print err
           Right (prog, cContext, gDefs, fContext) ->
             let startState = TypecheckerState { _freshVarNum = 0, _constrContext = cContext, _gadtDefs = gDefs, _funContext = fContext } in

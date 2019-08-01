@@ -18,7 +18,7 @@ main :: IO ()
 main = do
   args <- getArgs
   case readArgs args of
-    Nothing -> putStrLn "Please provide input file name!"
+    Nothing -> putStrLn "Please provide input file name(s)!"
     Just fileNames -> do
       stdlib <- readFile "stdlib.br"
       let (Right stdlibBlocks) = parseProgram "stdlib.br" stdlib

@@ -21,6 +21,7 @@ data ASTBuilderError p
   | WrongConstrResultTypeParameter (ConstrDef p) String
   | GADTDuplicateParamError p String [String]
   | MoreThanOneGADTDefinition String
+  | MoreThanOneConstrDefinition String
   | ConstrFormednessTypeError (TypeError p)
   | TypeParamIsNotMonotypeError p GADTDefParameter GADTParameterTemplate
   | FunctionLacksAnnotationError p Var
@@ -39,6 +40,7 @@ instance SourcePos ~ p => Show (ASTBuilderError p) where
   show (GADTDuplicateParamError p typeName params) = sourcePosPretty p ++ "\nType " ++ addQuotes (typeName ++ " " ++ unwords params) ++
     " has a duplicate parameter"
   show (MoreThanOneGADTDefinition typeName) = "Multiple declarations of type " ++ addQuotes typeName
+  show (MoreThanOneConstrDefinition constrName) = "Multiple definitions of constructor " ++ addQuotes constrName
   show (ConstrFormednessTypeError err) = show err
   show (TypeParamIsNotMonotypeError p defParam param) = sourcePosPretty p ++ "\nCouldn't convert type " ++  addQuotes (show param) ++
     " to monotype, while trying to match it with " ++ addQuotes (show defParam) ++ " parameter"
@@ -91,10 +93,15 @@ buildGADTContexts blocks = do
   else do
     let gDefs = Map.fromList gDefsList
     contstrContext <- foldM (buildGADTDef gDefs) vecAndListConstructorsContext gadtDefBlocks
-    return (contstrContext, gDefs)
+    let constrCounts = foldl countConstrsInDef (Map.fromSet (const (0 :: Integer)) $ Map.keysSet contstrContext) blocks
+    case filter ((> 1) . snd) . Map.toList $ constrCounts of
+      ((duplicateName, _) : _) -> Left $ MoreThanOneConstrDefinition duplicateName
+      [] -> return (contstrContext, gDefs)
     where
       unpackNameAndParams (GADTDef _ name params _) = (name, params)
       unpackNameAndParams _ = ("", [])
+      countConstrsInDef counts (GADTDef _ _ _ cs) = foldl (flip (Map.update (return . (+ 1)) . constrDefName)) counts cs
+      countConstrsInDef counts _ = counts
 
 checkGADTDefParams :: ProgramBlock p -> Either (ASTBuilderError p) ()
 checkGADTDefParams (GADTDef p name params _) =

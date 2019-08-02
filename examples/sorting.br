@@ -17,7 +17,7 @@ def qsort (x : xs) =
   let right = qsort right in
   left ++ (x : right)
 
-//insertion sort on Vec, since we are sorting list element by element
+//insertion sort on Vec, since we are sorting Vec element by element
 //we can prove that the resulting Vec has a same length as the input one
 
 def insert :: ∀ n : N, a : * . a -> Vec n a -> Vec (S n) a

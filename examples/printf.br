@@ -13,11 +13,11 @@ def printf ::  ∀ a : * . Format a -> a
 def printf End = ()
 def printf (Lit s format) = putStr s `seq` printf format
 def printf (Eol format) = putStrLn "" `seq` printf format
-def printf (Str format) = \x -> putStr x `seq` printf format
-def printf (Inr format) = \x -> (putStr . intToString) x `seq` printf format
-def printf (Flt format) = \x -> (putStr . floatToString) x `seq` printf format
-def printf (Bl  format) = \x -> (putStr . boolToString) x `seq` printf format
-def printf (Chr format) = \x -> putChar x `seq` printf format
+def printf (Str format) = λ x -> putStr x `seq` printf format
+def printf (Inr format) = λ x -> (putStr . intToString) x `seq` printf format
+def printf (Flt format) = λ x -> (putStr . floatToString) x `seq` printf format
+def printf (Bl  format) = λ x -> (putStr . boolToString) x `seq` printf format
+def printf (Chr format) = λ x -> putChar x `seq` printf format
 
 def main :: ()
 def main =

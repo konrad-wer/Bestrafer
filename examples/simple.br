@@ -1,0 +1,15 @@
+
+def fac :: Int -> Int
+def fac 0 = 1
+def fac n = n * fac (n - 1)
+
+def ack :: Int -> Int -> Int
+def ack m n = case (m, n) of
+  | (0, n) -> n + 1
+  | (m, 0) -> ack (m - 1) 1
+  | (m, n) -> ack (m - 1) (ack m (n - 1))
+
+def main :: ()
+def main =
+  printInt (fac 5) `seq`
+  printInt (ack 3 1)

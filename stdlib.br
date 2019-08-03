@@ -39,6 +39,14 @@ def cross f g = pair (f . fst, g . snd)
 
 //Vec
 
+def length :: ∀ n : N, a : * . Vec n a -> Int
+def length vec =
+  rec :: ∀ n : N, a : * . Vec n a -> Int  -> Int :
+    len v acc = case v of
+      | [] -> acc
+      | (_ : xs) -> len xs (acc + 1)
+  in len vec 0
+
 def elem :: ∀ n : N, a : * . a -> Vec n a -> Bool
 def elem _ [] = False
 def elem a (x : xs) = (a == x) || a `elem` xs
@@ -114,6 +122,14 @@ def zipWith _ [] [] = []
 def zipWith f (x : xs) (y : ys) = f x y : zipWith f xs ys
 
 //List
+
+def lengthL :: ∀ a : * . List a -> Int
+def lengthL list =
+  rec :: ∀ a : * . List a -> Int  -> Int :
+    len l acc = case l of
+      | {} -> acc
+      | (_ ; xs) -> len xs (acc + 1)
+  in len list 0
 
 def elemL :: ∀ a : * . a -> List a -> Bool
 def elemL _ {} = False

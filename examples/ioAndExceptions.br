@@ -1,0 +1,22 @@
+
+def checkPassword :: String -> ()
+def checkPassword s =
+  if s == "Rammstein" then
+    ()
+  else
+    error: "Password is incorrect"
+
+def main :: ()
+def main =
+  try:
+    let password = getLine () in
+    checkPassword password `seq`
+    let x = readLnInt () in
+    printInt (1000 / x) `seq`
+    let filename = getLine () in
+    readFile filename |> putStrLn
+  catch:
+    | IOException e -> putStrLn e
+    | ArithmeticException -> putStrLn "Division by zero"
+    | RuntimeException e -> putStrLn e
+    | Exception e -> putStrLn e

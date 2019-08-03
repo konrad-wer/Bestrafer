@@ -18,7 +18,7 @@ def main =
 
 //Matrix Algebra////////////////////////////////////////////////////////////////
 
-def mult :: ∀ n : N, m : N, k : N.
+def mult :: ∀ n : N, m : N, k : N .
   Vec (S n) (Vec (S m) Int) ->
   Vec (S m) (Vec (S k) Int) ->
   Vec (S n) (Vec (S k) Int)
@@ -37,7 +37,8 @@ def transpose matrix =
   let indices = mapi const (head matrix) in
   map (flip column matrix) indices
 
-def column :: ∀ n : N, m : N . Int ->
+def column :: ∀ n : N, m : N .
+  Int ->
   Vec (S n) (Vec (S m) Int) ->
   Vec (S n) Int
 def column i = map (nth i)

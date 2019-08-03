@@ -73,7 +73,8 @@ conversionFunctionsTypes =
     ("floatToInt", TArrow TFloat TInt),
     ("intToString", TArrow TInt TString),
     ("floatToString", TArrow TFloat TString),
-    ("boolToString", TArrow TBool TString)
+    ("boolToString", TArrow TBool TString),
+    ("charToString", TArrow TChar TString)
   ]
 
 builtinFunctionsTypes :: [(Var, Type)]
@@ -264,7 +265,8 @@ conversionFunctions =
     ("floatToInt",    Evaluated $ FunValue (\(FloatValue x)  -> return . IntValue $ truncate x)),
     ("intToString",   Evaluated $ FunValue (\(IntValue x)    -> return . StringValue $ show x)),
     ("floatToString", Evaluated $ FunValue (\(FloatValue x)  -> return . StringValue $ show x)),
-    ("boolToString",  Evaluated $ FunValue (\(BoolValue x)   -> return . StringValue $ show x))
+    ("boolToString",  Evaluated $ FunValue (\(BoolValue x)   -> return . StringValue $ show x)),
+    ("charToString",  Evaluated $ FunValue (\(CharValue x)   -> return . StringValue $ return x))
   ]
 
 builtinFunctions :: [(Var, DefinitionValue)]

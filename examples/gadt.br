@@ -23,7 +23,7 @@ data Ok
 data Fail
 
 data Either * 'A 'B where
-  | Left :: 'A -> Either Fail 'A 'B
+  | Left  :: 'A -> Either Fail 'A 'B
   | Right :: 'B -> Either Ok 'A 'B
 
 //this pattern matching is exhaustive because Right

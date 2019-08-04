@@ -1,0 +1,286 @@
+% Opcje klasy 'iithesis' opisane sa w komentarzach w pliku klasy. Za ich pomoca
+% ustawia sie przede wszystkim jezyk i rodzaj (lic/inz/mgr) pracy, oraz czy na
+% drugiej stronie pracy ma byc skladany wzor oswiadczenia o autorskim wykonaniu.
+\documentclass[declaration,shortabstract,english]{iithesis}
+
+\usepackage[utf8]{inputenc}
+
+%%%%% DANE DO STRONY TYTUŁOWEJ
+% Niezaleznie od jezyka pracy wybranego w opcjach klasy, tytul i streszczenie
+% pracy nalezy podac zarowno w jezyku polskim, jak i angielskim.
+% Pamietaj o madrym (zgodnym z logicznym rozbiorem zdania oraz estetyka) recznym
+% zlamaniu wierszy w temacie pracy, zwlaszcza tego w jezyku pracy. Uzyj do tego
+% polecenia \fmlinebreak.
+\polishtitle    {Wymagający złamania wierszy\fmlinebreak tytuł pracy w~języku polskim}
+\englishtitle   {English title}
+\polishabstract {\ldots}
+\englishabstract{\ldots}
+% w pracach wielu autorow nazwiska mozna oddzielic poleceniem \and
+\author         {Konrad Werbliński}
+% w przypadku kilku promotorow, lub koniecznosci podania ich afiliacji, linie
+% w ponizszym poleceniu mozna zlamac poleceniem \fmlinebreak
+\advisor        {dr Filip Sieczkowski}
+%\date          {}                     % Data zlozenia pracy
+% Dane do oswiadczenia o autorskim wykonaniu
+%\transcriptnum {}                     % Numer indeksu
+%\advisorgen    {dr. Jana Kowalskiego} % Nazwisko promotora w dopelniaczu
+%%%%%
+
+%%%%% WLASNE DODATKOWE PAKIETY
+%
+%\usepackage{graphicx,listings,amsmath,amssymb,amsthm,amsfonts,tikz}
+%
+%%%%% WŁASNE DEFINICJE I POLECENIA
+%
+%\theoremstyle{definition} \newtheorem{definition}{Definition}[chapter]
+%\theoremstyle{remark} \newtheorem{remark}[definition]{Observation}
+%\theoremstyle{plain} \newtheorem{theorem}[definition]{Theorem}
+%\theoremstyle{plain} \newtheorem{lemma}[definition]{Lemma}
+%\renewcommand \qedsymbol {\ensuremath{\square}}
+% ...
+%%%%%
+
+\begin{document}
+
+%%%%% POCZĄTEK ZASADNICZEGO TEKSTU PRACY
+
+\chapter{Introduction}
+\chapter{Language description}
+\section{Language features}
+Bestrafer's syntax was designed to be concise, expressive, readable and beautiful.
+It was strongly influenced by Haskell, but modified to be indentation-insensitive for greater
+flexibility in writing beautiful code and ease of parsing.
+\begin{verbatim}
+//Single-line comment
+/*
+  Multi-line comment
+*/
+
+def fac :: Int -> Int
+def fac 0 = 1
+def fac n = n * fac (n - 1)
+
+def ack :: Int -> Int -> Int
+def ack m n = case (m, n) of
+  | (0, n) -> n + 1
+  | (m, 0) -> ack (m - 1) 1
+  | (m, n) -> ack (m - 1) (ack m (n - 1))
+
+def main :: ()
+def main =
+  printInt (fac 5) `seq`
+  printInt (ack 3 1)
+\end{verbatim}
+Our language supports Haskell-like top-level pattern matching in definitions. Type annotations
+for top-level definitions are obligatory due to bidirectionality of the type system.
+We use call-by-value evaluation strategy like many mainstream functional languages.
+Program is evaluated from the top to the bottom of the source file
+(with a minor subtlety broader described in the chapter 4). All of the definitions on the top-level
+are mutually recursive. One can also define nested functions using \verb+rec+ keyword.
+\begin{verbatim}
+def fib :: Int -> Int
+def fib n =
+  rec :: (Int, Int) -> Int -> Int :
+    f lasts n = case n of
+      | 0 -> fst lasts
+      | n -> f (snd lasts, fst lasts + snd lasts) (n - 1)
+  in f (0, 1) n
+\end{verbatim}
+
+Bestrafer supports all of the typical IO operations including reading and writing files as well as
+parsing and printing values of primitive types from and to standard input-output.
+IO operations may be performed at any point in program, following the style of
+several languages in the ML family. It also supports exception handling with \verb+error+
+keyword for throwing errors and \verb+try-catch+ block for catching
+user thrown (\verb+RuntimeException+) and builtin (\verb+IOException+,
+\verb+ArithmeticException+) exceptions. We can use optional variable in exception pattern
+for extracting the error message.
+\begin{verbatim}
+def checkPassword :: String -> ()
+def checkPassword s =
+  if s == "Rammstein" then
+    ()
+  else
+    error: "Password is incorrect"
+
+def main :: ()
+def main =
+  try:
+    let password = getLine () in
+    checkPassword password `seq`
+    let x = readLnInt () in
+    printInt (1000 / x) `seq`
+    let filename = getLine () in
+    readFile filename |> putStrLn
+  catch:
+    | IOException e -> putStrLn e
+    | ArithmeticException -> putStrLn "Division by zero"
+    | RuntimeException e -> putStrLn e
+    | Exception e -> putStrLn e
+\end{verbatim}
+
+Bestrafer allows user to define his own generalized algebraic data types (GADTs)
+using the \verb+data+ keyword. There are two kinds of parameters in GADT definition:
+\begin{itemize}
+  \item named (denoted with a name starting with \verb+'+ followed by a capital letter) which work
+        exactly like parameters of standard algebraic data types in languages like Haskell or OCaml.
+  \item unnamed (denoted with their kind: \verb+*+ or \verb+N+) which may be set by the user to any type
+        of the specified kind, thus providing GADT functionality.
+\end{itemize}
+\begin{verbatim}
+data Maybe 'A where
+  | Nothing :: Maybe 'A
+  | Just :: 'A -> Maybe 'A
+\end{verbatim}
+Our language also supports defining data types without value constructors, which may be used as annotations in GADTs,
+like types \verb+Ok+ and \verb+Fail+ used to annotate type \verb+Either+ in the following example.
+\begin{verbatim}
+data Ok
+data Fail
+
+data Either * 'A 'B where
+  | Left  :: 'A -> Either Fail 'A 'B
+  | Right :: 'B -> Either Ok 'A 'B
+\end{verbatim}
+A flagship data type of Bestrafer language is a list indexed by its length, traditionally called \verb+Vec+.
+\begin{verbatim}
+data Vec N 'A where
+  | []  :: Vec 0 'A
+  | (:) :: forall n : N . 'A -> Vec n 'A -> Vec (S n) 'A
+\end{verbatim}
+Using the above definition we can write \verb+map+ function, which type encodes the proof that the resulting \verb+Vec+ has the same
+length as the input one.
+\begin{verbatim}
+def map :: forall n : N, a : *, b : * .
+  (a -> b) ->
+  Vec n a ->
+  Vec n b
+def map _ [] = []
+def map f (x : xs) = f x : map f xs
+\end{verbatim}
+To give programmer full flexibility and expressive power our language also has a standard non-indexed \verb+List+ data type.
+\begin{verbatim}
+data List 'A where
+  | {}  :: List 'A
+  | (;) :: 'A -> List 'A -> List 'A
+\end{verbatim}
+
+Bestrafer also supports existential types, but unlike in Haskell and OCaml their usage is not tied to data types declarations.
+Instead they can be used freely like any other type constructor. The following implementation of a \verb+filter+ function
+(taken from Bestrafer's standard library) utilizes existential type to express the fact that we cannot predict length of
+the resulting \verb+Vec+. We use \verb+let+ expression to unpack result of recursive call from the existential type, thus
+ensuring that the type variable describing length of \verb+tail+ is inserted to the context before the subtyping starts.
+\begin{verbatim}
+def filter :: forall n : N, a : * .
+  (a -> Bool) ->
+  Vec n a ->
+  exists k : N . Vec k a
+def filter _ [] = []
+def filter p (x : xs) =
+  let tail = filter p xs in
+  if p x then
+    x : tail
+  else
+    tail
+\end{verbatim}
+
+Quantifiers are always explicit to enforce conscious kind specification and emphasize connection to a type theoretic core.
+To articulate this connection even more instead of writing \verb+forall+, \verb+exists+ and \verb+\x -> x+ one can write
+$\forall$, $\exists$ and $\lambda$ \verb+x -> x+.
+\section{GADT examples}
+\subsection*{Matrix algebra}
+We can make a great use of Bestrafer's indexed Vec type to implement matrix algebra operations.
+Now the types provide the proof that the matrix operations that we defined produce results with
+correct dimensions and impose restriction on input arguments which ensures that they also have
+proper dimensions.
+\begin{verbatim}
+def mult :: forall n : N, m : N, k : N .
+  Vec (S n) (Vec (S m) Int) ->
+  Vec (S m) (Vec (S k) Int) ->
+  Vec (S n) (Vec (S k) Int)
+def mult a b = map ((flip multVec) b) a
+
+def multVec :: forall n : N, m : N .
+  Vec (S n) Int ->
+  Vec (S n) (Vec (S m) Int) ->
+  Vec (S m) Int
+def multVec v m =
+  map (foldl1 (\x y -> x + y))
+  (map (zipWith (\x y -> x * y) v) (transpose m))
+
+def transpose :: forall n : N, m : N .
+  Vec (S n) (Vec (S m) Int) ->
+  Vec (S m) (Vec (S n) Int)
+def transpose matrix =
+  let indices = mapi const (head matrix) in
+  map (flip column matrix) indices
+
+def column :: forall n : N, m : N .
+  Int ->
+  Vec (S n) (Vec (S m) Int) ->
+  Vec (S n) Int
+def column i = map (nth i)
+
+def nth :: forall n : N, a : * . Int -> Vec (S n) a -> a
+def nth 0 (x : xs) = x
+def nth _ [x] = x
+def nth n (x1 : x2 : xs) = nth (n - 1) (x2 : xs)
+\end{verbatim}
+\subsection*{Statically typed printf function}
+The well-known \verb+printf+ function from the C programming language,
+uses a string to provide formating of a printed text. However this approach
+has a major drawback, formated arguments are not statically type checked.
+As a result of that, writing \verb+printf("%d", 3.14);+ will print meaningless int,
+without emiting any warning or error. That's where the GADTs come to the rescue. In the following
+example, we define \verb+Format+ data type which is used to express intended formating of a
+printed string. By chaining constructors together we define type of intended printing function,
+which is accumulated in unnamed parameter of the \verb+Format+ data type. When a value of
+the type \verb+Format+ is applied to the function \verb+printf+ an appropriate printing function
+is built by step by step deconstruction of the \verb+Format+ value. By combining this approach
+with the function composition operator (.) (for writing more readable chains of constructors),
+we get a neat and type-safe way of pretty-printing values into the standard output.
+\begin{verbatim}
+data Format * where
+  | Str :: forall a : * . Format a -> Format (String -> a)
+  | Inr :: forall a : * . Format a -> Format (Int -> a)
+  | Flt :: forall a : * . Format a -> Format (Float -> a)
+  | Bl  :: forall a : * . Format a -> Format (Bool -> a)
+  | Chr :: forall a : * . Format a -> Format (Char -> a)
+  | Lit :: forall a : * . String -> Format a -> Format a
+  | Eol :: forall a : * . Format a -> Format a
+  | End :: Format ()
+
+def printf ::  forall a : * . Format a -> a
+def printf End = ()
+def printf (Lit s format) = putStr s `seq` printf format
+def printf (Eol format) = putStrLn "" `seq` printf format
+def printf (Str format) =
+  \x -> putStr x `seq` printf format
+def printf (Inr format) =
+  \x -> (putStr . intToString) x `seq` printf format
+def printf (Flt format) =
+  \x -> (putStr . floatToString) x `seq` printf format
+def printf (Bl  format) =
+  \x -> (putStr . boolToString) x `seq` printf format
+def printf (Chr format) =
+  \x -> putChar x `seq` printf format
+
+def main :: ()
+def main =
+  putStrLn "What is your name ?" `seq`
+  let name = getLine () in
+  printf ((Lit "Hello " . Str . Lit "!" . Eol .
+           Lit "The answer is: " . Inr . Eol) End) name 42
+\end{verbatim}
+
+\chapter{Type system}
+\chapter{Semantics}
+\chapter{Future work}
+
+%%%%% BIBLIOGRAFIA
+
+%\begin{thebibliography}{1}
+%\bibitem{example} \ldots
+%\end{thebibliography}
+
+\end{document}

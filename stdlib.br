@@ -49,7 +49,7 @@ def length vec =
 
 def elem :: ∀ n : N, a : * . a -> Vec n a -> Bool
 def elem _ [] = False
-def elem a (x : xs) = (a == x) || a `elem` xs
+def elem a (x : xs) = a == x || a `elem` xs
 
 def head :: ∀ n : N, a : * . Vec (S n) a -> a
 def head (x : _) = x
@@ -133,7 +133,7 @@ def lengthL list =
 
 def elemL :: ∀ a : * . a -> List a -> Bool
 def elemL _ {} = False
-def elemL a (x ; xs) = (a == x) || a `elemL` xs
+def elemL a (x ; xs) = a == x || a `elemL` xs
 
 def headL :: ∀ a : * . List a -> a
 def headL (x ; _) = x

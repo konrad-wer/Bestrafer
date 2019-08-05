@@ -189,7 +189,7 @@ To articulate this connection even more instead of writing \verb+forall+, \verb+
 $\forall$, $\exists$ and $\lambda$ \verb+x -> x+.
 \section{GADT examples}
 \subsection*{Matrix algebra}
-We can make a great use of Bestrafer's indexed Vec type to implement matrix algebra operations.
+We can make a great use of Bestrafer's indexed \verb+Vec+ type to implement matrix algebra operations.
 Now the types provide the proof that the matrix operations that we defined produce results with
 correct dimensions and impose restriction on input arguments which ensures that they also have
 proper dimensions.
@@ -228,14 +228,14 @@ def nth n (x1 : x2 : xs) = nth (n - 1) (x2 : xs)
 \end{verbatim}
 \subsection*{Statically typed printf function}
 The well-known \verb+printf+ function from the C programming language,
-uses a string to provide formating of a printed text. However this approach
-has a major drawback, formated arguments are not statically type checked.
+uses a string to provide formating of a printed text. However, this approach
+has a major drawback: formated arguments are not statically type checked.
 As a result of that, writing \verb+printf("%d", 3.14);+ will print meaningless int,
 without emiting any warning or error. That's where the GADTs come to the rescue. In the following
 example, we define \verb+Format+ data type which is used to express intended formating of a
 printed string. By chaining constructors together we define type of intended printing function,
 which is accumulated in unnamed parameter of the \verb+Format+ data type. When a value of
-the type \verb+Format+ is applied to the function \verb+printf+ an appropriate printing function
+the type \verb+Format+ is applied to the function \verb+printf+, an appropriate printing function
 is built by step by step deconstruction of the \verb+Format+ value. By combining this approach
 with the function composition operator (.) (for writing more readable chains of constructors),
 we get a neat and type-safe way of pretty-printing values into the standard output.

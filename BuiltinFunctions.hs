@@ -42,7 +42,9 @@ operatorsTypes =
     TArrow (TArrow (TUVar $ UTypeVar "b") (TUVar $ UTypeVar "c")) $ TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b"))
     (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "c"))),
     ("|>",  TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TArrow (TUVar $ UTypeVar "a") $
-    TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b")) (TUVar $ UTypeVar "b"))
+    TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b")) (TUVar $ UTypeVar "b")),
+    ("<|",  TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TArrow
+    (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b")) $ TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b"))
   ]
 
 ioFunctionsTypes :: [(Var, Type)]
@@ -167,7 +169,7 @@ compose :: Value
 compose = FunValue (\(FunValue f) -> return (FunValue (\(FunValue g) -> return $ FunValue (f <=< g))))
 
 pipe :: Value
-pipe = FunValue (\x -> return (FunValue (\(FunValue f) -> f x)))
+pipe = FunValue (\x -> return $ FunValue (\(FunValue f) -> f x))
 
 bfrReadFile :: Value
 bfrReadFile = FunValue (\(StringValue x) -> lift (StringValue <$> readFile x))
@@ -234,7 +236,8 @@ operators =
     ("@",  Evaluated concatList),
     ("++", Evaluated concatVec),
     (".",  Evaluated compose),
-    ("|>", Evaluated pipe)
+    ("|>", Evaluated pipe),
+    ("<|", Evaluated $ FunValue return)
   ]
 
 ioFunctions :: [(Var, DefinitionValue)]

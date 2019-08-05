@@ -314,6 +314,12 @@ plusParser = do
   (lexeme . try) (char '+' *> notFollowedBy (char '+'))
   return $ EBinOp pos (BinOp "+")
 
+lessThanParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
+lessThanParser = do
+  pos <- getSourcePos
+  (lexeme . try) (char '<' *> notFollowedBy (char '|'))
+  return $ EBinOp pos (BinOp "<")
+
 infixFunParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
 infixFunParser = do
   pos <- getSourcePos
@@ -347,11 +353,12 @@ operators =
     InfixN (binOpParser "!="),
     InfixN (binOpParser "<="),
     InfixN (binOpParser ">="),
-    InfixN (binOpParser "<"),
+    InfixN lessThanParser,
     InfixN (binOpParser ">")],
-   [InfixL (binOpParser "|>")],
    [InfixL (binOpParser "&&")],
-   [InfixL (binOpParser "||")]]
+   [InfixL (binOpParser "||")],
+   [InfixL (binOpParser "|>"),
+    InfixR (binOpParser "<|")]]
 
 expr :: Parser (Expr SourcePos)
 expr = makeExprParser eTerm operators

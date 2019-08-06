@@ -71,7 +71,7 @@ conversionFunctionsTypes :: [(Var, Type)]
 conversionFunctionsTypes =
   [
     ("stringToList", TArrow TString (TGADT "List" [ParameterType TChar])),
-    ("stringOfList", TArrow (TGADT "List" [ParameterType TChar]) TString),
+    ("stringFromList", TArrow (TGADT "List" [ParameterType TChar]) TString),
     ("intToFloat", TArrow TInt TFloat),
     ("floatToInt", TArrow TFloat TInt),
     ("intToString", TArrow TInt TString),
@@ -273,7 +273,7 @@ conversionFunctions :: [(Var, DefinitionValue)]
 conversionFunctions =
   [
     ("stringToList",  Evaluated $ FunValue (\(StringValue s) -> return . ListValue $ map CharValue s)),
-    ("stringOfList",  Evaluated $ FunValue (\(ListValue s)   -> return . StringValue $ map (\(CharValue c) -> c) s)),
+    ("stringFromList",  Evaluated $ FunValue (\(ListValue s)   -> return . StringValue $ map (\(CharValue c) -> c) s)),
     ("intToFloat",    Evaluated $ FunValue (\(IntValue x)    -> return . FloatValue $ fromInteger x)),
     ("floatToInt",    Evaluated $ FunValue (\(FloatValue x)  -> return . IntValue $ truncate x)),
     ("intToString",   Evaluated $ FunValue (\(IntValue x)    -> return . StringValue $ show x)),

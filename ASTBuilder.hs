@@ -267,6 +267,9 @@ buildFunction (erecs, funCntxt) ([FunTypeAnnot annotPos name t], defs) = do
     getBranch _ (GADTDef p _ _ _) = Left $ InternalCompilerASTBuilderError p "getBranch"
 buildFunction (erecs, funCntxt) _ = return (erecs, funCntxt)
 
+mergeUnOpsWithNumConstsInBranch :: Branch p -> Branch p
+mergeUnOpsWithNumConstsInBranch (ptrns, e, p) = (ptrns, mergeUnOpsWithNumConsts e, p)
+
 mergeUnOpsWithNumConsts :: Expr p -> Expr p
 mergeUnOpsWithNumConsts (EError  p e) = EError p e
 mergeUnOpsWithNumConsts (EVar    p x) = EVar p x
@@ -282,7 +285,7 @@ mergeUnOpsWithNumConsts (EDef    p f e)  = EDef p f $ mergeUnOpsWithNumConsts e
 mergeUnOpsWithNumConsts (EAnnot  p e t)  = EAnnot p (mergeUnOpsWithNumConsts e) t
 mergeUnOpsWithNumConsts (ETuple  p es n) = ETuple p (map mergeUnOpsWithNumConsts es) n
 mergeUnOpsWithNumConsts (EConstr p c es) = EConstr p c (map mergeUnOpsWithNumConsts es)
-mergeUnOpsWithNumConsts (ECase   p e bs) = ECase p (mergeUnOpsWithNumConsts e) bs
+mergeUnOpsWithNumConsts (ECase   p e bs) = ECase p (mergeUnOpsWithNumConsts e) $ map mergeUnOpsWithNumConstsInBranch bs
 mergeUnOpsWithNumConsts (ETry    p e cs) = ETry p (mergeUnOpsWithNumConsts e) (map (cross id mergeUnOpsWithNumConsts) cs)
 mergeUnOpsWithNumConsts (EIf     p e1 e2 e3) = EIf p (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2) (mergeUnOpsWithNumConsts e3)
 mergeUnOpsWithNumConsts (ELet    p x e1 e2)  = ELet p x (mergeUnOpsWithNumConsts e1) (mergeUnOpsWithNumConsts e2)

@@ -20,7 +20,9 @@ main = do
   case readArgs args of
     Nothing -> putStrLn "Please provide input file name(s)!"
     Just fileNames -> do
-      stdlib <- readFile "stdlib.br"
+      interpreterName <- getProgName
+      interpreterPath <- getExecutablePath
+      stdlib <- readFile $ (take $ length interpreterPath - length interpreterName) interpreterPath ++ "stdlib.br"
       let (Right stdlibBlocks) = parseProgram "stdlib.br" stdlib
       inputs <- mapM readFile fileNames
       case zipWithM parseProgram fileNames inputs of

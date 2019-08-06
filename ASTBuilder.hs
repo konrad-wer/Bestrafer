@@ -252,19 +252,22 @@ buildFunction :: ([Expr p], FunTypeContext) -> ([ProgramBlock p], [ProgramBlock 
 buildFunction (_, _) ([], FunDefCase p name _ _ : _) = Left $ FunctionLacksAnnotationError p name
 buildFunction (_, _) ([FunTypeAnnot p name _], []) = Left $ FunctionLacksImplementationError p name
 buildFunction (_, _) (FunTypeAnnot p name _ : _ : _, _) = Left $ MoreThanOneTypeAnnotationError p name
-buildFunction (erecs, funCntxt) ([FunTypeAnnot annotPos name t], defs) = do
-  let (FunDefCase _ _ argsExample _) = head defs
-  branches <- mapM (getBranch $ length argsExample) defs
-  let args = zipWith (++) (map (const "_x") argsExample) $ map show [1 .. length argsExample]
-  let caseExpr = ECase annotPos (ETuple annotPos (map (EVar annotPos) args) $ length argsExample) branches
-  let lambdasExpr = foldr (ELambda annotPos) caseExpr args
-  return (EDef annotPos name (EAnnot annotPos lambdasExpr t) : erecs, Map.insert name t funCntxt)
-  where
-    getBranch numArgs (FunDefCase p _ ptrns e)
-      | numArgs /= length ptrns = Left $ FunDifferentNumberOfArgsError annotPos name
-      | otherwise = return ([PTuple p ptrns $ length ptrns], e, p)
-    getBranch _ (FunTypeAnnot p _ _) = Left $ InternalCompilerASTBuilderError p "getBranch"
-    getBranch _ (GADTDef p _ _ _) = Left $ InternalCompilerASTBuilderError p "getBranch"
+buildFunction (erecs, funCntxt) ([FunTypeAnnot annotPos name t], defs) =
+  case Map.lookup name funCntxt of
+    Just _ -> Left $  MoreThanOneTypeAnnotationError annotPos name
+    Nothing -> do
+      let (FunDefCase _ _ argsExample _) = head defs
+      branches <- mapM (getBranch $ length argsExample) defs
+      let args = zipWith (++) (map (const "_x") argsExample) $ map show [1 .. length argsExample]
+      let caseExpr = ECase annotPos (ETuple annotPos (map (EVar annotPos) args) $ length argsExample) branches
+      let lambdasExpr = foldr (ELambda annotPos) caseExpr args
+      return (EDef annotPos name (EAnnot annotPos lambdasExpr t) : erecs, Map.insert name t funCntxt)
+      where
+        getBranch numArgs (FunDefCase p _ ptrns e)
+          | numArgs /= length ptrns = Left $ FunDifferentNumberOfArgsError annotPos name
+          | otherwise = return ([PTuple p ptrns $ length ptrns], e, p)
+        getBranch _ (FunTypeAnnot p _ _) = Left $ InternalCompilerASTBuilderError p "getBranch"
+        getBranch _ (GADTDef p _ _ _) = Left $ InternalCompilerASTBuilderError p "getBranch"
 buildFunction (erecs, funCntxt) _ = return (erecs, funCntxt)
 
 mergeUnOpsWithNumConstsInBranch :: Branch p -> Branch p

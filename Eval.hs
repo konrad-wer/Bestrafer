@@ -9,13 +9,6 @@ import qualified Data.Map as Map
 import Control.Lens hiding (Context, op)
 import Control.Exception
 
-catchStateT :: StateT EvalState IO a -> [HandlerT a] ->  StateT EvalState IO a
-catchStateT comp handlers = do
-  s1 <- get
-  (res, s2) <- liftIO $ runStateT comp s1 `catches` map (\(HandlerT f) -> Handler (flip runStateT s1 . f)) handlers
-  put s2
-  return res
-
 makeExceptionHandler :: EvalContext -> Catch p -> HandlerT Value
 makeExceptionHandler c (BestraferException _ "ArithmeticException" Nothing, expr) =
   HandlerT ((\_ -> evalExpr c expr) :: ArithException -> StateT EvalState IO Value)

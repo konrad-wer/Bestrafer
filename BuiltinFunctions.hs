@@ -5,6 +5,7 @@ import EvalUtils
 import Control.Monad
 import Control.Monad.State
 import Control.Exception
+import Data.Char
 
 operatorsTypes :: [(Var, Type)]
 operatorsTypes =
@@ -76,7 +77,9 @@ conversionFunctionsTypes =
     ("intToString", TArrow TInt TString),
     ("floatToString", TArrow TFloat TString),
     ("boolToString", TArrow TBool TString),
-    ("charToString", TArrow TChar TString)
+    ("charToString", TArrow TChar TString),
+    ("ord", TArrow TChar TInt),
+    ("chr", TArrow TInt TChar)
   ]
 
 builtinFunctionsTypes :: [(Var, Type)]
@@ -117,8 +120,8 @@ modInt :: Value
 modInt = FunValue (\(IntValue x) -> return (FunValue (\(IntValue y) ->
   if y /= 0 then
     return $ IntValue (x `mod` y)
-    else
-      liftIO $ throw DivideByZero)))
+  else
+    liftIO $ throw DivideByZero)))
 
 addFloat :: Value
 addFloat = FunValue (\(FloatValue x) -> return (FunValue (\(FloatValue y) -> return $ FloatValue (x + y))))
@@ -259,6 +262,13 @@ ioFunctions =
     ("readLnFloat", Evaluated bfrReadLnFloat)
   ]
 
+chrBestrafer :: Value
+chrBestrafer = FunValue (\(IntValue x) ->
+  if x <= 0x10FFFF && x >= 0 then
+    return . CharValue . chr $ fromInteger x
+  else
+    liftIO . throw $ CustomException "chr: domain error")
+
 conversionFunctions :: [(Var, DefinitionValue)]
 conversionFunctions =
   [
@@ -269,7 +279,9 @@ conversionFunctions =
     ("intToString",   Evaluated $ FunValue (\(IntValue x)    -> return . StringValue $ show x)),
     ("floatToString", Evaluated $ FunValue (\(FloatValue x)  -> return . StringValue $ show x)),
     ("boolToString",  Evaluated $ FunValue (\(BoolValue x)   -> return . StringValue $ show x)),
-    ("charToString",  Evaluated $ FunValue (\(CharValue x)   -> return . StringValue $ return x))
+    ("charToString",  Evaluated $ FunValue (\(CharValue x)   -> return . StringValue $ return x)),
+    ("ord", Evaluated $ FunValue (\(CharValue x) -> return . IntValue . fromIntegral $ ord x)),
+    ("chr", Evaluated chrBestrafer)
   ]
 
 builtinFunctions :: [(Var, DefinitionValue)]

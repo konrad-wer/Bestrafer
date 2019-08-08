@@ -72,6 +72,16 @@ evalExpr c (ESpine _ e s) = do
   f <- evalExpr c e
   xs <- mapM (evalExpr c) s
   foldM (\(FunValue fi) -> fi) f xs
+evalExpr c (EBinOp _ (BinOp "&&") e1 e2) = do
+  v1 <- evalExpr c e1
+  case v1 of
+    BoolValue True -> evalExpr c e2
+    b1 -> return b1
+evalExpr c (EBinOp _ (BinOp "||") e1 e2) = do
+  v1 <- evalExpr c e1
+  case v1 of
+    BoolValue False -> evalExpr c e2
+    b1 -> return b1
 evalExpr c (EBinOp _ (BinOp opName) e1 e2) = do
   gc <- view globalContext <$> get
   FunValue op <- valueOfGlobalContextEntry $ gc Map.! opName

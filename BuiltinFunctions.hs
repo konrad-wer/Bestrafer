@@ -138,12 +138,6 @@ multFloat = FunValue (\(FloatValue x) -> return (FunValue (\(FloatValue y) -> re
 divFloat :: Value
 divFloat = FunValue (\(FloatValue x) -> return (FunValue (\(FloatValue y) -> return $ FloatValue (x / y))))
 
-andBool :: Value
-andBool = FunValue (\(BoolValue x) -> return (FunValue (\(BoolValue y) -> return $ BoolValue (x && y))))
-
-orBool :: Value
-orBool = FunValue (\(BoolValue x) -> return (FunValue (\(BoolValue y) -> return $ BoolValue (x || y))))
-
 equal :: Value
 equal = FunValue (\x -> return (FunValue (\y -> return $ BoolValue (x == y))))
 
@@ -230,8 +224,6 @@ operators =
     ("-.", Evaluated subFloat),
     ("*.", Evaluated multFloat),
     ("/.", Evaluated divFloat),
-    ("&&", Evaluated andBool),
-    ("||", Evaluated orBool),
     ("^",  Evaluated concatStr),
     ("==", Evaluated equal),
     ("!=", Evaluated notEqual),

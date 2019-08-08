@@ -29,6 +29,8 @@
 %%%%% WLASNE DODATKOWE PAKIETY
 %
 %\usepackage{graphicx,listings,amsmath,amssymb,amsthm,amsfonts,tikz}
+\usepackage{mathtools,array}
+
 %
 %%%%% WŁASNE DEFINICJE I POLECENIA
 %
@@ -37,7 +39,12 @@
 %\theoremstyle{plain} \newtheorem{theorem}[definition]{Theorem}
 %\theoremstyle{plain} \newtheorem{lemma}[definition]{Lemma}
 %\renewcommand \qedsymbol {\ensuremath{\square}}
-% ...
+
+\newenvironment{grammar}[2]
+ {\begin{tabular}{@{\qquad}>{$}l<{$}@{\qquad}l@{}}
+  \multicolumn{1}{@{}l@{}}{$#1$}&\multicolumn{1}{l@{}}{\hspace{-2em}#2}\\}
+ {\end{tabular}}
+
 %%%%%
 
 \begin{document}
@@ -274,7 +281,54 @@ def main =
 \end{verbatim}
 
 \chapter{Type system}
-\chapter{Semantics}
+\section{Dunfield's and Krishnaswami's system}
+
+\subsection*{Typing and subtyping rules}
+
+\subsection*{Types, monotypes and propositions}
+
+Lorem ipsum
+
+\textbf{Types:}
+
+\begin{grammar}{A,B,C\Coloneqq}{}
+  \verb+()+ \mid \verb+Bool+ \mid \verb+Int+ \mid \verb+Float+  \mid \verb+Char+ \mid \verb+String+ & simple types\\
+  \mid  A_1 \times A_2 \times \dots A_n & product\\
+  \mid \alpha                           & universal variable\\
+  \mid  \hat{\alpha}                    & existential variable\\
+  \mid \forall t \colon \kappa. A       & universal quantification\\
+  \mid \exists t \colon \kappa. A       & existential quantification\\
+  \mid P \supset A                      & guarded type\\
+  \mid A \wedge  P                      & asserting type\\
+  \mid \textit{Type identifier } A_1  A_2  \dots A_n              & user defined GADT
+\end{grammar}
+
+\textbf{Monotypes:}
+
+\begin{grammar}{t,n\Coloneqq}{}
+  0                                & zero\\
+  \mid S \, n                              & successor of n\\
+  \mid \verb+()+ \mid \verb+Bool+ \mid \verb+Int+ \mid \verb+Float+  \mid \verb+Char+ \mid \verb+String+ & simple types\\
+  \mid  t_1 \times t_2 \times \dots t_n & product\\
+  \mid \alpha                           & universal variable\\
+  \mid  \hat{\alpha}                    & existential variable\\
+  \mid \textit{Type identifier } t_1  t_2  \dots t_n              & user defined GADT
+\end{grammar}
+
+\textbf{Propositions}
+
+\begin{grammar}{P,Q\Coloneqq}{}
+  t = t`
+\end{grammar}
+
+\section{Our contribution}
+\subsection*{User defined GADTs}
+
+\chapter{Remarks on semantics}
+\section{Function definitions}
+\section{GADT constructors}
+\section{Evaluation order}
+
 \chapter{Future work}
 
 %%%%% BIBLIOGRAFIA

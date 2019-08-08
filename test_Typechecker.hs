@@ -2537,7 +2537,8 @@ checkExpr_ELambda_test14 :: Test
 checkExpr_ELambda_test14 =
   case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "x" $ EVar () "x"))
             (TUniversal (UTypeVar "a") KStar (TArrow (TUVar (UTypeVar "a")) (TUVar (UTypeVar "a")))) NotPrincipal of
-    Left (TypeInferenceError (ELambda () "x" (EVar () "x"))) -> True
+    Left (TypesNotEquivalentError () (TArrow (TEVar (ETypeVar "a#inferExpr#0")) (TEVar (ETypeVar "b#inferExpr#1")))
+         (TUVar (UTypeVar "a"))) -> True
     _ -> False
 
 inferExpr_EVar_test1 :: Test

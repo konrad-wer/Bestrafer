@@ -686,6 +686,12 @@ inferExpr c (EInt    _ _) = return (TInt, Principal, c)
 inferExpr c (EFloat  _ _) = return (TFloat, Principal, c)
 inferExpr c (EChar   _ _) = return (TChar, Principal, c)
 inferExpr c (EString _ _) = return (TString, Principal, c)
+inferExpr c (ELambda _ x e) = do
+  a <- ETypeVar <$> generateFreshTypeVarName "inferExpr" "a"
+  b <- ETypeVar <$> generateFreshTypeVarName "inferExpr" "b"
+  let c2 = CVar x (TEVar a) NotPrincipal : CMarker : CTypeVar (E a) KStar : CTypeVar (E b) KStar : c
+  c3 <- dropContextToMarker <$> checkExpr c2 e (TEVar b) NotPrincipal
+  return (TArrow (TEVar a) (TEVar b), NotPrincipal, c3)
 inferExpr c (EError _ _) =
   return (TUniversal (UTypeVar "e") KStar (TUVar $ UTypeVar "e"), Principal, c)
 inferExpr c (ETuple _ es n) = do

@@ -1,0 +1,28 @@
+/*
+    Scott's encoding of lists that utilizes Bestrafer's
+    higher rank polymorphism (rank 2 in this case, although
+    Bestrafer supports rank n polymorphism)
+*/
+
+data ListS 'A where
+  | ListS :: (forall r : *. ('A -> ListS 'A -> r) -> r -> r) -> ListS 'A
+
+def nil :: forall a : * . ListS a
+def nil = ListS (\co ni -> ni)
+
+def cons :: forall a : * . a -> ListS a -> ListS a
+def cons x xs = ListS (\co ni -> co x xs)
+
+def uncons :: forall a : *, r : *. (a -> ListS a -> r) -> r -> ListS a -> r
+def uncons co ni (ListS f) = f co ni
+
+def mapS :: forall a : *, b : * . (a -> b) -> ListS a -> ListS b
+def mapS f = uncons (\x xs -> f x `cons` mapS f xs) nil
+
+def iterS :: forall a : * . (a -> ()) -> ListS a -> ()
+def iterS f = uncons (\x xs -> f x `seq` iterS f xs) ()
+
+def main :: ()
+def main =
+  let xs = cons 1 . cons 2 . cons 3 . cons 4 <| nil in
+  iterS printInt <| mapS succ xs

@@ -3,7 +3,7 @@
     higher rank polymorphism (rank 2 in this case, although
     Bestrafer supports rank n polymorphism)
 
-    Implementation based on:
+    Example based on:
     https://ocharles.org.uk/guest-posts/2014-12-18-rank-n-types.html
 */
 

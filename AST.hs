@@ -268,7 +268,6 @@ instance Show (BestraferException p) where
 showCatch :: Catch e -> String
 showCatch (ex, e) = show ex ++ " -> " ++ show e
 
-
 instance Show (Pattern p) where
   show (PVar    _ x) = x
   show (PTuple  _ [] _) = "()"

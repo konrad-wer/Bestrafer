@@ -1,0 +1,47 @@
+/*
+    Church encoding of lists that utilizes Bestrafer's
+    higher rank polymorphism (rank 2 in this case, although
+    Bestrafer supports rank n polymorphism)
+
+    Note that ListC type does not occur recursively in the value constructor,
+    so type ListC is just an alias for the type:
+    forall a : *, r : * . (a -> r -> r) -> r -> r,
+    thus we defined lists using only functions, only by
+    defining foldr operation
+
+    Example based on:
+    https://ocharles.org.uk/guest-posts/2014-12-18-rank-n-types.html
+    https://stackoverflow.com/a/50766652
+*/
+
+data ListC 'A where
+  | ListC :: (forall r : * . ('A -> r -> r) -> r -> r) -> ListC 'A
+
+def foldrC :: forall a : *, r : * . (a -> r -> r) -> r -> ListC a -> r
+def foldrC co ni (ListC f) = f co ni
+
+def nil :: forall a : * . ListC a
+def nil = ListC (\f ni -> ni)
+
+def cons :: forall a : * . a -> ListC a -> ListC a
+def cons x xs = ListC (\co ni -> co x <| foldrC co ni xs)
+
+def mapC :: forall a : *, b : * . (a -> b) -> ListC a -> ListC b
+def mapC f xs = foldrC (cons . f) nil xs
+
+def iterC :: forall a : * . (a -> ()) -> ListC a -> ()
+def iterC f xs = foldrC (seq . f) () xs
+
+//We have to use unit to enforce lazy evaluation since Bestrafer is a call-by-value language
+def headC :: forall a : * . ListC a -> a
+def headC (ListC f) = f (\a b x -> a) (\x -> error: "Head of empty Church list") ()
+
+//from the declarative point of view we could write \g -> g h (t f) but we use let expression
+//to ensure correct order of side effects
+def tailC :: forall a : * . ListC a -> ListC a
+def tailC xs = ListC (\f ni -> (foldrC (\h t -> \g -> let gh = g h in gh (t f)) (const ni) xs) (const id))
+
+def main :: ()
+def main =
+  let xs = cons 1 . cons 2 . cons 3 . cons 4 <| nil in
+  iterC printInt . tailC <| (mapC succ xs)

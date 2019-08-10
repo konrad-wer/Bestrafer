@@ -530,7 +530,7 @@ inferSpine c s @ (_ : _) (TUniversal u k t) _ = do
   inferSpine (CTypeVar (E e) k : c) s (substituteUVarInType u (E e) t) NotPrincipal
 inferSpine c (e : s) (TEVar a) NotPrincipal = do
   let (a1, a2) = generateSubETypeVars a
-  c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] $ getPos e
+  c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a2) KStar, CTypeVar (E a1) KStar] $ getPos e
   inferSpine c2 (e : s) (TArrow (TEVar a1) (TEVar a2)) NotPrincipal
 inferSpine _ (e : _) t _ = lift . Left $ SpineInferenceError e t
 
@@ -628,7 +628,7 @@ checkExpr context expression checkedType principality = do
       return $ dropContextToMarker c2
     (c, ELambda p x e, TEVar a, NotPrincipal) -> do
       let (a1, a2) = generateSubETypeVars a
-      c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a1) KStar, CTypeVar (E a2) KStar] p
+      c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a2) KStar, CTypeVar (E a1) KStar] p
       c3 <- checkExpr (CVar x (TEVar a1) NotPrincipal : CMarker : c2) e (TEVar a2) NotPrincipal
       return $ dropContextToMarker c3
     (c, ETuple _ [] 0, TProduct [] 0, _) -> return c
@@ -676,7 +676,9 @@ checkExpr context expression checkedType principality = do
           checkExpr _c e t' pr
     (c, e, t, _) -> do
       (t2, _, c2) <- inferExpr c e
-      subtype c2 t2 (joinPolarity (polarity t) (polarity t2)) t (getPos e) (SubtypingClue t2 t)
+      t2' <- lift $ applyContextToType (getPos e) c2 t2
+      t'  <- lift $ applyContextToType (getPos e) c2 t
+      subtype c2 t2' (joinPolarity (polarity t') (polarity t2')) t' (getPos e) (SubtypingClue t2' t')
 
 inferExpr :: Context -> Expr p -> StateT TypecheckerState (Either (TypeError p)) (Type, Principality, Context)
 inferExpr c (EDef _ _ e) = inferExpr c e
@@ -689,7 +691,7 @@ inferExpr c (EString _ _) = return (TString, Principal, c)
 inferExpr c (ELambda _ x e) = do
   a <- ETypeVar <$> generateFreshTypeVarName "inferExpr" "a"
   b <- ETypeVar <$> generateFreshTypeVarName "inferExpr" "b"
-  let c2 = CVar x (TEVar a) NotPrincipal : CMarker : CTypeVar (E a) KStar : CTypeVar (E b) KStar : c
+  let c2 = CVar x (TEVar a) NotPrincipal : CMarker : CTypeVar (E b) KStar : CTypeVar (E a) KStar : c
   c3 <- dropContextToMarker <$> checkExpr c2 e (TEVar b) NotPrincipal
   return (TArrow (TEVar a) (TEVar b), NotPrincipal, c3)
 inferExpr c (EError _ _) =

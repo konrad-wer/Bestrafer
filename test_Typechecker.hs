@@ -2482,16 +2482,16 @@ checkExpr_ELambda_test7 :: Test
 checkExpr_ELambda_test7 =
   case flip evalStateT startState $ checkExpr context2 (ELambda () "x" $ EVar () "x") (TEVar $ ETypeVar "b") NotPrincipal of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MArrow (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
-           CETypeVar (ETypeVar "b-1") KStar (MEVar (ETypeVar "b-2")), CTypeVar (E (ETypeVar "b-2")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
+           CETypeVar (ETypeVar "b-2") KStar (MEVar (ETypeVar "b-1")), CTypeVar (E (ETypeVar "b-1")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 checkExpr_ELambda_test8 :: Test
 checkExpr_ELambda_test8 =
   case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x")) (TEVar $ ETypeVar "b") NotPrincipal of
     Right [CTypeVar (E (ETypeVar "a")) KNat, CMarker, CETypeVar (ETypeVar "b") KStar (MArrow (MEVar (ETypeVar "b-1")) (MEVar (ETypeVar "b-2"))),
-           CETypeVar (ETypeVar "b-1") KStar (MEVar (ETypeVar "b-2-2")),
            CETypeVar (ETypeVar "b-2") KStar (MArrow (MEVar (ETypeVar "b-2-1")) (MEVar (ETypeVar "b-2-2"))),
-           CTypeVar (E (ETypeVar "b-2-1")) KStar, CTypeVar (E (ETypeVar "b-2-2")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
+           CETypeVar (ETypeVar "b-2-2") KStar (MEVar (ETypeVar "b-1")),
+           CTypeVar (E (ETypeVar "b-2-1")) KStar, CTypeVar (E (ETypeVar "b-1")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
 checkExpr_ELambda_test9 :: Test
@@ -2506,9 +2506,9 @@ checkExpr_ELambda_test10=
   case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "y" $ EVar () "x"))
             (TExistential (UTypeVar "r") KStar (TUVar $ UTypeVar "r")) NotPrincipal of
     Right [CETypeVar (ETypeVar "r#checkExpr#0") KStar (MArrow (MEVar (ETypeVar "r#checkExpr#0-1")) (MEVar (ETypeVar "r#checkExpr#0-2"))),
-           CETypeVar (ETypeVar "r#checkExpr#0-1") KStar (MEVar (ETypeVar "r#checkExpr#0-2-2")),
-           CETypeVar (ETypeVar "r#checkExpr#0-2") KStar (MArrow (MEVar (ETypeVar "r#checkExpr#0-2-1")) (MEVar (ETypeVar "r#checkExpr#0-2-2"))),
-           CTypeVar (E (ETypeVar "r#checkExpr#0-2-1")) KStar, CTypeVar (E (ETypeVar "r#checkExpr#0-2-2")) KStar,
+          CETypeVar (ETypeVar "r#checkExpr#0-2") KStar (MArrow (MEVar (ETypeVar "r#checkExpr#0-2-1")) (MEVar (ETypeVar "r#checkExpr#0-2-2"))),
+           CETypeVar (ETypeVar "r#checkExpr#0-2-2") KStar (MEVar (ETypeVar "r#checkExpr#0-1")),
+           CTypeVar (E (ETypeVar "r#checkExpr#0-2-1")) KStar, CTypeVar (E (ETypeVar "r#checkExpr#0-1")) KStar,
            CTypeVar (E (ETypeVar "a")) KNat, CMarker, CTypeVar (E (ETypeVar "b")) KStar, CTypeVar (E (ETypeVar "c")) KStar] -> True
     _ -> False
 
@@ -2537,7 +2537,7 @@ checkExpr_ELambda_test14 :: Test
 checkExpr_ELambda_test14 =
   case flip evalStateT startState $ checkExpr context2 (ELambda () "x" (ELambda () "x" $ EVar () "x"))
             (TUniversal (UTypeVar "a") KStar (TArrow (TUVar (UTypeVar "a")) (TUVar (UTypeVar "a")))) NotPrincipal of
-    Left (TypesNotEquivalentError () (TArrow (TEVar (ETypeVar "a#inferExpr#0")) (TEVar (ETypeVar "b#inferExpr#1")))
+    Left (TypesNotEquivalentError () (TArrow (TEVar (ETypeVar "a#inferExpr#0")) (TEVar (ETypeVar "a#inferExpr#0")))
          (TUVar (UTypeVar "a"))) -> True
     _ -> False
 

@@ -174,7 +174,7 @@ generateFreshTypeVars f trace names = do
   let n = fromIntegral $ length names
   firstFreshVarNum <- view freshVarNum <$> get
   modify $ over freshVarNum (+ n)
-  return $ map f $ zipWith (++) names (map ((("#" ++ trace ++ "#") ++) . show) [firstFreshVarNum .. firstFreshVarNum + n - 1])
+  return $ reverse . map f $ zipWith (++) names (map ((("#" ++ trace ++ "#") ++) . show) [firstFreshVarNum .. firstFreshVarNum + n - 1])
 
 generateFreshTypeVarName :: String -> Var -> StateT TypecheckerState (Either (TypeError p)) Var
 generateFreshTypeVarName trace name = do

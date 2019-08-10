@@ -8,7 +8,7 @@
 */
 
 data ListS 'A where
-  | ListS :: (forall r : *. ('A -> ListS 'A -> r) -> r -> r) -> ListS 'A
+  | ListS :: (forall r : * . ('A -> ListS 'A -> r) -> r -> r) -> ListS 'A
 
 def nil :: forall a : * . ListS a
 def nil = ListS (\co ni -> ni)
@@ -16,7 +16,7 @@ def nil = ListS (\co ni -> ni)
 def cons :: forall a : * . a -> ListS a -> ListS a
 def cons x xs = ListS (\co ni -> co x xs)
 
-def uncons :: forall a : *, r : *. (a -> ListS a -> r) -> r -> ListS a -> r
+def uncons :: forall a : *, r : * . (a -> ListS a -> r) -> r -> ListS a -> r
 def uncons co ni (ListS f) = f co ni
 
 def mapS :: forall a : *, b : * . (a -> b) -> ListS a -> ListS b

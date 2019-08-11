@@ -247,6 +247,10 @@ headedByAnd :: Type -> Bool
 headedByAnd TAnd {} = True
 headedByAnd _ = False
 
+headedByImp :: Type -> Bool
+headedByImp TImp {} = True
+headedByImp _ = False
+
 unpack :: Context -> Type -> (Context, Type)
 unpack c (TExistential u k t) = unpack (CTypeVar (U u) k : c) t
 unpack c t = (c, t)

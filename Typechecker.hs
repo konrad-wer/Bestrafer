@@ -149,9 +149,16 @@ inferMonotypeKind p clue c (MUVar x) =
 subtype
   :: Context -> Type -> Polarity -> Type -> p -> ErrorClue p
   -> StateT TypecheckerState (Either (TypeError p)) Context
+subtype c (TArrow a b) Negative (TArrow a' b') p clue = do
+  c2 <- subtype c a' Positive a p clue
+  b2  <- lift $ applyContextToType p c2 b
+  b2' <- lift $ applyContextToType p c2 b'
+  subtype c2 b2 Negative b2' p clue
 subtype c t1 pol t2 p clue
   | not (headedByUniversal t1) && not (headedByExistential t1) &&
-    not (headedByUniversal t2) && not (headedByExistential t2) = equivalentType c t1 t2 p clue
+    not (headedByUniversal t2) && not (headedByExistential t2) &&
+    not (headedByImp t1) && not (headedByAnd t1) &&
+    not (headedByImp t2) && not (headedByAnd t2) = equivalentType c t1 t2 p clue
   | headedByUniversal t1 && not (headedByUniversal t2) && neg pol = do
       let (TUniversal (UTypeVar a) k t) = t1
       e <- ETypeVar <$> generateFreshTypeVarName "subtype" a
@@ -172,6 +179,36 @@ subtype c t1 pol t2 p clue
       e <- ETypeVar <$> generateFreshTypeVarName "subtype" b
       c2 <- subtype (CTypeVar (E e) k : CMarker : c) t1 Positive (substituteUVarInType (UTypeVar b) (E e) t) p clue
       return $ dropContextToMarker c2
+  | headedByImp t1 && not (headedByImp t2) && neg pol = do
+      let (TImp prop t) = t1
+      c2 <- checkPropTrue c prop p clue
+      t'  <- lift $ applyContextToType p c2 t
+      t2' <- lift $ applyContextToType p c2 t2
+      subtype c2 t' Negative t2' p clue
+  | headedByImp t2 && neg pol = do
+      let (TImp prop t) = t2
+      unificationResult <- runMaybeT $ eliminatePropEquation (CMarker : c) prop p clue
+      case unificationResult of
+        Nothing -> return c
+        Just c2 -> do
+          t1' <- lift $ applyContextToType p c2 t1
+          t'  <- lift $ applyContextToType p c2 t
+          dropContextToMarker <$> subtype c2 t1' Negative t' p clue
+  | headedByAnd t1 && pos pol = do
+      let (TAnd t prop) = t1
+      unificationResult <- runMaybeT $ eliminatePropEquation (CMarker : c) prop p clue
+      case unificationResult of
+        Nothing -> return c
+        Just c2 -> do
+          t'  <- lift $ applyContextToType p c2 t
+          t2' <- lift $ applyContextToType p c2 t2
+          dropContextToMarker <$> subtype c2 t' Positive t2' p clue
+  | not (headedByAnd t1) && headedByAnd t2 && pos pol = do
+      let (TAnd t prop) = t2
+      c2 <- checkPropTrue c prop p clue
+      t1' <- lift $ applyContextToType p c2 t1
+      t'  <- lift $ applyContextToType p c2 t
+      subtype c2 t1' Positive t' p clue
   | pos pol && (neg . polarity $ t1) && (nonpos . polarity $ t2) = subtype c t1 Negative t2 p clue
   | pos pol && (nonpos . polarity $ t1) && (neg . polarity $ t2) = subtype c t1 Negative t2 p clue
   | neg pol && (pos . polarity $ t1) && (nonneg . polarity $ t2) = subtype c t1 Positive t2 p clue

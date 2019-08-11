@@ -1,0 +1,35 @@
+/*
+    Encoding GADTs using continuations, Bestrafer's guarded types and
+    higher rank polymorphism (rank 2 in this case, although
+    Bestrafer supports rank n polymorphism)
+
+    Example based on:
+    https://ocharles.org.uk/guest-posts/2014-12-18-rank-n-types.html
+*/
+
+data SomeC * where
+  | SomeC :: forall a : *. (forall r : * .
+             (a = Int => Int -> r) ->
+             (a = String => String -> r) ->
+             (a -> r) -> r) -> SomeC a
+
+def int :: Int -> SomeC Int
+def int x = SomeC (\i s o -> i x)
+
+def string :: String -> SomeC String
+def string x = SomeC (\i s o -> s x)
+
+def other :: forall a : * . a -> SomeC a
+def other x = SomeC (\i s o -> o x)
+
+def unsome :: forall a : *, r : * .
+  (Int -> r) ->
+  (String -> r) ->
+  (a -> r) ->
+  SomeC a -> r
+def unsome i s o (SomeC f) = f i s o
+
+def main :: ()
+def main =
+  let x = other 3.14 in
+  printInt <| unsome id intFromString floatToInt x

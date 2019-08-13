@@ -29,7 +29,8 @@
 %%%%% WLASNE DODATKOWE PAKIETY
 %
 %\usepackage{graphicx,listings,amsmath,amssymb,amsthm,amsfonts,tikz}
-\usepackage{mathtools,array}
+\usepackage{mathtools, array, amsfonts}
+\usepackage[nottoc]{tocbibind}
 
 %
 %%%%% WŁASNE DEFINICJE I POLECENIA
@@ -233,7 +234,7 @@ def nth 0 (x : xs) = x
 def nth _ [x] = x
 def nth n (x1 : x2 : xs) = nth (n - 1) (x2 : xs)
 \end{verbatim}
-\subsection*{Statically typed printf function}
+\subsection*{Statically typed printf function\cite{inproceedings}}
 The well-known \verb+printf+ function from the C programming language,
 uses a string to provide formating of a printed text. However, this approach
 has a major drawback: formated arguments are not statically type checked.
@@ -285,11 +286,34 @@ def main =
 
 \subsection*{Typing and subtyping rules}
 
+\section{Our variant of the system}
+We made some necessary modification to the type system to make our language useful and user friendly.
+First of all we added typing rules for simple types such as
+\verb+Int+ or \verb+String+, operators, \verb+if+ statements, \verb+let+ expressions,
+\verb+error+ throwing and \verb+try+ - \verb+catch+ blocks, but we omit them in this paper because
+they are not interesting and straightforward. (Coś o let'cie). We also
+added extra inference rules following the style of Dunfield and Krishnaswami [2013] \cite{Dunfield13:bidir},
+to mimize boilerplate type annotations and produce better quality typechecking erors. Following
+remark of Dunfield and Krishnaswami [2019] \cite{gadt-popl19} we extended subtyping to functions and propositional types.
+
+
+
 \subsection*{Types, monotypes and propositions}
 
-Lorem ipsum
+We distinguish between types (for clarity sometimes called big types) and monotypes.
+Basically monotypes are just simplified types (whithout quantification and propositional types) plus
+inhabitants of kind $\mathbb{N}$ (namely zero - \verb+0+ and successor - \verb+S+).
+As we can see from the following definition quantification and propositions are restricted to monotypes.
+However use cases for polymorphism on big types seem to be rare in practice. Moreover our extended subtyping
+reduces number of programs which would not typecheck due to this restriction.
 
-\textbf{Types:}
+\textbf{Kinds:}
+
+\begin{grammar}{\kappa \Coloneqq}{}
+  \star \mid \mathbb{N}
+\end{grammar}
+
+\textbf{Types:} (big types)
 
 \begin{grammar}{A,B,C\Coloneqq}{}
   \verb+()+ \mid \verb+Bool+ \mid \verb+Int+ \mid \verb+Float+  \mid \verb+Char+ \mid \verb+String+ & simple types\\
@@ -300,7 +324,13 @@ Lorem ipsum
   \mid \exists t \colon \kappa. A       & existential quantification\\
   \mid P \supset A                      & guarded type\\
   \mid A \wedge  P                      & asserting type\\
-  \mid \textit{Type identifier } A_1  A_2  \dots A_n              & user defined GADT
+  \mid \textit{Type identifier } \rho_1  \rho_2  \dots \rho_n              & user defined GADT
+\end{grammar}
+
+\textbf{GADT parameters:}
+
+\begin{grammar}{\rho \Coloneqq}{}
+  A \mid n                              & type or monotype
 \end{grammar}
 
 \textbf{Monotypes:}
@@ -321,6 +351,69 @@ Lorem ipsum
   t = t`
 \end{grammar}
 
+\subsection*{Higher rank polymorphism}
+One of the key features of the Dunfield's and Krishnaswami's system is higher rank polymorphism.
+Polymorphhic types are treated like any other big type so they can be nested in each ohter arbitrarily
+many times. The following example uses higher rank universal quantification in GADT constructor
+to implement Scott's encoding of lists as a two continuations.
+\begin{verbatim}
+data ListS 'A where
+  | ListS :: (forall r : * .
+             ('A -> ListS 'A -> r) ->r -> r) ->
+             ListS 'A
+
+def nil :: forall a : * . ListS a
+def nil = ListS (\co ni -> ni)
+
+def cons :: forall a : * . a -> ListS a -> ListS a
+def cons x xs = ListS (\co ni -> co x xs)
+
+def uncons :: forall a : *, r : * .
+  (a -> ListS a -> r) -> r -> ListS a -> r
+def uncons co ni (ListS f) = f co ni
+\end{verbatim}
+Bestrafer also allows higher rank existential quantification as the following example shows.
+\begin{verbatim}
+def heads :: forall n : N, a : * .
+  Vec n (exists m : N . Vec (S m) a) ->
+  Vec n a
+def heads [] = []
+def heads (x : xs) = head x : heads xs
+\end{verbatim}
+
+\subsection*{Guarded types}
+
+\begin{verbatim}
+data SomeC * where
+  | SomeC :: forall a : *. (forall r : * .
+             (a = Int => Int -> r) ->
+             (a = String => String -> r) ->
+             (a -> r) -> r) -> SomeC a
+
+def int :: Int -> SomeC Int
+def int x = SomeC (\i s o -> i x)
+
+def string :: String -> SomeC String
+def string x = SomeC (\i s o -> s x)
+
+def other :: forall a : * . a -> SomeC a
+def other x = SomeC (\i s o -> o x)
+
+def unsome :: forall a : *, r : * .
+  (Int -> r) ->
+  (String -> r) ->
+  (a -> r) ->
+  SomeC a -> r
+def unsome i s o (SomeC f) = f i s o
+
+def main :: ()
+def main =
+  let x = other 3.14 in
+  printInt <| unsome id intFromString floatToInt x
+\end{verbatim}
+
+\subsection*{Extended subtyping}
+
 \section{Our contribution}
 \subsection*{User defined GADTs}
 
@@ -333,8 +426,7 @@ Lorem ipsum
 
 %%%%% BIBLIOGRAFIA
 
-%\begin{thebibliography}{1}
-%\bibitem{example} \ldots
-%\end{thebibliography}
+\bibliographystyle{unsrt}
+\bibliography{biblo.bib}
 
 \end{document}

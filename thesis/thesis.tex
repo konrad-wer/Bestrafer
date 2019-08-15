@@ -29,7 +29,8 @@
 %%%%% WLASNE DODATKOWE PAKIETY
 %
 %\usepackage{graphicx,listings,amsmath,amssymb,amsthm,amsfonts,tikz}
-\usepackage{mathtools, array, amsfonts}
+\let\lll\undefined
+\usepackage{mathtools, array, amsfonts, mathpartir, amssymb}
 \usepackage[nottoc]{tocbibind}
 
 %
@@ -234,6 +235,11 @@ def nth 0 (x : xs) = x
 def nth _ [x] = x
 def nth n (x1 : x2 : xs) = nth (n - 1) (x2 : xs)
 \end{verbatim}
+One could think that the above functions are only useful for some statically defined values,
+since we cannot predict dimensions of \verb+Vec+s which come from IO. But, that is not true!
+We can use them in program that reads matrices from IO, but we have to prove, that we handle
+all cases of invalid input before passing it into our matrix algebra functions.
+
 \subsection*{Statically typed printf function\cite{inproceedings}}
 The well-known \verb+printf+ function from the C programming language,
 uses a string to provide formating of a printed text. However, this approach
@@ -291,12 +297,14 @@ We made some necessary modification to the type system to make our language usef
 First of all we added typing rules for simple types such as
 \verb+Int+ or \verb+String+, operators, \verb+if+ statements, \verb+let+ expressions,
 \verb+error+ throwing and \verb+try+ - \verb+catch+ blocks, but we omit them in this paper because
-they are not interesting and straightforward. (Coś o let'cie). We also
-added extra inference rules following the style of Dunfield and Krishnaswami [2013] \cite{Dunfield13:bidir},
-to mimize boilerplate type annotations and produce better quality typechecking erors. Following
+they are not interesting and straightforward. However, it is important to remark, that \verb+let+ expression unpacks the
+existential types which is necessary to ensure correct order of inserting type variables to the context while defining
+recursive functions. We also added extra inference rules following the style of Dunfield and Krishnaswami [2013] \cite{Dunfield13:bidir},
+to mimize boilerplate type annotations and produce better quality typechecking errors. Following
 remark of Dunfield and Krishnaswami [2019] \cite{gadt-popl19} we extended subtyping to functions and propositional types.
-
-
+The biggest modification is the introduction of user defined generalized algebraic data types. The last section
+of this chapter covers exhaustively typing rules and implementation details of GADTs. We discarded separate rules for
+\verb+Vec+, treating it like any other GADT.
 
 \subsection*{Types, monotypes and propositions}
 
@@ -355,7 +363,7 @@ reduces number of programs which would not typecheck due to this restriction.
 One of the key features of the Dunfield's and Krishnaswami's system is higher rank polymorphism.
 Polymorphhic types are treated like any other big type so they can be nested in each ohter arbitrarily
 many times. The following example uses higher rank universal quantification in GADT constructor
-to implement Scott's encoding of lists as a two continuations.
+to implement Scott's encoding of lists as a two continuations\cite{rankNtypes}.
 \begin{verbatim}
 data ListS 'A where
   | ListS :: (forall r : * .
@@ -381,7 +389,12 @@ def heads [] = []
 def heads (x : xs) = head x : heads xs
 \end{verbatim}
 
-\subsection*{Guarded types}
+\subsection*{Guarded types and asserting types}
+Bestrafer supports guarded types $P \supset A $ (\textit{$P$ implies $A$})
+and asserting types $A \wedge  P$ (\textit{$A$ with $P$}).
+Although the usage of propositions is in most cases implicit and hidden in typechecking GADTs,
+there are some use cases for propositional types.
+The following example uses guarded types to express GADT in continuation passing style\cite{rankNtypes}.
 
 \begin{verbatim}
 data SomeC * where
@@ -413,7 +426,31 @@ def main =
 \end{verbatim}
 
 \subsection*{Extended subtyping}
-
+Function subtyping:
+\begin{mathpar}
+\inferrule{\Gamma \vdash A' \le^+ A \dashv \Theta \\
+           \Theta \vdash [\Theta]B \le^- [\Theta]B' \dashv \Delta}
+           {\Gamma \vdash A \rightarrow B \le^- A' \rightarrow B' \dashv \Delta}
+\end{mathpar}
+Propositional types subtyping:
+\begin{mathpar}
+\inferrule{B \: not \: guarded \\ \Gamma \vdash P \: true \dashv \Theta \\
+           \Theta \vdash [\Theta]A \le^- [\Theta]B \dashv \Delta}
+           {\Gamma \vdash P \supset A \le^- B \dashv \Delta} \and
+\inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \Theta \\
+           \Theta \vdash [\Theta]A \le^- [\Theta]B \dashv \Delta , \, _{\blacktriangleright P}, \, \Delta'}
+           {\Gamma \vdash A \le^- P \supset B \dashv \Delta} \and
+\inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \bot}
+          {\Gamma \vdash A \le^- P \supset B \dashv \Gamma} \and
+\inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \Theta \\
+           \Theta \vdash [\Theta]A \le^+ [\Theta]B \dashv \Delta , \, _{\blacktriangleright P}, \, \Delta'}
+           {\Gamma \vdash A \wedge P \le^+ B \dashv \Delta} \and
+\inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \bot}
+          {\Gamma \vdash A \wedge P \le^+ B \dashv \Gamma} \and \and
+\inferrule{A \: not \: asserting \\ \Gamma \vdash P \: true \dashv \Theta \\
+           \Theta \vdash [\Theta]A \le^+ [\Theta]B \dashv \Delta}
+           {\Gamma \vdash A \le^+ B \wedge P \dashv \Delta} \and
+\end{mathpar}
 \section{Our contribution}
 \subsection*{User defined GADTs}
 

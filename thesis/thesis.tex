@@ -426,13 +426,16 @@ def main =
 \end{verbatim}
 
 \subsection*{Extended subtyping}
-Function subtyping:
+We added extra subtyping rules to improve flexibility and expressiveness of the type system.
+Without these rules the above example would not work, since we wouldn't be able to subtype
+\verb+(Int -> r) +$<$ \verb+(a = Int => Int -> r)+.
+\subsubsection*{Function subtyping:}
 \begin{mathpar}
 \inferrule{\Gamma \vdash A' \le^+ A \dashv \Theta \\
            \Theta \vdash [\Theta]B \le^- [\Theta]B' \dashv \Delta}
            {\Gamma \vdash A \rightarrow B \le^- A' \rightarrow B' \dashv \Delta}
 \end{mathpar}
-Propositional types subtyping:
+\subsubsection*{Propositional types subtyping:}
 \begin{mathpar}
 \inferrule{B \: not \: guarded \\ \Gamma \vdash P \: true \dashv \Theta \\
            \Theta \vdash [\Theta]A \le^- [\Theta]B \dashv \Delta}
@@ -451,8 +454,47 @@ Propositional types subtyping:
            \Theta \vdash [\Theta]A \le^+ [\Theta]B \dashv \Delta}
            {\Gamma \vdash A \le^+ B \wedge P \dashv \Delta} \and
 \end{mathpar}
-\section{Our contribution}
-\subsection*{User defined GADTs}
+\section{Our contribution - user defined GADTs}
+
+\subsection*{Named and unnamed parameters}
+Let's take a look again at the definition of data type \verb+Vec+:
+\begin{verbatim}
+data Vec N 'A where
+  | []  :: Vec 0 'A
+  | (:) :: forall n : N . 'A -> Vec n 'A -> Vec (S n) 'A
+\end{verbatim}
+One could wonder why do we need named parameters in our type system.
+Couldn't we just use unnamed parameters and quantifiers, like in the example below ?
+\begin{verbatim}
+data Vec N * where
+  | []  :: forall a : * . Vec 0 a
+  | (:) :: forall n : N, a : * . a -> Vec n a -> Vec (S n) a
+\end{verbatim}
+That's true, we can define \verb+Vec+ like that, but there is a drawback to that approach. Since we are using
+quantification on \verb+a+, our definition of \verb+Vec+ is restricted to monotypes, so, for example, we wouldn't be
+able to typecheck vector of mixed length vectors: \verb+Vec n (exists m : N . Vec m a)+. That's where
+named parameters come into play. They are capable of storing big types,
+but that also means that they cannot be involved in type equations. As we can see, the combination of both kinds
+of parameters is essential to provide full expressive power to the programmer.
+
+\subsection*{Template constructors}
+
+\textbf{Type templates:}
+
+\begin{grammar}{A,B,C\Coloneqq}{}
+  \verb+()+ \mid \verb+Bool+ \mid \verb+Int+ \mid \verb+Float+  \mid \verb+Char+ \mid \verb+String+ & simple types\\
+  \mid  A_1 \times A_2 \times \dots A_n & product\\
+  \mid \alpha                           & universal variable\\
+  \mid  \hat{\alpha}                    & existential variable\\
+  \mid \forall t \colon \kappa. A       & universal quantification\\
+  \mid \exists t \colon \kappa. A       & existential quantification\\
+  \mid P \supset A                      & guarded type\\
+  \mid A \wedge  P                      & asserting type\\
+  \mid \textit{Type identifier } \rho_1  \rho_2  \dots \rho_n              & user defined GADT \\
+  \mid \textit{parameter index}         & index of GADT parameter
+\end{grammar}
+
+\subsection*{Functional constructors}
 
 \chapter{Remarks on semantics}
 \section{Function definitions}

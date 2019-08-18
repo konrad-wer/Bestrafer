@@ -23,4 +23,4 @@ def main :: ()
 def main =
   putStrLn "What is your name ?" `seq`
   let name = getLine () in
-  printf ((Lit "Hello " . Str . Lit "!\nWhat do you get if you multiply six by nine? " . Inr . Eol) End) name 42
+  printf (Lit "Hello " . Str . Lit "!\nWhat do you get if you multiply six by nine? " . Inr . Eol <| End) name 42

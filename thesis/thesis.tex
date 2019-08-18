@@ -325,7 +325,7 @@ reduces number of programs which would not typecheck due to this restriction.
 
 \begin{grammar}{A,B,C\Coloneqq}{}
   \verb+()+ \mid \verb+Bool+ \mid \verb+Int+ \mid \verb+Float+  \mid \verb+Char+ \mid \verb+String+ & simple types\\
-  \mid  A_1 \times A_2 \times \dots A_n & product\\
+  \mid  A_1 \times A_2 \times \dots \times A_n & product\\
   \mid \alpha                           & universal variable\\
   \mid  \hat{\alpha}                    & existential variable\\
   \mid \forall t \colon \kappa. A       & universal quantification\\
@@ -347,7 +347,7 @@ reduces number of programs which would not typecheck due to this restriction.
   0                                & zero\\
   \mid S \, n                              & successor of n\\
   \mid \verb+()+ \mid \verb+Bool+ \mid \verb+Int+ \mid \verb+Float+  \mid \verb+Char+ \mid \verb+String+ & simple types\\
-  \mid  t_1 \times t_2 \times \dots t_n & product\\
+  \mid  t_1 \times t_2 \times \dots \times t_n & product\\
   \mid \alpha                           & universal variable\\
   \mid  \hat{\alpha}                    & existential variable\\
   \mid \textit{Type identifier } t_1  t_2  \dots t_n              & user defined GADT
@@ -477,24 +477,44 @@ named parameters come into play. They are capable of storing big types,
 but that also means that they cannot be involved in type equations. As we can see, the combination of both kinds
 of parameters is essential to provide full expressive power to the programmer.
 
-\subsection*{Template constructors}
+\subsection*{Building and typechecking constructors}
+We build GADT representations between parsing and typechecking process. We start by checking well-formedness of
+constructors. We define well formed constructor in the following manner:
+
+$Well \: formed \: constructor ::= Universal$
+
+\begin{grammar}{Universal\Coloneqq}{}
+  \forall \alpha : \kappa \,.\, Universal
+  \mid Arrow
+\end{grammar}
+
+\begin{grammar}{Arrow\Coloneqq}{}
+  A \rightarrow Arrow
+  \mid Well \: formed \: result \: type
+\end{grammar}\bigskip\\
+By $Well \: formed \: result \: type$ we mean the type that matches type signature of currently defined GADT,
+where positions of named parameters and kinds of types associated with unnamed parameters also match the type signature.
+After that we build two representations of each constructor: template representation which is used when we check constructor
+expression against known GADT type and functional which is used in all other cases (namely, partial application and passing
+constructor as an argument to a function).
+\subsubsection*{Template representation}
 
 \textbf{Type templates:}
 
-\begin{grammar}{A,B,C\Coloneqq}{}
+\begin{grammar}{A_\dagger,B_\dagger,C_\dagger\Coloneqq}{}
   \verb+()+ \mid \verb+Bool+ \mid \verb+Int+ \mid \verb+Float+  \mid \verb+Char+ \mid \verb+String+ & simple types\\
-  \mid  A_1 \times A_2 \times \dots A_n & product\\
+  \mid  A_{\dagger1} \times A_{\dagger2} \times \dots \times A_{\dagger n} & product\\
   \mid \alpha                           & universal variable\\
   \mid  \hat{\alpha}                    & existential variable\\
-  \mid \forall t \colon \kappa. A       & universal quantification\\
-  \mid \exists t \colon \kappa. A       & existential quantification\\
-  \mid P \supset A                      & guarded type\\
-  \mid A \wedge  P                      & asserting type\\
+  \mid \forall t \colon \kappa. A_\dagger       & universal quantification\\
+  \mid \exists t \colon \kappa. A_\dagger       & existential quantification\\
+  \mid P_\dagger \supset A_\dagger                      & guarded type\\
+  \mid A_\dagger \wedge  P_\dagger                      & asserting type\\
   \mid \textit{Type identifier } \rho_1  \rho_2  \dots \rho_n              & user defined GADT \\
   \mid \textit{parameter index}         & index of GADT parameter
 \end{grammar}
 
-\subsection*{Functional constructors}
+\subsubsection*{Functional representation}
 
 \chapter{Remarks on semantics}
 \section{Function definitions}

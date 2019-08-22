@@ -30,7 +30,7 @@
 %
 %\usepackage{graphicx,listings,amsmath,amssymb,amsthm,amsfonts,tikz}
 \let\lll\undefined
-\usepackage{mathtools, array, amsfonts, mathpartir, amssymb}
+\usepackage{mathtools, array, amsfonts, mathpartir, amssymb, stmaryrd}
 \usepackage[nottoc]{tocbibind}
 
 %
@@ -353,7 +353,7 @@ reduces number of programs which would not typecheck due to this restriction.
   \mid \textit{Type identifier } t_1  t_2  \dots t_n              & user defined GADT
 \end{grammar}
 
-\textbf{Propositions}
+\textbf{Propositions:}
 
 \begin{grammar}{P,Q\Coloneqq}{}
   t = t`
@@ -361,7 +361,7 @@ reduces number of programs which would not typecheck due to this restriction.
 
 \subsection*{Higher rank polymorphism}
 One of the key features of the Dunfield's and Krishnaswami's system is higher rank polymorphism.
-Polymorphhic types are treated like any other big type so they can be nested in each ohter arbitrarily
+Polymorphic types are treated like any other big type so they can be nested in each ohter arbitrarily
 many times. The following example uses higher rank universal quantification in GADT constructor
 to implement Scott's encoding of lists as a two continuations\cite{rankNtypes}.
 \begin{verbatim}
@@ -497,24 +497,93 @@ where positions of named parameters and kinds of types associated with unnamed p
 After that we build two representations of each constructor: template representation which is used when we check constructor
 expression against known GADT type and functional which is used in all other cases (namely, partial application and passing
 constructor as an argument to a function).
+
 \subsubsection*{Template representation}
+For the purpose of template representation we defined type templates, which basically are types with indexed holes,
+which may be filled with any big type or monotype.
 
 \textbf{Type templates:}
 
 \begin{grammar}{A_\dagger,B_\dagger,C_\dagger\Coloneqq}{}
   \verb+()+ \mid \verb+Bool+ \mid \verb+Int+ \mid \verb+Float+  \mid \verb+Char+ \mid \verb+String+ & simple types\\
   \mid  A_{\dagger1} \times A_{\dagger2} \times \dots \times A_{\dagger n} & product\\
-  \mid \alpha                           & universal variable\\
-  \mid  \hat{\alpha}                    & existential variable\\
-  \mid \forall t \colon \kappa. A_\dagger       & universal quantification\\
-  \mid \exists t \colon \kappa. A_\dagger       & existential quantification\\
-  \mid P_\dagger \supset A_\dagger                      & guarded type\\
-  \mid A_\dagger \wedge  P_\dagger                      & asserting type\\
-  \mid \textit{Type identifier } \rho_1  \rho_2  \dots \rho_n              & user defined GADT \\
-  \mid \textit{parameter index}         & index of GADT parameter
+  \mid \alpha                                                                                   & universal variable\\
+  \mid  \hat{\alpha}                                                                            & existential variable\\
+  \mid \forall t \colon \kappa. A_\dagger                                                       & universal quantification\\
+  \mid \exists t \colon \kappa. A_\dagger                                                       & existential quantification\\
+  \mid P_\dagger \supset A_\dagger                                                              & guarded type\\
+  \mid A_\dagger \wedge  P_\dagger                                                              & asserting type\\
+  \mid \textit{Type identifier } \rho_{\dagger1}  \rho_{\dagger2}  \dots \rho_{\dagger n}       & user defined GADT \\
+  \mid 1,2,3,\dots         & index of GADT parameter
 \end{grammar}
 
+\textbf{GADT parameter templates:}
+
+\begin{grammar}{\rho \Coloneqq}{}
+  A_\dagger \mid n_\dagger                        & type template or monotype template
+\end{grammar}
+
+\textbf{Proposition templates:}
+
+\begin{grammar}{P_\dagger,Q_\dagger\Coloneqq}{}
+  t_\dagger = t`_\dagger
+\end{grammar}\bigskip\\
+We define monotype templates similarly to big type templates, so we omit the formal definition for space reasons.
+
+Template representation consists of list of universally quantified variables, list of propositions and list of constructor
+arguments represented as type templates. We substitute named parameters identifiers and unnamed parameters in the result type with
+\textit{parameters indices}, which correspond to adequate parameters in the type signature.
+We generate propositions automatically based on constructor's result type.
+
+When typechecking a constructor, we start by checking if its result type matches the type against which we are typechecking.
+Then we check the arity of the constructor.
+After that we substitute constructor's universally quantified variables with fresh existential variables.
+Then we convert arguments' type templates and propositions' templates to types, monotypes and propositions
+by replacing parameters' indices with types and monotypes from checked type parameters.
+Next, we check propositions. Finally, we check constructor's arguments against generate types.
+The following, quite lenghty, rule describes that process in the formal way:
+
+\begin{mathpar}
+\inferrule{typeName_{constrName} = typeName \\
+  \alpha_1, \alpha_2, \dots, \alpha_m \shortleftarrow uvars_{constrName} \\
+  P_{\dagger1}, P_{\dagger2}, \dots, P_{\dagger l} \shortleftarrow props_{constrName} \\
+  A_{\dagger1}, A_{\dagger2}, \dots, A_{\dagger k} \shortleftarrow args_{constrName} \\
+  P'_{\dagger1}, P'_{\dagger2}, \dots, P'_{\dagger l} \leftarrow
+  [\hat{\alpha}_1 / \alpha_1, \hat{\alpha}_2 / \alpha_2, \dots, \hat{\alpha}_m / \alpha_m]
+  P_{\dagger1}, P_{\dagger2}, \dots, P_{\dagger l}\\
+  P_1, P_2, \dots, P_l \shortleftarrow [\rho_1 / 1, \rho_2 / 2, ... , \rho_n / n]
+  P'_{\dagger1}, P'_{\dagger2}, \dots, P'_{\dagger l}\\
+  A'_{\dagger1}, A'_{\dagger2}, \dots, A'_{\dagger k} \leftarrow
+  [\hat{\alpha}_1 / \alpha_1, \hat{\alpha}_2 / \alpha_2, \dots, \hat{\alpha}_m / \alpha_m]
+  A_{\dagger1}, A_{\dagger2}, \dots, A_{\dagger k}\\
+  A_1, A_2, \dots, A_k \shortleftarrow [\rho_1 / 1, \rho_2 / 2, ... , \rho_n / n]
+  A'_{\dagger1}, A'_{\dagger2}, \dots, A'_{\dagger k}\\
+  \Gamma \vdash P_1 \: true \dashv \Theta_1\\
+  \Theta_1 \vdash P_2 \: true \dashv \Theta_2\\
+  \cdots \\ \Theta_{l-1} \vdash P_l \: true \dashv \Theta_l\\
+  \Theta_l \vdash e_1 \Leftarrow [\Theta_l]A_1 \dashv \Delta_1\\
+  \Delta_1 \vdash e_2 \Leftarrow [\Delta_1]A_2 \dashv \Delta_2\\
+  \cdots \\ \Delta_{k-1} \vdash e_k \Leftarrow [\Delta_{k-1}]A_k \dashv \Delta_k
+  }
+  {\Gamma \vdash constrName \; e_1 \, e_2 \, \dots \, e_k
+  \Leftarrow typeName \; \rho_1 \, \rho_2 \, \dots \, \rho_n \dashv \Delta_k}
+\end{mathpar}
+
 \subsubsection*{Functional representation}
+Supplementary to the template representation, we represent constructors as a polymorphic functions.
+To build functional representation we change named parameters into universally quantified variables.
+For example cons of \verb+Vec+:
+\begin{verbatim}
+(:) :: forall n : N . 'A -> Vec n 'A -> Vec (S n) 'A
+\end{verbatim}
+is represented as:
+\begin{verbatim}
+(:) :: forall a : *, n : N . a -> Vec n a -> Vec (S n) a
+\end{verbatim}
+Since we are using universal quantification on all parameters,
+when using functional representation every parameter must by monotype.
+This is why we put so much effort into creating template representation based on named
+parameters.
 
 \chapter{Remarks on semantics}
 \section{Function definitions}

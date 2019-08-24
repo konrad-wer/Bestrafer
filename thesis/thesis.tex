@@ -289,7 +289,6 @@ def main =
 
 \chapter{Type system}
 \section{Dunfield's and Krishnaswami's system}
-
 \subsection*{Typing and subtyping rules}
 
 \section{Our variant of the system}
@@ -583,12 +582,38 @@ is represented as:
 Since we are using universal quantification on all parameters,
 when using functional representation every parameter must by monotype.
 This is why we put so much effort into creating template representation based on named
-parameters.
+parameters, which is not restricted to monotypes.
 
 \chapter{Remarks on semantics}
-\section{Function definitions}
 \section{GADT constructors}
-\section{Evaluation order}
+Partially applied constructors are changed into (interpreted as) lambda expressions, that take as input missing arguments of the constructor.
+For example, if we consider type:
+\begin{verbatim}
+data Pair 'A 'B where
+  | Pair :: 'A -> 'B -> Pair 'A 'B
+\end{verbatim}
+partial aplication: \verb+Pair 42+ will be changed into \verb+\b -> Pair 42 b+.
+\section{Function definitions and evaluation order}
+Top-level pattern matching definitions are just syntax sugar for lambda with a match expression inside.
+For example function definition:
+\begin{verbatim}
+def map _ [] = []
+def map f (x : xs) = f x : map f xs
+\end{verbatim}
+will be desugared into:
+\begin{verbatim}
+\x0 x1 -> case (x0, x1) of
+  | (_, []) -> []
+  | (f, x : xs) -> f x : map f xs
+\end{verbatim}
+
+The top-level definitions are all mutually recursive and each of them is evaluated once starting from the beginning
+down to the end of the source file. This may raise a question, what happens if some function or definition uses the definition which is located
+lower in the source file. In this situation the lower definition will be evaluated at the time when it was called in higher definition,
+its value will be remembered and the definition won't be evaluated for the second time.
+Another concern is what would happend, if in the previous situation lower function would throw an error and the higher function would
+handle it with a \verb+try-catch+ block. Because lower definition failed to evaluate we treat it as non evaluated and try to evaluate it
+on its next use or at the top-level.
 
 \chapter{Future work}
 

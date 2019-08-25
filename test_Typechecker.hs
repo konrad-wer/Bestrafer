@@ -157,7 +157,7 @@ freeExistentialVariables_test3 :: Test
 freeExistentialVariables_test3 =
   case Set.toList . freeExistentialVariables $ TExistential (UTypeVar "x") KStar $
                     TProduct [TUnit, TArrow (TEVar $ ETypeVar "x") TUnit, TUnit, TGADT "T" [ParameterType TUnit], TUnit] 5 of
-    [] -> True
+    [ETypeVar "x"] -> True
     _ -> False
 
 freeExistentialVariables_test4 :: Test
@@ -171,7 +171,7 @@ freeExistentialVariables_test5 =
   case Set.toList . freeExistentialVariables $ TUniversal (UTypeVar "U") KNat $ TExistential (UTypeVar "x") KStar $
        TImp (MSucc (MEVar $ ETypeVar "U") , MArrow (MEVar $ ETypeVar "W") (MEVar $ ETypeVar "r"))
        (TProduct [TArrow (TEVar $ ETypeVar "x") TUnit, TGADT "p" [ParameterType $ TEVar $ ETypeVar "y", ParameterType TUnit]] 2) of
-    [ETypeVar "U", ETypeVar "W", ETypeVar "r", ETypeVar "y"] -> True
+    [ETypeVar "U", ETypeVar "W", ETypeVar "r",  ETypeVar "x", ETypeVar "y"] -> True
     _ -> False
 
 freeExistentialVariables_test6 :: Test
@@ -179,7 +179,7 @@ freeExistentialVariables_test6 =
   case Set.toList . freeExistentialVariables $ TUniversal (UTypeVar "U") KNat $ TExistential (UTypeVar "x") KStar $
        TAnd (TProduct [TArrow (TEVar $ ETypeVar "x") TUnit, TGADT "F" [ParameterType $ TEVar $ ETypeVar "y"]] 2)
        (MSucc (MEVar $ ETypeVar "U") , MArrow (MEVar $ ETypeVar "W") (MEVar $ ETypeVar "r")) of
-    [ETypeVar "U", ETypeVar "W", ETypeVar "r", ETypeVar "y"] -> True
+    [ETypeVar "U", ETypeVar "W", ETypeVar "r", ETypeVar "x", ETypeVar "y"] -> True
     _ -> False
 
 freeExistentialVariables_test7 :: Test
@@ -187,7 +187,7 @@ freeExistentialVariables_test7 =
   case Set.toList . freeExistentialVariables $ TExistential (UTypeVar "h") KNat $  TExistential (UTypeVar "c") KStar $ TExistential (UTypeVar "g") KStar $
        TProduct [TArrow (TUVar $ UTypeVar "x") (TEVar $ ETypeVar "g"),
        TGADT "J" [ParameterType $ TEVar $ ETypeVar "h", ParameterType $ TEVar $ ETypeVar "c"]] 2 of
-    [] -> True
+    [ETypeVar "c", ETypeVar "g", ETypeVar "h"] -> True
     _ -> False
 
 freeVariablesOfMonotype_test1 :: Test
@@ -1439,8 +1439,8 @@ checkTypeWellFormednessWithPrnc_test10 =
 checkTypeWellFormednessWithPrnc_test11 :: Test
 checkTypeWellFormednessWithPrnc_test11 =
   case flip evalStateT startState $ checkTypeWellFormednessWithPrnc () context1
-            (TExistential (UTypeVar "Konrad") KStar (TArrow (TEVar $ ETypeVar "Konrad") TUnit)) Principal of
-    Left (UndeclaredETypeVarError () (ETypeVar "Konrad")) -> True
+            (TExistential (UTypeVar "Konrad") KStar (TArrow (TEVar $ ETypeVar "Monad") TUnit)) Principal of
+    Left (TypeFormednessPrcFEVError () [ETypeVar "Monad"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test12 :: Test
@@ -1489,7 +1489,7 @@ checkTypeWellFormednessWithPrnc_test18 :: Test
 checkTypeWellFormednessWithPrnc_test18 =
   case flip evalStateT startState $ checkTypeWellFormednessWithPrnc () []
             (TExistential (UTypeVar "x") KStar (TImp (MZero, MSucc (MEVar $ ETypeVar "x")) (TArrow (TEVar $ ETypeVar "z") TUnit))) Principal of
-    Left (TypeFormednessPrcFEVError () [ETypeVar "z"]) -> True
+    Left (TypeFormednessPrcFEVError () [ETypeVar "x",  ETypeVar "z"]) -> True
     _ -> False
 
 checkTypeWellFormednessWithPrnc_test19 :: Test

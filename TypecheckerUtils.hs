@@ -316,7 +316,7 @@ freeExistentialVariables (TProduct ts _) = Set.unions $ map freeExistentialVaria
 freeExistentialVariables (TUVar _) = Set.empty
 freeExistentialVariables (TEVar x) = Set.singleton x
 freeExistentialVariables (TUniversal _ _ t) = freeExistentialVariables t
-freeExistentialVariables (TExistential x _ t) = Set.delete (ETypeVar $ uTypeVarName x) $ freeExistentialVariables t
+freeExistentialVariables (TExistential _ _ t) = freeExistentialVariables t
 freeExistentialVariables (TImp p t) = Set.union (freeExistentialVariablesOfProp p) (freeExistentialVariables t)
 freeExistentialVariables (TAnd t p) = Set.union (freeExistentialVariables t) (freeExistentialVariablesOfProp p)
 

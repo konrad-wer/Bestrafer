@@ -710,7 +710,10 @@ checkExpr context expression checkedType principality = do
           checkPropTrue _c prop' p $ CheckExprClue (EConstr p constrName es) (TGADT typeName ts)
         auxType _c (e, t) = do
           t' <- lift $ applyContextToType p _c t
-          checkExpr _c e t' pr
+          if Set.null $ freeExistentialVariables t then
+            checkExpr _c e t' pr
+          else
+            checkExpr _c e t' NotPrincipal
     (c, e, t, _) -> do
       (t2, _, c2) <- inferExpr c e
       t2' <- lift $ applyContextToType (getPos e) c2 t2

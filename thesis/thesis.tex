@@ -30,7 +30,7 @@
 %
 %\usepackage{graphicx,listings,amsmath,amssymb,amsthm,amsfonts,tikz}
 \let\lll\undefined
-\usepackage{mathtools, array, amsfonts, mathpartir, amssymb, stmaryrd}
+\usepackage{mathtools, array, amsfonts, mathpartir, amssymb, stmaryrd, cancel}
 \usepackage[nottoc]{tocbibind}
 
 %
@@ -54,6 +54,38 @@
 %%%%% POCZĄTEK ZASADNICZEGO TEKSTU PRACY
 
 \chapter{Introduction}
+We introduce Bestrafer - functional programming language utilizing a novel approach to GADTs proposed
+by Joshua Dunfield and Neelakantan R. Krishnaswami in the article "Sound and Complete
+Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types"\cite{gadt-popl19}.
+\section{Our contributions}
+\subsection*{Extension of Dunfield's and Krishnaswami's system}
+We have fine-tuned their system for usage in practical and user-friendly programming language, by
+extending subtyping and inference and adding extra typechecking rules for typical language features like \verb+if+
+and \verb+let+ expressions, operators and exception handling. We extended their system by adding user defined
+generalized algebraic data types. Our approach of creating two representations of each constructor
+(one for typechecking and one for type inference) in combination with bidirectionality of the original
+system provides full expressive power to the programmer, by enabling parametrization with big types.
+\subsection*{Definition of a language and implementation}
+We created a language with modern syntax and practical features like exception handling, handful of primitive types
+and standard library with many builtin operators, rich base of IO, utlity, convertion and traditional FP functions.
+We implemented interter of a Bestrafer language in Haskell. We put a lot of effort into
+creating reliable, useful and easy to use implementation of our language.
+To ensure correctness of the implementation we created almost 440 unit tests for the type system.
+We payed extra attention to producing readable and helpful type checking error messages.
+For example:
+\begin{verbatim}
+prog.br:4:26
+Couldn't match expected type 'Int' with actual type 'Float'
+\end{verbatim}
+We are also providing hints for some more complex error cases:
+\begin{verbatim}
+sorting.br:17:3
+Type variable not in scope: 'k'
+While trying to subtype: '(exists k : N . (Vec k a))' < '(Vec n1~ a~)'
+Hint: try using let to unpack '(exists k : N . (Vec k a))'
+before using it in expression of type '(Vec n1~ a~)'
+\end{verbatim}
+Finally, we provided handful of example Bestrafer codes which showcase language syntax and features.
 \chapter{Language description}
 \section{Language features}
 Bestrafer's syntax was designed to be concise, expressive, readable and beautiful.
@@ -289,6 +321,13 @@ def main =
 
 \chapter{Type system}
 \section{Dunfield's and Krishnaswami's system}
+Bestrafer uses extended version of Dunfield's and Krishnaswami's bidirectional type system introduced in the article
+"Sound and Complete Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types"\cite{gadt-popl19}.
+Their unique approach enabling mixing existential and universal quantifiers in higher rank polymorphism is made possible by
+their novel polarized subtyping rule, which fixes the order in which quantifiers are instantiated, making the
+problem decidable and keeps the fundamental properties of subtyping,
+like stability under substitution and transitivity. Their system also features principality tracking, where in following
+rules: \textbf{!} means principal judgement and \cancel{\textbf{!}} or omitted means non-principal.
 \subsection*{Typing and subtyping rules}
 
 \section{Our variant of the system}
@@ -537,12 +576,17 @@ We generate propositions automatically based on constructor's result type.
 When typechecking a constructor, we start by checking if its result type matches the type against which we are typechecking.
 Then we check the arity of the constructor.
 After that we substitute constructor's universally quantified variables with fresh existential variables.
-Then we convert arguments' type templates and propositions' templates to types, monotypes and propositions
-by replacing parameters' indices with types and monotypes from checked type parameters.
-Next, we check propositions. Finally, we check constructor's arguments against generate types.
+Then we convert arguments' type templates and propositions' templates to types and propositions
+by replacing parameters' indices with types and monotypes from checked type's parameters.
+Next, we check propositions. Finally, we check constructor's arguments against generated types.
 The following, quite lenghty, rule describes that process in the formal way:
 
 \begin{mathpar}
+prnc(A, \; p) = \begin{cases}
+  \cancel{\textbf{!}} & when \; FEV(A) \neq \emptyset \\
+  p                   & when \; FEV(A) = \emptyset
+\end{cases}
+
 \inferrule{typeName_{constrName} = typeName \\
   \alpha_1, \alpha_2, \dots, \alpha_m \shortleftarrow uvars_{constrName} \\
   P_{\dagger1}, P_{\dagger2}, \dots, P_{\dagger l} \shortleftarrow props_{constrName} \\
@@ -558,14 +602,13 @@ The following, quite lenghty, rule describes that process in the formal way:
   A_1, A_2, \dots, A_k \shortleftarrow [\rho_1 / 1, \rho_2 / 2, ... , \rho_n / n]
   A'_{\dagger1}, A'_{\dagger2}, \dots, A'_{\dagger k}\\
   \Gamma \vdash P_1 \: true \dashv \Theta_1\\
-  \Theta_1 \vdash P_2 \: true \dashv \Theta_2\\
-  \cdots \\ \Theta_{l-1} \vdash P_l \: true \dashv \Theta_l\\
-  \Theta_l \vdash e_1 \Leftarrow [\Theta_l]A_1 \dashv \Delta_1\\
-  \Delta_1 \vdash e_2 \Leftarrow [\Delta_1]A_2 \dashv \Delta_2\\
-  \cdots \\ \Delta_{k-1} \vdash e_k \Leftarrow [\Delta_{k-1}]A_k \dashv \Delta_k
-  }
+  \Theta_1 \vdash [\Theta_1]P_2 \: true \dashv \Theta_2\\
+  \cdots \\ \Theta_{l-1} \vdash [\Theta_{l-1}]P_l \: true \dashv \Theta_l\\
+  \Theta_l \vdash e_1 \Leftarrow [\Theta_l]A_1 \; prnc(A_1, \: p) \dashv \Delta_1\\
+  \Delta_1 \vdash e_2 \Leftarrow [\Delta_1]A_2 \; prnc(A_2, \: p) \dashv \Delta_2\\
+  \cdots \\ \Delta_{k-1} \vdash e_k \Leftarrow [\Delta_{k-1}]A_k \; prnc(A_k, \: p) \dashv \Delta_k}
   {\Gamma \vdash constrName \; e_1 \, e_2 \, \dots \, e_k
-  \Leftarrow typeName \; \rho_1 \, \rho_2 \, \dots \, \rho_n \dashv \Delta_k}
+  \Leftarrow (typeName \; \rho_1 \, \rho_2 \, \dots \, \rho_n) \; p \dashv \Delta_k}
 \end{mathpar}
 
 \subsubsection*{Functional representation}

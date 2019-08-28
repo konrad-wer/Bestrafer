@@ -398,8 +398,11 @@ reduces number of programs which would not typecheck due to this restriction.
   \mid \exists t \colon \kappa. A       & existential quantification\\
   \mid P \supset A                      & guarded type\\
   \mid A \wedge  P                      & asserting type\\
-  \mid \textit{Type identifier } \rho_1  \rho_2  \dots \rho_n              & user defined GADT
+  \mid \mathrm{T}\, \rho_1  \rho_2  \dots \rho_n              & user defined GADT
 \end{grammar}
+
+\textbf{Type identifiers:}
+$\mathrm{T}$
 
 \textbf{GADT parameters:}
 
@@ -416,7 +419,7 @@ reduces number of programs which would not typecheck due to this restriction.
   \mid  t_1 \times t_2 \times \dots \times t_n & product\\
   \mid \alpha                           & universal variable\\
   \mid  \hat{\alpha}                    & existential variable\\
-  \mid \textit{Type identifier } t_1  t_2  \dots t_n              & user defined GADT
+  \mid \mathrm{T}\, t_1  t_2  \dots t_n              & user defined GADT
 \end{grammar}
 
 \textbf{Propositions:}
@@ -579,7 +582,7 @@ which may be filled with any big type or monotype.
   \mid \exists t \colon \kappa. A_\dagger                                                       & existential quantification\\
   \mid P_\dagger \supset A_\dagger                                                              & guarded type\\
   \mid A_\dagger \wedge  P_\dagger                                                              & asserting type\\
-  \mid \textit{Type identifier } \rho_{\dagger1}  \rho_{\dagger2}  \dots \rho_{\dagger n}       & user defined GADT \\
+  \mid \mathrm{T} \, \rho_{\dagger1}  \rho_{\dagger2}  \dots \rho_{\dagger n}       & user defined GADT \\
   \mid 1,2,3,\dots         & index of GADT parameter
 \end{grammar}
 
@@ -615,7 +618,7 @@ prnc(A, \; p) = \begin{cases}
   p                   & when \; FEV(A) = \emptyset
 \end{cases}
 
-\inferrule{\mathit{typeName}_\mathit{constrName} = typeName \\
+\inferrule{\mathrm{T}_\mathit{constrName} = \mathrm{T} \\
   \alpha_1, \alpha_2, \dots, \alpha_m \shortleftarrow \mathit{uvars}_\mathit{constrName} \\
   P_{\dagger1}, P_{\dagger2}, \dots, P_{\dagger l} \shortleftarrow \mathit{props}_\mathit{constrName} \\
   A_{\dagger1}, A_{\dagger2}, \dots, A_{\dagger k} \shortleftarrow \mathit{args}_\mathit{constrName} \\
@@ -636,7 +639,7 @@ prnc(A, \; p) = \begin{cases}
   \Delta_1 \vdash e_2 \Leftarrow [\Delta_1]A_2 \; prnc(A_2, \: p) \dashv \Delta_2\\
   \cdots \\ \Delta_{k-1} \vdash e_k \Leftarrow [\Delta_{k-1}]A_k \; prnc(A_k, \: p) \dashv \Delta_k}
   {\Gamma \vdash \mathit{constrName} \; e_1 \, e_2 \, \dots \, e_k
-  \Leftarrow (typeName \; \rho_1 \, \rho_2 \, \dots \, \rho_n) \; p \dashv \Delta_k}
+  \Leftarrow (\mathrm{T} \; \rho_1 \, \rho_2 \, \dots \, \rho_n) \; p \dashv \Delta_k}
 \end{mathpar}
 
 \subsubsection*{Functional representation}

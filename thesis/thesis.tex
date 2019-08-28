@@ -58,7 +58,7 @@ We introduce Bestrafer - functional programming language utilizing a novel appro
 by Joshua Dunfield and Neelakantan R. Krishnaswami in the article "Sound and Complete
 Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types"\cite{gadt-popl19}.
 \section{Our contributions}
-\subsection*{Extension of Dunfield's and Krishnaswami's system}
+\subsection*{Extension of Dunfield and Krishnaswami's system}
 We have fine-tuned their system for usage in practical and user-friendly programming language, by
 extending subtyping and inference and adding extra typechecking rules for typical language features like \verb+if+
 and \verb+let+ expressions, operators and exception handling. We extended their system by adding user defined
@@ -272,13 +272,14 @@ since we cannot predict dimensions of \verb+Vec+s which come from IO. But, that 
 We can use them in program that reads matrices from IO, but we have to prove, that we handle
 all cases of invalid input before passing it into our matrix algebra functions.
 
-\subsection*{Statically typed printf function\cite{inproceedings}}
+\subsection*{Statically typed printf function}
 The well-known \verb+printf+ function from the C programming language,
 uses a string to provide formating of a printed text. However, this approach
 has a major drawback: formated arguments are not statically type checked.
 As a result of that, writing \verb+printf("%d", 3.14);+ will print meaningless int,
-without emiting any warning or error. That's where the GADTs come to the rescue. In the following
-example, we define \verb+Format+ data type which is used to express intended formating of a
+without emiting any warning or error. That's where the GADTs come to the rescue.
+We reimplemented Andrew Kennedy and Claudio Russo's\cite{gadt-oop} solution for that problem, originally written in \verb+C#+.
+In the following example, we define \verb+Format+ data type which is used to express intended formating of a
 printed string. By chaining constructors together we define type of intended printing function,
 which is accumulated in unnamed parameter of the \verb+Format+ data type. When a value of
 the type \verb+Format+ is applied to the function \verb+printf+, an appropriate printing function
@@ -319,9 +320,36 @@ def main =
            Lit "The answer is: " . Inr . Eol) End) name 42
 \end{verbatim}
 
+It is worth mentioning, that it is possible to implement statically typed printf function
+whithout using GADTs, utilizing continuation passing style (CPS)\cite{unparsing}.
+However, GADT solution provides better encapsulation of implementation and
+is easier to comprehend. We show Bestrafer implementation of the CPS approach in the following example.
+\begin{verbatim}
+def lit :: forall a : * . String -> (String -> a) -> String -> a
+def lit s1 c s2 = c (s2 ^ s1)
+
+def eol :: forall a : * . (String -> a) -> String -> a
+def eol c s = c (s ^ "\n")
+
+def inr :: forall a : * . (String -> a) -> String -> Int -> a
+def inr c s x = c (s ^ (intToString x))
+
+def flt :: forall a : * . (String -> a) -> String -> Float -> a
+def flt c s x = c (s ^ (floatToString x))
+
+def str :: forall a : * . (String -> a) -> String -> String -> a
+def str c s1 s2 = c (s1 ^ s2)
+
+def sprintf :: forall a : *, b : * . ((a -> a) -> String -> b) -> b
+def sprintf format = format (\x -> x) ""
+
+def main :: ()
+def main = putStrLn <| sprintf (flt . eol . inr)  44.0 42
+\end{verbatim}
+
 \chapter{Type system}
-\section{Dunfield's and Krishnaswami's system}
-Bestrafer uses extended version of Dunfield's and Krishnaswami's bidirectional type system introduced in the article
+\section{Dunfield and Krishnaswami's system}
+Bestrafer uses extended version of Dunfield and Krishnaswami's bidirectional type system introduced in the article
 "Sound and Complete Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types"\cite{gadt-popl19}.
 Their unique approach enabling mixing existential and universal quantifiers in higher rank polymorphism is made possible by
 their novel polarized subtyping rule, which fixes the order in which quantifiers are instantiated, making the
@@ -398,7 +426,7 @@ reduces number of programs which would not typecheck due to this restriction.
 \end{grammar}
 
 \subsection*{Higher rank polymorphism}
-One of the key features of the Dunfield's and Krishnaswami's system is higher rank polymorphism.
+One of the key features of the Dunfield and Krishnaswami's system is higher rank polymorphism.
 Polymorphic types are treated like any other big type so they can be nested in each ohter arbitrarily
 many times. The following example uses higher rank universal quantification in GADT constructor
 to implement Scott's encoding of lists as a two continuations\cite{rankNtypes}.
@@ -475,7 +503,7 @@ Without these rules the above example would not work, since we wouldn't be able 
 \end{mathpar}
 \subsubsection*{Propositional types subtyping:}
 \begin{mathpar}
-\inferrule{B \: not \: guarded \\ \Gamma \vdash P \: true \dashv \Theta \\
+\inferrule{\text{$B$ not guarded} \\ \Gamma \vdash P \: \mathit{true} \dashv \Theta \\
            \Theta \vdash [\Theta]A \le^- [\Theta]B \dashv \Delta}
            {\Gamma \vdash P \supset A \le^- B \dashv \Delta} \and
 \inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \Theta \\
@@ -488,7 +516,7 @@ Without these rules the above example would not work, since we wouldn't be able 
            {\Gamma \vdash A \wedge P \le^+ B \dashv \Delta} \and
 \inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \bot}
           {\Gamma \vdash A \wedge P \le^+ B \dashv \Gamma} \and \and
-\inferrule{A \: not \: asserting \\ \Gamma \vdash P \: true \dashv \Theta \\
+\inferrule{\text{$A$ not asserting} \\ \Gamma \vdash P \: \mathit{true} \dashv \Theta \\
            \Theta \vdash [\Theta]A \le^+ [\Theta]B \dashv \Delta}
            {\Gamma \vdash A \le^+ B \wedge P \dashv \Delta} \and
 \end{mathpar}
@@ -519,18 +547,18 @@ of parameters is essential to provide full expressive power to the programmer.
 We build GADT representations between parsing and typechecking process. We start by checking well-formedness of
 constructors. We define well formed constructor in the following manner:
 
-$Well \: formed \: constructor ::= Universal$
+$\mathrm{WFConstr} ::= \mathrm{Universal}$
 
-\begin{grammar}{Universal\Coloneqq}{}
-  \forall \alpha : \kappa \,.\, Universal
-  \mid Arrow
+\begin{grammar}{\mathrm{Universal}\Coloneqq}{}
+  \forall \alpha : \kappa \,.\, \mathrm{Universal}
+  \mid \mathrm{Arrow}
 \end{grammar}
 
-\begin{grammar}{Arrow\Coloneqq}{}
-  A \rightarrow Arrow
-  \mid Well \: formed \: result \: type
+\begin{grammar}{\mathrm{Arrow}\Coloneqq}{}
+  A \rightarrow \mathrm{Arrow}
+  \mid \mathrm{WFResult}
 \end{grammar}\bigskip\\
-By $Well \: formed \: result \: type$ we mean the type that matches type signature of currently defined GADT,
+By $\mathrm{WFResult}$ (well formed result type) we mean the type that matches type signature of currently defined GADT,
 where positions of named parameters and kinds of types associated with unnamed parameters also match the type signature.
 After that we build two representations of each constructor: template representation which is used when we check constructor
 expression against known GADT type and functional which is used in all other cases (namely, partial application and passing
@@ -587,10 +615,10 @@ prnc(A, \; p) = \begin{cases}
   p                   & when \; FEV(A) = \emptyset
 \end{cases}
 
-\inferrule{typeName_{constrName} = typeName \\
-  \alpha_1, \alpha_2, \dots, \alpha_m \shortleftarrow uvars_{constrName} \\
-  P_{\dagger1}, P_{\dagger2}, \dots, P_{\dagger l} \shortleftarrow props_{constrName} \\
-  A_{\dagger1}, A_{\dagger2}, \dots, A_{\dagger k} \shortleftarrow args_{constrName} \\
+\inferrule{\mathit{typeName}_\mathit{constrName} = typeName \\
+  \alpha_1, \alpha_2, \dots, \alpha_m \shortleftarrow \mathit{uvars}_\mathit{constrName} \\
+  P_{\dagger1}, P_{\dagger2}, \dots, P_{\dagger l} \shortleftarrow \mathit{props}_\mathit{constrName} \\
+  A_{\dagger1}, A_{\dagger2}, \dots, A_{\dagger k} \shortleftarrow \mathit{args}_\mathit{constrName} \\
   P'_{\dagger1}, P'_{\dagger2}, \dots, P'_{\dagger l} \leftarrow
   [\hat{\alpha}_1 / \alpha_1, \hat{\alpha}_2 / \alpha_2, \dots, \hat{\alpha}_m / \alpha_m]
   P_{\dagger1}, P_{\dagger2}, \dots, P_{\dagger l}\\
@@ -607,7 +635,7 @@ prnc(A, \; p) = \begin{cases}
   \Theta_l \vdash e_1 \Leftarrow [\Theta_l]A_1 \; prnc(A_1, \: p) \dashv \Delta_1\\
   \Delta_1 \vdash e_2 \Leftarrow [\Delta_1]A_2 \; prnc(A_2, \: p) \dashv \Delta_2\\
   \cdots \\ \Delta_{k-1} \vdash e_k \Leftarrow [\Delta_{k-1}]A_k \; prnc(A_k, \: p) \dashv \Delta_k}
-  {\Gamma \vdash constrName \; e_1 \, e_2 \, \dots \, e_k
+  {\Gamma \vdash \mathit{constrName} \; e_1 \, e_2 \, \dots \, e_k
   \Leftarrow (typeName \; \rho_1 \, \rho_2 \, \dots \, \rho_n) \; p \dashv \Delta_k}
 \end{mathpar}
 

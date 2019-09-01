@@ -14,7 +14,13 @@
 \polishtitle    {Wymagający złamania wierszy\fmlinebreak tytuł pracy w~języku polskim}
 \englishtitle   {English title}
 \polishabstract {\ldots}
-\englishabstract{\ldots}
+\englishabstract{
+We introduce Bestrafer - functional programming language utilizing a novel approach to GADTs proposed
+by Joshua Dunfield and Neelakantan R. Krishnaswami in the article "Sound and Complete
+Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types"\cite{gadt-popl19}.
+In this paper we present our language and discuss our contribution
+in extending and implementing Dunfield and Krishnaswami's type system.
+}
 % w pracach wielu autorow nazwiska mozna oddzielic poleceniem \and
 \author         {Konrad Werbliński}
 % w przypadku kilku promotorow, lub koniecznosci podania ich afiliacji, linie
@@ -54,9 +60,37 @@
 %%%%% POCZĄTEK ZASADNICZEGO TEKSTU PRACY
 
 \chapter{Introduction}
-We introduce Bestrafer - functional programming language utilizing a novel approach to GADTs proposed
-by Joshua Dunfield and Neelakantan R. Krishnaswami in the article "Sound and Complete
-Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types"\cite{gadt-popl19}.
+Generalized algebraic data types (GADTs)\cite{grd}\cite{fcpt} have received lot of recognition in
+the functional programming world in recent years. They enable value constructors to return specific, rather
+then parametric instances of their own data types. This provides greater flexibility and expressivity of the
+type system, but also allows to statically prove correctness of invariants and properties of functions.
+For example, we can utilize expressive power of GADTs to implement statically typechecked \verb+printf+ function
+or to prove that matrix algebra functions produce results with correct dimensions. Another desirable type system
+features are higher rank polymorphism and existential types. Rank-n polymorphism allows to nest quantifiers
+arbitrarily deep, which greatly improves expressivity of the type system. Existential types are extremely useful
+in combination with indexed types, for example allowing conveniente programming with length indexed lists.
+
+Mainstream functional languages such as Haskell or OCaml use type systems based on Hindley-Milner\cite{Hindley}\cite{Milner} system.
+This classical inference based type system provides method of typechecking languages with parametric polymorphism.
+However, type inference for generalized algebraic data types in languages like OCaml is difficult\cite{ocaml-gadts}.
+Moreover, complete type inference for laguages with higher rank polymorphism is undecidable, thus it is required to
+provide some type-annotations to guide the type system and make the problem decidable. This led us to a different solution,
+namely bidirectional typechecking. This approach combains two mutually recursive judgements,
+type inference (synthesis) and checking against known type.
+Since, type annotations for top-level declarations are considered a good practice
+and help to document the code, we made them obligatory in our language and used for the checking part of the bidirectional approach.
+Thanks to the inference part of the type system, these top-level annotations are, in practice, sufficient to check entire
+definition, thus not requiring any extra type annotations inside the body of the definition.
+
+Bidirectional typechecking found many applications in whole spectrum of programming languages, from
+imperative object oriented laguages like C\# \cite{csharp2}\cite{csharp3} to typechecking dependent types\cite{Coquand}
+and even to some extent in the GHC compiler of the Haskell programming language for typechecking rank-n types\cite{peytonjones}.
+This technique allows to define elegant and understandable type systems and scales up well with a new features added to the
+language. Bidirectional systems also provide good quality error messages, contrary to sometimes incomprehensible type errors
+in inference based type system implementations.
+
+We followed approach of Joshua Dunfield and Neelakantan R. Krishnaswami\cite{gadt-popl19} to create Bestrafer -
+functional programming language with higher-rank polymorphism, existential types and user defined generalized algebraic data types.
 \section{Our contributions}
 \subsection*{Extension of Dunfield and Krishnaswami's system}
 We have fine-tuned their system for usage in practical and user-friendly programming language, by
@@ -353,8 +387,17 @@ Bestrafer uses extended version of Dunfield and Krishnaswami's bidirectional typ
 "Sound and Complete Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types"\cite{gadt-popl19}.
 Their unique approach enabling mixing existential and universal quantifiers in higher rank polymorphism is made possible by
 their novel polarized subtyping rule, which fixes the order in which quantifiers are instantiated, making the
-problem decidable and keeps the fundamental properties of subtyping,
-like stability under substitution and transitivity. Their system also features principality tracking, where in following
+problem decidable and keeps the fundamental properties of subtyping, like stability under substitution and transitivity.
+Contrary to most of mainstream functional languages like Haskell and OCaml,
+usage of existential types in their system is not tied to data types declarations. This means that existential types
+don't have to be packaged in another datatype, instead they can be used like any other type constructor.
+Their system also features guarded $P \supset A $ (\textit{$P$ implies $A$})
+and asserting types $A \wedge  P$ (\textit{$A$ with $P$}).
+Similarly to Hindley - Milner they distinguish between monotypes and polytypes (in their paper refered to as just types).
+Their system is bidirectional, but their approach relies heavily on checking against known type, providing only few inference
+rules that eliminate need for most tedious type annotations.
+They provide algorithms for typechecking, subtyping, checking pattern matching coverage and finally checking and eliminating propositions.
+Their system also features principality tracking, where in following
 rules: \textbf{!} means principal judgement and \cancel{\textbf{!}} or omitted means non-principal.
 \subsection*{Typing and subtyping rules}
 
@@ -365,9 +408,9 @@ First of all we added typing rules for simple types such as
 \verb+error+ throwing and \verb+try+ - \verb+catch+ blocks, but we omit them in this paper because
 they are not interesting and straightforward. However, it is important to remark, that \verb+let+ expression unpacks the
 existential types which is necessary to ensure correct order of inserting type variables to the context while defining
-recursive functions. We also added extra inference rules following the style of Dunfield and Krishnaswami [2013] \cite{Dunfield13:bidir},
+recursive functions. We also added extra inference rules following the style of Dunfield and Krishnaswami [2013]\cite{Dunfield13:bidir},
 to mimize boilerplate type annotations and produce better quality typechecking errors. Following
-remark of Dunfield and Krishnaswami [2019] \cite{gadt-popl19} we extended subtyping to functions and propositional types.
+remark of Dunfield and Krishnaswami [2019]\cite{gadt-popl19} we extended subtyping to functions and propositional types.
 The biggest modification is the introduction of user defined generalized algebraic data types. The last section
 of this chapter covers exhaustively typing rules and implementation details of GADTs. We discarded separate rules for
 \verb+Vec+, treating it like any other GADT.
@@ -459,7 +502,7 @@ def heads (x : xs) = head x : heads xs
 \end{verbatim}
 
 \subsection*{Guarded types and asserting types}
-Bestrafer supports guarded types $P \supset A $ (\textit{$P$ implies $A$})
+Bestrafer supports explicit guarded types $P \supset A $ (\textit{$P$ implies $A$})
 and asserting types $A \wedge  P$ (\textit{$A$ with $P$}).
 Although the usage of propositions is in most cases implicit and hidden in typechecking GADTs,
 there are some use cases for propositional types.
@@ -495,9 +538,12 @@ def main =
 \end{verbatim}
 
 \subsection*{Extended subtyping}
-We added extra subtyping rules to improve flexibility and expressiveness of the type system.
+Following remark in Dunfield and Krishnaswami's [2019]\cite{gadt-popl19} paper,
+we added extra subtyping rules to improve flexibility and expressiveness of the type system.
 Without these rules the above example would not work, since we wouldn't be able to subtype
-\verb+(Int -> r) +$<$ \verb+(a = Int => Int -> r)+.
+\verb+(Int -> r) +$<$ \verb+(a = Int => Int -> r)+. Rules $A \le^- P \supset B$ and $A \le^+ B \wedge P$
+are based on typechecking rules for asserting and guarding types.
+Rules $P \supset A \le^- B$ and $A \wedge P \le^+ B$ are obtained as a duality of previous two rules.
 \subsubsection*{Function subtyping:}
 \begin{mathpar}
 \inferrule{\Gamma \vdash A' \le^+ A \dashv \Theta \\
@@ -659,6 +705,11 @@ This is why we put so much effort into creating template representation based on
 parameters, which is not restricted to monotypes.
 
 \chapter{Remarks on semantics}
+Bestrafer is a call-by-value language, with some minor exceptions further discussed below.
+We implemented interpreted of the language that realises big-step semantics.
+Formal rules for semantics are typical and rather straightforward so we omit them in this paper. However, addition
+of more complex features like user defined generalized algebraic data types, IO operations and exceptions creates
+some subtleties wchich we cover in this chapter.
 \section{GADT constructors}
 Partially applied constructors are changed into (interpreted as) lambda expressions, that take as input missing arguments of the constructor.
 For example, if we consider type:

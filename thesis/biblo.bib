@@ -41,7 +41,122 @@
   doi = {10.1145/1103845.1094814}
 }
 
-@misc{
-  rankNtypes,
+@misc{rankNtypes,
   note = {\url{https://ocharles.org.uk/guest-posts/2014-12-18-rank-n-types.html}}
+}
+
+@misc{ocaml-gadts,
+  note = {\url{https://caml.inria.fr/pub/docs/manual-ocaml-400/manual021.html#toc85}}
+}
+
+@article{grd,
+ author = {Xi, Hongwei and Chen, Chiyan and Chen, Gang},
+ title = {Guarded Recursive Datatype Constructors},
+ journal = {SIGPLAN Not.},
+ issue_date = {January 2003},
+ volume = {38},
+ number = {1},
+ month = jan,
+ year = {2003},
+ issn = {0362-1340},
+ pages = {224--235},
+ numpages = {12},
+ url = {http://doi.acm.org/10.1145/640128.604150},
+ doi = {10.1145/640128.604150},
+ acmid = {604150},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {guarded recursive datatype constructors},
+}
+
+@article{fcpt,
+  author = {Cheney, James and Hinze, Ralf},
+  year = {2003},
+  month = {01},
+  pages = {},
+  title = {First-Class Phantom Types}
+}
+
+@article{Hindley,
+ ISSN = {00029947},
+ URL = {http://www.jstor.org/stable/1995158},
+ author = {R. Hindley},
+ journal = {Transactions of the American Mathematical Society},
+ pages = {29--60},
+ publisher = {American Mathematical Society},
+ title = {The Principal Type-Scheme of an Object in Combinatory Logic},
+ volume = {146},
+ year = {1969}
+}
+
+@ARTICLE{Milner,
+  author = {Robin Milner},
+  title = {A theory of type polymorphism in programming},
+  journal = {Journal of Computer and System Sciences},
+  year = {1978},
+  volume = {17},
+  pages = {348--375}
+}
+
+@article{csharp2,
+  author = {Bierman, Gavin},
+  year = {2010},
+  month = {06},
+  pages = {},
+  title = {Formalizing and extending C\# type inference (Work in progress)}
+}
+
+@inproceedings{csharp3,
+  author = {Bierman, Gavin and Meijer, Erik and Torgersen, Mads},
+  year = {2007},
+  month = {10},
+  pages = {479-498},
+  title = {Lost in translation: Formalizing proposed extensions to C\#},
+  volume = {42},
+  journal = {Proceedings of the Conference on Object-Oriented Programming Systems, Languages, and Applications, OOPSLA},
+  doi = {10.1145/1297027.1297063}
+}
+
+@article{Coquand,
+  title = "An algorithm for type-checking dependent types",
+  journal = "Science of Computer Programming",
+  volume = "26",
+  number = "1",
+  pages = "167 - 177",
+  year = "1996",
+  issn = "0167-6423",
+  doi = "https://doi.org/10.1016/0167-6423(95)00021-6",
+  url = "http://www.sciencedirect.com/science/article/pii/0167642395000216",
+  author = "Thierry Coquand",
+  abstract = "We present a simple type-checker for a language with dependent types and let expressions, with a simple proof of correctness."
+}
+
+@Article{peytonjones,
+  author = {Peyton Jones, Simon and Vytiniotis, Dimitrios and Weirich, Stephanie and Shields, Mark},
+  title = {Practical type inference for arbitrary-rank types},
+  year = {2005},
+  month = {January},
+  abstract = {Very minor post-JFP revision: Nov 2006 Final minor revision: Feb 2006
+  Second major revision: July 2005
+  Major revision: April 2004
+
+    Technical Appendix to the paper
+    Prototype implementation in Haskell
+    Related papers
+
+  Haskell's popularity has driven the need for ever more expressive type system features, most of which threaten the decidability and practicality of Damas-Milner type inference. One such feature is the ability to write functions with higher-rank types --- that is, functions that take polymorphic functions as their arguments.
+
+  Complete type inference is known to be undecidable for higher-rank (impredicative) type systems, but in practice programmers are more than willing to add type annotations to guide the type inference engine, and to document their code. However, the choice of just what annotations are required, and what changes are required in the type system and its inference algorithm, has been an ongoing topic of research.
+
+  We take as our starting point a lambda-calculus proposed by Odersky and Laufer. Their system supports arbitrary-rank polymorphism through the exploitation of type annotations on lambda-bound arguments and arbitrary sub-terms. Though elegant, and more convenient than some other proposals, Odersky and Laufer's system requires many annotations. We show how to use local type inference (invented by Pierce and Turner) to greatly reduce the annotation burden, to the point where higher-rank types become eminently usable.
+
+  Higher-rank types have a very modest impact on type inference. We substantiate this claim in a very concrete way, by presenting a complete type-inference engine, written in Haskell, for a traditional Damas-Milner type system, and then showing how to extend it for higher-rank types. We write the type-inference engine using a monadic framework: it turns out to be a particularly compelling example of monads in action.
+
+  The paper is long, but is strongly tutorial in style.},
+  url = {https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/},
+  pages = {1-82},
+  journal = {Journal of Functional Programming},
+  volume = {17},
+  edition = {Journal of Functional Programming},
+  note = {Submitted to the Journal of Functional Programming},
 }

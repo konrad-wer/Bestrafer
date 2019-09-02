@@ -68,7 +68,7 @@ For example, we can utilize expressive power of GADTs to implement statically ty
 or to prove that matrix algebra functions produce results with correct dimensions. Another desirable type system
 features are higher rank polymorphism and existential types. Rank-n polymorphism allows to nest quantifiers
 arbitrarily deep, which greatly improves expressivity of the type system. Existential types are extremely useful
-in combination with indexed types, for example allowing conveniente programming with length indexed lists.
+in combination with indexed types, for example allowing convenient programming with length indexed lists.
 
 Mainstream functional languages such as Haskell or OCaml use type systems based on Hindley-Milner\cite{Hindley}\cite{Milner} system.
 This classical inference based type system provides method of typechecking languages with parametric polymorphism.
@@ -741,6 +741,14 @@ handle it with a \verb+try-catch+ block. Because lower definition failed to eval
 on its next use or at the top-level.
 
 \chapter{Future work}
+\section{Unification modulo equality theory on natural numbers}
+\section{Automatically unpacking existential quantifiers}
+\section{Compiler}
+We plan to implement industry-grade compiler for one of the mainstream infrastructures like .NET or JVM.
+Another interesting option for further development would be a front-end web development world,
+namely implementing transpiler to JavaScript or compiler to web assembly.
+In both of these paths the essential part would be to implement elegant and convenient integration
+with standard libraries of these platforms.
 
 %%%%% BIBLIOGRAFIA
 

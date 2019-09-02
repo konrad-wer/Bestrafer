@@ -25,7 +25,7 @@ instance SourcePos ~ p => Show (ErrorClue p) where
     case (t1, t2) of
       (_, TUniversal {}) -> "\nHint: if you are defining a function, try eta-expanding it"
       (TExistential {}, _) -> "\nHint: try using let to unpack " ++ addQuotes (show t1) ++
-        " before using it in expression of type " ++ addQuotes (show t2)
+        " before using it in the expression of type " ++ addQuotes (show t2)
       _ -> ""
   show (CheckExprClue e t) = "\nWhile trying to check expression " ++ addQuotes (show e) ++ " against type " ++ addQuotes (show t)
   show (CheckBranchClue _ []) = ""

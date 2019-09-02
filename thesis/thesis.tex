@@ -117,7 +117,7 @@ sorting.br:17:3
 Type variable not in scope: 'k'
 While trying to subtype: '(exists k : N . (Vec k a))' < '(Vec n1~ a~)'
 Hint: try using let to unpack '(exists k : N . (Vec k a))'
-before using it in expression of type '(Vec n1~ a~)'
+before using it in the expression of type '(Vec n1~ a~)'
 \end{verbatim}
 Finally, we provided handful of example Bestrafer codes which showcase language syntax and features.
 \chapter{Language description}
@@ -742,7 +742,29 @@ on its next use or at the top-level.
 
 \chapter{Future work}
 \section{Unification modulo equality theory on natural numbers}
+We intend to extended the type system with unification modulo equality theory on natural numbers.
+This extension will allow to fully express type of the append function on \verb+Vec+:
+\begin{verbatim}
+def append :: forall n : N, m : N, a : * .
+  Vec n a ->
+  Vec m a ->
+  Vec (n + m) a
+def append [] ys = ys
+def append (x : xs) ys = let tail = append xs ys in x : tail
+\end{verbatim}
+Instead of using existential as the funcion return type:
+\begin{verbatim}
+def append :: forall n : N, m : N, a : * .
+  Vec n a ->
+  Vec m a ->
+  exists k : N . Vec k a
+\end{verbatim}
 \section{Automatically unpacking existential quantifiers}
+In our language we have to use \verb+let+ expression to unpack existential quantifiers.
+This is needed to ensure correct order of adding type variables to the environment.
+However, this may be counterintuitive and hard to understand for beginner programmers, thus
+we would like to implement automatic unpacking of existential quantifiers.
+Modified transformation to A-normal form before typechecking seem to be promising approach to that problem.
 \section{Compiler}
 We plan to implement industry-grade compiler for one of the mainstream infrastructures like .NET or JVM.
 Another interesting option for further development would be a front-end web development world,

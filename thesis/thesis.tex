@@ -15,6 +15,10 @@
 \englishtitle   {English title}
 \polishabstract {\ldots}
 \englishabstract{
+Generalized algebraic data types have gained a lot of attention in the functional programming community
+over the last two decades. They greatly extended expressivity of the type system
+and allow to proof static properties of programs.
+
 We introduce Bestrafer - functional programming language utilizing a novel approach to GADTs proposed
 by Joshua Dunfield and Neelakantan R. Krishnaswami in the article "Sound and Complete
 Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types"\cite{gadt-popl19}.
@@ -98,7 +102,8 @@ extending subtyping and inference and adding extra typechecking rules for typica
 and \verb+let+ expressions, operators and exception handling. We extended their system by adding user defined
 generalized algebraic data types. Our approach of creating two representations of each constructor
 (one for typechecking and one for type inference) in combination with bidirectionality of the original
-system provides full expressive power to the programmer, by enabling parametrization with big types.
+system provides full expressive power to the programmer, by enabling parametrization with big types and
+treating constructors like functions.
 \subsection*{Definition of a language and implementation}
 We created a language with modern syntax and practical features like exception handling, handful of primitive types
 and standard library with many builtin operators, rich base of IO, utlity, convertion and traditional FP functions.

@@ -750,7 +750,7 @@ def append :: forall n : N, m : N, a : * .
   Vec m a ->
   Vec (n + m) a
 def append [] ys = ys
-def append (x : xs) ys = let tail = append xs ys in x : tail
+def append (x : xs) ys = x : append xs ys
 \end{verbatim}
 Instead of using existential as the funcion return type:
 \begin{verbatim}
@@ -758,6 +758,8 @@ def append :: forall n : N, m : N, a : * .
   Vec n a ->
   Vec m a ->
   exists k : N . Vec k a
+def append [] ys = ys
+def append (x : xs) ys = let tail = append xs ys in x : tail
 \end{verbatim}
 \section{Automatically unpacking existential quantifiers}
 In our language we have to use \verb+let+ expression to unpack existential quantifiers.

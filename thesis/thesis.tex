@@ -20,7 +20,7 @@ W ostatnich latach uogólnione algebraiczne typy danych zyskały dużą popular
 języków programowania. Znacznie zwiększają one ekspresywność systemu typów oraz umożliwiają dowodzenie
 statycznych właściwości programów.
 
-Przedstawiamy funkcyjny język programowania wykorzystujący nowatorskie podejście
+Przedstawiamy funkcyjny język programowania Bestrafer wykorzystujący nowatorskie podejście
 do uogólnionych typów algebraicznych zapropne niedawno przez
 Joshua'e Dunfield'a and Neelakantan'a R. Krishnaswami'ego.
 W tej pracy opisujemy nasz język oraz omawiamy nasz wkład w implementację oraz
@@ -75,50 +75,64 @@ in extending and implementing Dunfield and Krishnaswami's type system.
 %%%%% POCZĄTEK ZASADNICZEGO TEKSTU PRACY
 
 \chapter{Introduction}
-Generalized algebraic data types (GADTs)\cite{grd}\cite{fcpt} have received lot of recognition in
+Mainstream functional programming languages such as Haskell or OCaml use type systems
+based on Hindley-Milner\cite{Hindley,Milner} system.
+It supports full type inference for languages with parametric polymorphism.
+However, in its standard form, Hindley-Milner enables only rank-1 polymorphism, which means that quantifiers may only
+occur on the outside of type. In this system, types are divided into monotypes and polytypes,
+where polytypes are superset of monotypes, that also includes universal quantifiers.
+Type variables may only by instantiated with monotypes. Milner provided efficient
+method of inference for this system called algorithm W\cite{Milner}.
+Notable features of Hindley-Milner are completeness and ability to infer the most general type
+without any type annotations provided by a programmer.
+
+Generalized algebraic data types (GADTs)\cite{grd,fcpt} have received lot of recognition in
 the functional programming world in recent years. They enable value constructors to return specific, rather
-then parametric instances of their own data types. This provides greater flexibility and expressivity of the
-type system, but also allows to statically prove correctness of invariants and properties of functions.
-For example, we can utilize expressive power of GADTs to implement statically typechecked \verb+printf+ function
-or to prove that matrix algebra functions produce results with correct dimensions. Another desirable type system
-features are higher rank polymorphism and existential types. Rank-n polymorphism allows to nest quantifiers
+then parametric instances of their own data types. For instance, in the following example, we define
+constructors which produce specific instances of the \verb+Value+ data type.
+\begin{verbatim}
+data Value * where
+  | F :: Float -> Value Float
+  | I :: Int -> Value Int
+  | B :: Bool -> Value Bool
+\end{verbatim}
+This provides greater flexibility and expressivity of the type system,
+but also allows to statically prove correctness of invariants and properties of functions.
+For example, we can utilize expressive power of GADTs to implement statically type checked \verb+printf+ function
+or to prove that matrix algebra functions produce results of correct dimensions. Another desirable type system
+features are higher-rank polymorphism and existential types. Rank-n polymorphism allows to nest quantifiers
 arbitrarily deep, which greatly improves expressivity of the type system. Existential types are extremely useful
 in combination with indexed types, for example allowing convenient programming with length indexed lists.
 
-Mainstream functional languages such as Haskell or OCaml use type systems based on Hindley-Milner\cite{Hindley}\cite{Milner} system.
-This classical inference based type system provides method of typechecking languages with parametric polymorphism.
-However, type inference for generalized algebraic data types in languages like OCaml is difficult\cite{ocaml-gadts}.
-Moreover, complete type inference for laguages with higher rank polymorphism is undecidable, thus it is required to
-provide some type-annotations to guide the type system and make the problem decidable. This led us to a different solution,
-namely bidirectional typechecking. This approach combains two mutually recursive judgements,
+However, type inference for GADTs in languages like OCaml is difficult\cite{ocaml-gadts}.
+Moreover, complete type inference for laguages with higher-rank polymorphism is undecidable, thus it is required to
+provide some type-annotations to guide the type system and make the problem decidable. This made us use a different solution,
+namely bidirectional type checking\cite{PierceTurnerBidType}. This approach combines two mutually recursive judgements,
 type inference (synthesis) and checking against known type.
-Since, type annotations for top-level declarations are considered a good practice
-and help to document the code, we made them obligatory in our language and used for the checking part of the bidirectional approach.
-Thanks to the inference part of the type system, these top-level annotations are, in practice, sufficient to check entire
-definition, thus not requiring any extra type annotations inside the body of the definition.
 
-Bidirectional typechecking found many applications in whole spectrum of programming languages, from
-imperative object oriented laguages like C\# \cite{csharp2}\cite{csharp3} to typechecking dependent types\cite{Coquand}
-and even to some extent in the GHC compiler of the Haskell programming language for typechecking rank-n types\cite{peytonjones}.
-This technique allows to define elegant and understandable type systems and scales up well with a new features added to the
-language. Bidirectional systems also provide good quality error messages, contrary to sometimes incomprehensible type errors
+Bidirectional type checking found many applications in a wide-spectrum of programming languages, ranging from
+imperative, object-oriented laguages like C\# \cite{csharp2,csharp3} to type checking dependent types\cite{Coquand}
+and even to some extent in the GHC compiler of the Haskell programming language for type checking rank-n types\cite{peytonjones}.
+This technique allows one to define elegant and understandable type systems and scales well with new features added to the
+language. Bidirectional systems also provide good quality error messages, in contrast to sometimes incomprehensible type errors
 in inference based type system implementations.
 
-We followed approach of Joshua Dunfield and Neelakantan R. Krishnaswami\cite{gadt-popl19} to create Bestrafer -
-functional programming language with higher-rank polymorphism, existential types and user defined generalized algebraic data types.
+We follow the innovative approach of Joshua Dunfield and Neelakantan R. Krishnaswami\cite{gadt-popl19} to create Bestrafer -
+a call-by-value functional programming language with higher-rank polymorphism,
+existential types and user defined generalized algebraic data types.
 \section{Our contributions}
 \subsection*{Extension of Dunfield and Krishnaswami's system}
-We have fine-tuned their system for usage in practical and user-friendly programming language, by
-extending subtyping and inference and adding extra typechecking rules for typical language features like \verb+if+
+We have fine-tuned the system for use in practical and user-friendly programming language, by
+extending subtyping and inference and adding extra type checking rules for typical language features like \verb+if+
 and \verb+let+ expressions, operators and exception handling. We extended their system by adding user defined
 generalized algebraic data types. Our approach of creating two representations of each constructor
-(one for typechecking and one for type inference) in combination with bidirectionality of the original
-system provides full expressive power to the programmer, by enabling parametrization with big types and
+(one for type checking and one for type inference) in combination with bidirectionality of the original
+system provides full expressive power to the programmer, by enabling parametrization with polymorphic types and
 treating constructors like functions.
 \subsection*{Definition of a language and implementation}
 We created a language with modern syntax and practical features like exception handling, handful of primitive types
 and standard library with many builtin operators, rich base of IO, utlity, convertion and traditional FP functions.
-We implemented interter of a Bestrafer language in Haskell. We put a lot of effort into
+We implemented interpreter of Bestrafer in Haskell. We put a lot of effort into
 creating reliable, useful and easy to use implementation of our language.
 To ensure correctness of the implementation we created almost 440 unit tests for the type system.
 We payed extra attention to producing readable and helpful type checking error messages.
@@ -211,17 +225,16 @@ def main =
 \end{verbatim}
 
 Bestrafer allows the user to define his own generalized algebraic data types (GADTs)
-using the \verb+data+ keyword. There are two kinds of parameters in GADT definition:
-\begin{itemize}
-  \item named (denoted with a name starting with \verb+'+ followed by a capital letter) which work
-        exactly like parameters of standard algebraic data types in languages like Haskell or OCaml.
-  \item unnamed (denoted with their kind: \verb+*+ or \verb+N+) which may be set by the user to any type
-        of the specified kind, thus providing GADT functionality.
-\end{itemize}
+using the \verb+data+ keyword.
 \begin{verbatim}
 data Maybe 'A where
   | Nothing :: Maybe 'A
   | Just :: 'A -> Maybe 'A
+
+data Value * where
+  | F :: Float -> Value Float
+  | I :: Int -> Value Int
+  | B :: Bool -> Value Bool
 \end{verbatim}
 Our language also supports defining data types without value constructors, which may be used as annotations in GADTs,
 like types \verb+Ok+ and \verb+Fail+ used to annotate type \verb+Either+ in the following example.
@@ -234,6 +247,11 @@ data Either * 'A 'B where
   | Right :: 'B -> Either Ok 'A 'B
 \end{verbatim}
 A flagship data type of Bestrafer language is a list indexed by its length, traditionally called \verb+Vec+.
+In the following example, we can see usage of the separate kind of natural numbers. We distinguish between
+kind of types (\verb+*+) and kind of natural numbers (\verb+N+) to enforce type safety. It is possible to express
+natural numbers without addition of a separate kind, by defining type zero: \verb+data Zero+ and successor: \verb+data Succ *+.
+However, division into two kinds provides greater clarity and safety. Moreover, we are planning to add to our language
+unification modulo equality theory of natural numbers, which will only work on inhabitants of kind \verb+N+.
 \begin{verbatim}
 data Vec N 'A where
   | []  :: Vec 0 'A
@@ -400,18 +418,18 @@ def main = putStrLn <| sprintf (flt . eol . inr)  44.0 42
 \chapter{Type system}
 \section{Dunfield and Krishnaswami's system}
 Bestrafer uses an extended version of recent bidirectional type system by Dunfield and Krishnaswami\cite{gadt-popl19}.
-Their unique approach enables mixing existential and universal quantifiers in higher rank polymorphism. This is made possible by
+Their unique approach enables mixing existential and universal quantifiers in higher-rank polymorphism. This is made possible by
 their novel polarized subtyping rule, which fixes the order in which quantifiers are instantiated, making the
 problem decidable and keeps the fundamental properties of subtyping, like stability under substitution and transitivity.
 Contrary to most mainstream functional languages like Haskell and OCaml,
 the usage of existential types in their system is not tied to data types declarations. This means that existential types
-do not have to be packaged within another datatype; instead they can be used like any other type constructor.
+do not have to be packaged within another data type; instead they can be used like any other type constructor.
 Their system also features a guarded type $P \supset A $ (\textit{$P$ implies $A$})
 and an asserting type $A \wedge  P$ (\textit{$A$ with $P$}).
 Similarly to Hindley-Milner they distinguish between monotypes and polytypes.
 While their system is bidirectional, their approach relies heavily on checking against known type, providing only few inference
 rules that eliminate need for most tedious type annotations.
-They provide algorithms for typechecking, subtyping, checking pattern matching coverage and finally checking and eliminating propositions.
+They provide algorithms for type checking, subtyping, checking pattern matching coverage and finally checking and eliminating propositions.
 We call the typing judgement principal, if it is not result of guessing. Dunfield and Krishnaswami's system features principality tracking,
 where in following rules: \textbf{!} means principal judgement and \cancel{\textbf{!}} or omitted means non-principal.
 Information about principality is used, for example, in match coverage algorithm, where propositions are assumed only
@@ -426,11 +444,11 @@ First of all we added typing rules for simple types such as
 they are not interesting and straightforward. However, it is important to remark, that \verb+let+ expression unpacks the
 existential types which is necessary to ensure correct order of inserting type variables to the context while defining
 recursive functions. We also added extra inference rules following the earlier work of Dunfield and Krishnaswami\cite{Dunfield13:bidir},
-to minize boilerplate type annotations and produce better quality typechecking errors. Following
+to minize boilerplate type annotations and produce better quality type checking errors. Following
 remark of Dunfield and Krishnaswami\cite{gadt-popl19} we extended subtyping to functions and propositional types.
 The biggest modification is the introduction of user defined generalized algebraic data types. The last section
-of this chapter covers exhaustively typing rules and implementation details of GADTs. We discarded separate rules for
-\verb+Vec+, treating it like any other GADT.
+of this chapter covers exhaustively typing rules and implementation details of GADTs. %We discarded separate rules for
+%\verb+Vec+, treating it like any other GADT.
 
 \subsection*{Types, monotypes and propositions}
 
@@ -438,8 +456,7 @@ We distinguish between types (for clarity sometimes called big types) and monoty
 Monotypes consist of simplified types (whithout quantification and propositional types) and
 inhabitants of kind $\mathbb{N}$ (constructed from zero - \verb+0+ and successor - \verb+S+).
 As we can see from the following definition quantification and propositions are restricted to monotypes.
-However use cases for polymorphism on big types seem to be rare in practice. Moreover our extended subtyping
-reduces number of programs which would not typecheck due to this restriction.
+However, our extended subtyping reduces number of programs which would not type check due to this restriction.
 
 \textbf{Kinds:}
 
@@ -488,10 +505,10 @@ $\mathrm{T}$
   t = t`
 \end{grammar}
 
-\subsection*{Higher rank polymorphism}
-One of the key features of the Dunfield and Krishnaswami's system is higher rank polymorphism.
+\subsection*{Higher-rank polymorphism}
+One of the key features of the Dunfield and Krishnaswami's system is higher-rank polymorphism.
 Polymorphic types are treated like any other big type so they can be nested arbitrarily
-deep. The following example uses higher rank universal quantification in GADT constructor
+deep. The following example uses higher-rank universal quantification in GADT constructor
 to implement Scott's encoding of lists as a two continuations\cite{rankNtypes}.
 \begin{verbatim}
 data ListS 'A where
@@ -509,7 +526,7 @@ def uncons :: forall a : *, r : * .
   (a -> ListS a -> r) -> r -> ListS a -> r
 def uncons co ni (ListS f) = f co ni
 \end{verbatim}
-Bestrafer also allows higher rank existential quantification as the following example shows.
+Bestrafer also allows higher-rank existential quantification as the following example shows.
 \begin{verbatim}
 def heads :: forall n : N, a : * .
   Vec n (exists m : N . Vec (S m) a) ->
@@ -521,7 +538,7 @@ def heads (x : xs) = head x : heads xs
 \subsection*{Guarded types and asserting types}
 Bestrafer supports explicit guarded types $P \supset A $ (\textit{$P$ implies $A$})
 and asserting types $A \wedge  P$ (\textit{$A$ with $P$}).
-Although the usage of propositions is in most cases implicit and hidden in typechecking GADTs,
+Although the usage of propositions is in most cases implicit and hidden in type checking GADTs,
 there are some use cases for propositional types.
 The following example uses guarded types to express GADT in continuation passing style\cite{rankNtypes}.
 
@@ -559,7 +576,7 @@ Following remark in Dunfield and Krishnaswami's\cite{gadt-popl19} paper,
 we include additional subtyping rules to improve flexibility and expressiveness of the type system.
 Without these rules the above example would not work, since we wouldn't be able to subtype
 \verb+(Int -> r) +$<$ \verb+(a = Int => Int -> r)+. Rules $A \le^- P \supset B$ and $A \le^+ B \wedge P$
-are based on typechecking rules for asserting and guarding types.
+are based on type checking rules for asserting and guarding types.
 Rules $P \supset A \le^- B$ and $A \wedge P \le^+ B$ are obtained as a duality of previous two rules.
 \subsubsection*{Function subtyping:}
 \begin{mathpar}
@@ -589,7 +606,8 @@ Rules $P \supset A \le^- B$ and $A \wedge P \le^+ B$ are obtained as a duality o
 \section{Our contribution - user defined GADTs}
 
 \subsection*{Named and unnamed parameters}
-Let's take a look again at the definition of data type \verb+Vec+:
+We distinguish between two kinds of parameters in a GADT definition, that is named and unnamed.
+In the following definition of data type \verb+Vec+ we utilize both of these kinds:
 \begin{verbatim}
 data Vec N 'A where
   | []  :: Vec 0 'A
@@ -602,15 +620,16 @@ data Vec N * where
   | []  :: forall a : * . Vec 0 a
   | (:) :: forall n : N, a : * . a -> Vec n a -> Vec (S n) a
 \end{verbatim}
-That's true, we can define \verb+Vec+ like that, but there is a drawback to that approach. Since we are using
-quantification on \verb+a+, our definition of \verb+Vec+ is restricted to monotypes, so, for example, we wouldn't be
-able to typecheck vector of mixed length vectors: \verb+Vec n (exists m : N . Vec m a)+. That's where
-named parameters come into play. They are capable of storing big types,
-but that also means that they cannot be involved in type equations. As we can see, the combination of both kinds
+It is that we can define \verb+Vec+ like this, but there is a drawback to that approach. Since we use
+quantification over \verb+a+, our definition of \verb+Vec+ is restricted to monotypes. Thus, for example, we wouldn't be
+able to type check vector of mixed length vectors: \verb+Vec n (exists m : N . Vec m a)+. That's where
+named parameters come into play. They are capable of storing big types.
+However, that also means that they cannot be involved in propositions, because we only support equations over monotypes.
+As we can see, the combination of both kinds
 of parameters is essential to provide full expressive power to the programmer.
 
-\subsection*{Building and typechecking constructors}
-We build GADT representations between parsing and typechecking process. We start by checking well-formedness of
+\subsection*{Building and type checking constructors}
+We build GADT representations between parsing and type checking process. We start by checking well-formedness of
 constructors. We define well formed constructor in the following manner:
 
 $\mathrm{WFConstr} ::= \mathrm{Universal}$
@@ -667,7 +686,7 @@ arguments represented as type templates. We substitute named parameters identifi
 \textit{parameters indices}, which correspond to adequate parameters in the type signature.
 We generate propositions automatically based on constructor's result type.
 
-When typechecking a constructor, we start by checking if its result type matches the type against which we are typechecking.
+When type checking a constructor, we start by checking if its result type matches the type against which we are type checking.
 Then we check the arity of the constructor.
 After that we substitute constructor's universally quantified variables with fresh existential variables.
 Then we convert arguments' type templates and propositions' templates to types and propositions
@@ -737,7 +756,7 @@ data Pair 'A 'B where
 partial aplication: \verb+Pair 42+ will be changed into \verb+\b -> Pair 42 b+.
 \section{Function definitions and evaluation order}
 Top-level pattern matching definitions are just syntax sugar for lambda with a match expression inside.
-For example function definition:
+For instance, function definition:
 \begin{verbatim}
 def map _ [] = []
 def map f (x : xs) = f x : map f xs
@@ -749,12 +768,12 @@ will be desugared into:
   | (f, x : xs) -> f x : map f xs
 \end{verbatim}
 
-The top-level definitions are all mutually recursive and each of them is evaluated once starting from the beginning
-down to the end of the source file. This may raise a question, what happens if some function or definition uses the definition which is located
-lower in the source file. In this situation the lower definition will be evaluated at the time when it was called in higher definition,
-its value will be remembered and the definition won't be evaluated for the second time.
-Another concern is what would happend, if in the previous situation lower function would throw an error and the higher function would
-handle it with a \verb+try-catch+ block. Because lower definition failed to evaluate we treat it as non evaluated and try to evaluate it
+The top-level definitions are all mutually recursive and each of them is evaluated once, starting from the beginning
+down to the end of the source file. This may raise a question, what happens if some function uses the definition which is located
+further in the source file. In this situation the further definition will be evaluated at the time when it was called,
+its value will be remembered and it won't be evaluated for the second time.
+Another concern is what would happend in the previous situation if second function would throw an error and the first function would
+handle it with a \verb+try-catch+ block. Because the further definition failed to evaluate we treat it as not evaluated and try to evaluate it
 on its next use or at the top-level.
 
 \chapter{Future work}
@@ -787,7 +806,7 @@ In our language we have to use \verb+let+ expressions to unpack existential quan
 This is needed in order to ensure that type variables are inserted into the environment in the correct order.
 However, this may be counterintuitive and difficult to understand at the first time, thus
 we would like to implement automatic unpacking of existential quantifiers.
-Modified transformation to A-normal form before typechecking seem to be promising approach to that problem.
+Modified transformation to A-normal form before type checking seem to be promising approach to that problem.
 \section{Compiler}
 We plan to implement industry-grade compiler for one of the mainstream infrastructures like .NET or JVM.
 Another interesting option for further development would be a front-end web development world,

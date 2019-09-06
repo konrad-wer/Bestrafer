@@ -777,13 +777,14 @@ handle it with a \verb+try-catch+ block. Because the further definition failed t
 on its next use or at the top-level.
 
 \chapter{Discussion and future work}
-%Bideriactional type checking is an elegant and practical method of imlementing type systems with GADTs, existential types and higher-rank polymorphism.
-%Moreover, it produces better quality type errors and scales well with new features added to the language. Since top-level type annotations are considered
-%good practice and help to document the code, bidirectional type system does not require much addiotional effort from the programmer.
-%Dunfield and Krishnaswami's system\cite{gadt-popl19} proves to perform well in the practical programming language implementation.
-%Our extension of user defined GADTs fully utylizes bidirectional nature of their type system, allowing parametrization with polymorphic types and treating
-%constructors as functions.
-%
+Bideriactional type checking is an elegant and practical method of imlementing type systems with GADTs,
+existential types and higher-rank polymorphism. Moreover, it produces better quality type errors
+and scales well with new features added to the language. Since top-level type annotations are considered
+good practice and help to document the code, bidirectional type system does not require much addiotional effort from the programmer.
+Dunfield and Krishnaswami's system\cite{gadt-popl19} proves to perform well in the practical programming language implementation.
+Our extension of user defined GADTs fully utylizes bidirectional nature of their type system,
+allowing parametrization with polymorphic types and treating constructors as functions.
+
 \section{Unification modulo equality theory of natural numbers}
 We intend to extend the type system with unification modulo equality theory of natural numbers.
 This extension will allow to fully express the type of the append function on \verb+Vec+:

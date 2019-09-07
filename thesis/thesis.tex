@@ -1,15 +1,15 @@
-% Opcje klasy 'iithesis' opisane sa w komentarzach w pliku klasy. Za ich pomoca
-% ustawia sie przede wszystkim jezyk i rodzaj (lic/inz/mgr) pracy, oraz czy na
-% drugiej stronie pracy ma byc skladany wzor oswiadczenia o autorskim wykonaniu.
+% Opcje klasy 'iithesis' opisane sa w komentarzach w pliku klasy. Za ich pomocą
+% ustawia sie przede wszystkim język i rodzaj (lic/inz/mgr) pracy, oraz czy na
+% drugiej stronie pracy ma byc składany wzór oświadczenia o autorskim wykonaniu.
 \documentclass[declaration,shortabstract,english]{iithesis}
 
 \usepackage[utf8]{inputenc}
 
 %%%%% DANE DO STRONY TYTUŁOWEJ
-% Niezaleznie od jezyka pracy wybranego w opcjach klasy, tytul i streszczenie
-% pracy nalezy podac zarowno w jezyku polskim, jak i angielskim.
-% Pamietaj o madrym (zgodnym z logicznym rozbiorem zdania oraz estetyka) recznym
-% zlamaniu wierszy w temacie pracy, zwlaszcza tego w jezyku pracy. Uzyj do tego
+% Niezależnie od języka pracy wybranego w opcjach klasy, tytuł i streszczenie
+% pracy należy podać zarówno w języku polskim, jak i angielskim.
+% Pamiętaj o mądrym (zgodnym z logicznym rozbiorem zdania oraz estetyka) ręcznym
+% złamaniu wierszy w temacie pracy, zwłaszcza tego w języku pracy. Użyj do tego
 % polecenia \fmlinebreak.
 \polishtitle    {Implementacja funkcyjnego języka programowania z polimorfizmem wyższego rzędu oraz
 uogólnionymi algebraicznymi typami danych}
@@ -36,18 +36,18 @@ recently proposed by Joshua Dunfield and Neelakantan R. Krishnaswami.
 In this thesis we present our language and discuss our contribution
 in extending and implementing Dunfield and Krishnaswami's type system.
 }
-% w pracach wielu autorow nazwiska mozna oddzielic poleceniem \and
+% w pracach wielu autorów nazwiska można oddzielić poleceniem \and
 \author         {Konrad Werbliński}
-% w przypadku kilku promotorow, lub koniecznosci podania ich afiliacji, linie
-% w ponizszym poleceniu mozna zlamac poleceniem \fmlinebreak
+% w przypadku kilku promotorów, lub konieczności podania ich afiliacji, linie
+% w poniższym poleceniu można złamać poleceniem \fmlinebreak
 \advisor        {dr Filip Sieczkowski}
-%\date          {}                     % Data zlozenia pracy
-% Dane do oswiadczenia o autorskim wykonaniu
+%\date          {}                     % Data złożenia pracy
+% Dane do oświadczenia o autorskim wykonaniu
 %\transcriptnum {}                     % Numer indeksu
-%\advisorgen    {dr. Jana Kowalskiego} % Nazwisko promotora w dopelniaczu
+%\advisorgen    {dr. Jana Kowalskiego} % Nazwisko promotora w dopełniaczu
 %%%%%
 
-%%%%% WLASNE DODATKOWE PAKIETY
+%%%%% WŁASNE DODATKOWE PAKIETY
 %
 %\usepackage{graphicx,listings,amsmath,amssymb,amsthm,amsfonts,tikz}
 \let\lll\undefined
@@ -97,7 +97,7 @@ data Tree a = Leaf | Node (Tree a) a (Tree a)
 
 Generalized algebraic data types (GADTs)\cite{grd,fcpt} have received lot of recognition in
 the functional programming world in recent years. They extend ADTs by enabling value constructors to return specific, rather
-then parametric instances of their own data types. For instance, in the following example, we define
+then parametric instances of their own data type. For instance, in the following example, we define
 constructors which produce specific instances of the \verb+Value a+ data type.
 \begin{verbatim}
 data Value a where
@@ -203,7 +203,7 @@ def fib n =
 
 Bestrafer supports all of the typical IO operations including reading and writing files as well as
 parsing and printing values of primitive types from and to standard input-output.
-IO operations may be performed at any point in program, following the style of
+IO operations may be performed at any point in the program, following the style of
 several languages in the ML family. It also supports exception handling with \verb+error+
 keyword for throwing errors and \verb+try-catch+ block for catching
 user thrown (\verb+RuntimeException+) and builtin (\verb+IOException+,
@@ -286,7 +286,7 @@ data List 'A where
 
 Bestrafer also supports existential types, but unlike in Haskell and OCaml their usage is not tied to data types declarations.
 Instead they can be used freely like any other type constructor. The following implementation of a \verb+filter+ function
-(taken from Bestrafer's standard library) utilizes existential type to express the fact that we cannot predict length of
+(taken from Bestrafer's standard library) uses existential type to express the fact that we cannot predict length of
 the resulting \verb+Vec+. We use \verb+let+ expression to unpack result of recursive call from the existential type, thus
 ensuring that the type variable describing length of \verb+tail+ is inserted to the context before the subtyping starts.
 \begin{verbatim}
@@ -359,9 +359,9 @@ without emitting any warning or error. That's where the GADTs come to the rescue
 We reimplemented Andrew Kennedy and Claudio Russo's\cite{gadt-oop} solution for that problem, originally written in \verb+C#+.
 In the following example, we define \verb+Format+ data type which is used to express intended formating of a
 printed string. By chaining constructors together we define type of intended printing function,
-which is accumulated in unnamed parameter of the \verb+Format+ data type. When a value of
+which is accumulated in the parameter of the \verb+Format+ data type. When a value of
 the type \verb+Format+ is applied to the function \verb+printf+, an appropriate printing function
-is built by step by step deconstruction of the \verb+Format+ value. By combining this approach
+is built by step-by-step deconstruction of the \verb+Format+ value. By combining this approach
 with the function composition operator (.) (for writing more readable chains of constructors),
 we get a neat and type-safe way of pretty-printing values into the standard output.
 \begin{verbatim}
@@ -577,7 +577,7 @@ passing spine $s$ to a function of type $A$ synthesizes type $C$; recover princi
             {\Gamma \vdash s : A \: \textbf{!} \gg C\lceil \textbf{!}\rceil \dashv \Delta} \and
   \inferrule{\Gamma \vdash s : A \: p \gg C \: q \dashv \Delta \\
              \big((p = \cancel{\textbf{!}}) \operatorname{or} \,
-             (q = \textbf{!}) \operatorname{or} \mathit{FEV}(C) \neq \emptyset \big)}
+             (q = \textbf{!}) \operatorname{or} \, (\mathit{FEV}(C) \neq \emptyset)\big)}
             {\Gamma \vdash s : A \: p \gg C\lceil q\rceil \dashv \Delta}
 \end{mathpar}
 \section{Our variant of the system}
@@ -610,14 +610,14 @@ of this chapter covers exhaustively typing rules and implementation details of G
 
 We distinguish between types (for clarity sometimes called big types) and monotypes.
 Monotypes consist of simplified types (without quantification and propositional types) and
-inhabitants of kind $\mathbb{N}$ (constructed from zero - \verb+0+ and successor - \verb+S+).
-As we can see from the following definition quantification and propositions are restricted to monotypes.
+inhabitants of kind \verb+N+ (constructed from zero - \verb+0+ and successor - \verb+S+).
+As we can see from the following definition, quantification and propositions are restricted to monotypes.
 However, our extended subtyping reduces number of programs which would not type check due to this restriction.
 
 \textbf{Kinds:}
 
 \begin{grammar}{\kappa \Coloneqq}{}
-  \star \mid \mathbb{N}
+  \star \mid \verb+N+
 \end{grammar}
 
 \textbf{Types:} (big types)
@@ -840,14 +840,14 @@ We define monotype templates similarly to big type templates, so we omit the for
 
 Template representation consists of list of universally quantified variables, list of propositions and list of constructor
 arguments represented as type templates. We substitute named parameters identifiers and unnamed parameters in the result type with
-\textit{parameters indices}, which correspond to adequate parameters in the type signature.
+parameters indices, which correspond to adequate parameters in the type signature.
 We generate propositions automatically based on constructor's result type.
 
 When type checking a constructor, we start by checking if its result type matches the type against which we are type checking.
 Then we check the arity of the constructor.
 After that we substitute constructor's universally quantified variables with fresh existential variables.
-Then we convert arguments' type templates and propositions' templates to types and propositions
-by replacing parameters' indices with types and monotypes from checked type's parameters.
+Then we convert arguments' type templates and proposition templates to types and propositions
+by replacing parameters' indices with parameters of the checked type.
 Next, we check propositions. Finally, we check constructor's arguments against generated types.
 The following, quite lengthy, rule describes that process in the formal way:
 
@@ -933,7 +933,7 @@ down to the end of the source file. This may raise a question, what happens if s
 further in the source file. In this situation the further definition will be evaluated at the time when it was called,
 its value will be remembered and it won't be evaluated for the second time. This is possible because we evaluate mutually recursive
 definitions in a DFS order.
-Another concern is what would happened in the previous situation if second function would throw an error and the first function would
+Another concern is what would happened in the previous situation if the second function would throw an error and the first function would
 handle it with a \verb+try-catch+ block. Because the further definition failed to evaluate we treat it as not evaluated and try to evaluate it
 on its next use or at the top-level.
 
@@ -966,7 +966,7 @@ def append :: forall n : N, m : N, a : * .
 def append [] ys = ys
 def append (x : xs) ys = let tail = append xs ys in x : tail
 \end{verbatim}
-With that extension we will obtain programming language with similar capabilities as
+With this extension we will obtain programming language with similar capabilities as
 Dependent ML\cite{DependentML}. By using equality theory we will get intuitive operations
 on types of kind \verb+N+, in contrast to, for example, quite clumsy arithmetic
 defined with Haskell's type families.

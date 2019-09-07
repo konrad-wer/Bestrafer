@@ -21,7 +21,7 @@ języków programowania. Znacznie zwiększają one ekspresywność systemu typó
 statycznych właściwości programów.
 
 Przedstawiamy funkcyjny język programowania Bestrafer wykorzystujący nowatorskie podejście
-do uogólnionych typów algebraicznych zapropne niedawno przez
+do uogólnionych typów algebraicznych zaproponowane niedawno przez
 Joshua'e Dunfield'a and Neelakantan'a R. Krishnaswami'ego.
 W tej pracy opisujemy nasz język oraz omawiamy nasz wkład w implementację oraz
 rozszerzenie systemu typów Dunfield'a and Krishnaswami'ego.
@@ -51,7 +51,7 @@ in extending and implementing Dunfield and Krishnaswami's type system.
 %
 %\usepackage{graphicx,listings,amsmath,amssymb,amsthm,amsfonts,tikz}
 \let\lll\undefined
-\usepackage{mathtools, array, amsfonts, mathpartir, amssymb, stmaryrd, cancel}
+\usepackage{mathtools, array, amsfonts, mathpartir, amssymb, stmaryrd, cancel, cleveref, fancyvrb}
 \usepackage[nottoc]{tocbibind}
 
 %
@@ -78,40 +78,49 @@ in extending and implementing Dunfield and Krishnaswami's type system.
 Mainstream functional programming languages such as Haskell or OCaml use type systems
 based on Hindley-Milner\cite{Hindley,Milner} system.
 It supports full type inference for languages with parametric polymorphism.
-However, in its standard form, Hindley-Milner enables only rank-1 polymorphism, which means that quantifiers may only
-occur on the outside of type. In this system, types are divided into monotypes and polytypes,
+However, in its standard form, Hindley-Milner enables only prenex polymorphism, also known as
+rank-1 polymorphism. In this system, types are divided into monotypes and polytypes,
 where polytypes are superset of monotypes, that also includes universal quantifiers.
-Type variables may only by instantiated with monotypes. Milner provided efficient
+Type variables may only be instantiated with monotypes. Milner provided efficient
 method of inference for this system called algorithm W\cite{Milner}.
 Notable features of Hindley-Milner are completeness and ability to infer the most general type
-without any type annotations provided by a programmer.
+without any type annotations provided by a programmer. Many Hindley-Milner based languages
+support algebraic data types (ADTs). They are combination of sum and product types, hence the name "algebraic".
+In the following fragment of Haskell code, we define \verb+Value+ algebraic data type:
+\begin{verbatim}
+data Value = F Float | I Int | B Bool
+\end{verbatim}
+ADTs may also be parameterized, for example, we can define type \verb+Tree a+ which describes binary trees:
+\begin{verbatim}
+data Tree a = Leaf | Node (Tree a) a (Tree a)
+\end{verbatim}
 
 Generalized algebraic data types (GADTs)\cite{grd,fcpt} have received lot of recognition in
-the functional programming world in recent years. They enable value constructors to return specific, rather
+the functional programming world in recent years. They extend ADTs by enabling value constructors to return specific, rather
 then parametric instances of their own data types. For instance, in the following example, we define
-constructors which produce specific instances of the \verb+Value+ data type.
+constructors which produce specific instances of the \verb+Value a+ data type.
 \begin{verbatim}
-data Value * where
-  | F :: Float -> Value Float
-  | I :: Int -> Value Int
-  | B :: Bool -> Value Bool
+data Value a where
+  F :: Float -> Value Float
+  I :: Int -> Value Int
+  B :: Bool -> Value Bool
 \end{verbatim}
 This provides greater flexibility and expressivity of the type system,
-but also allows to statically prove correctness of invariants and properties of functions.
-For example, we can utilize expressive power of GADTs to implement statically type checked \verb+printf+ function
+but also allows to statically prove correctness of simple invariants and properties of functions.
+For example, we can utilize expressive power of GADTs to implement a statically type checked \verb+printf+ function
 or to prove that matrix algebra functions produce results of correct dimensions. Another desirable type system
 features are higher-rank polymorphism and existential types. Rank-n polymorphism allows to nest quantifiers
-arbitrarily deep, which greatly improves expressivity of the type system. Existential types are extremely useful
-in combination with indexed types, for example allowing convenient programming with length indexed lists.
+arbitrarily deep, which greatly improves expressivity of the type system. Existential types are especially useful
+in conjunction with indexed types, for example allowing convenient programming with length-indexed lists.
 
 However, type inference for GADTs in languages like OCaml is difficult\cite{ocaml-gadts}.
-Moreover, complete type inference for laguages with higher-rank polymorphism is undecidable, thus it is required to
+Moreover, complete type inference for languages with higher-rank polymorphism is undecidable, thus it is required to
 provide some type-annotations to guide the type system and make the problem decidable. This made us use a different solution,
-namely bidirectional type checking\cite{PierceTurnerBidType}. This approach combines two mutually recursive judgements,
+namely bidirectional type checking\cite{PierceTurnerBidType}. This approach combines two mutually recursive judgments,
 type inference (synthesis) and checking against known type.
 
 Bidirectional type checking found many applications in a wide-spectrum of programming languages, ranging from
-imperative, object-oriented laguages like C\# \cite{csharp2,csharp3} to type checking dependent types\cite{Coquand}
+imperative, object-oriented languages like C\# \cite{csharp2,csharp3} to type checking dependent types\cite{Coquand}
 and even to some extent in the GHC compiler of the Haskell programming language for type checking rank-n types\cite{peytonjones}.
 This technique allows one to define elegant and understandable type systems and scales well with new features added to the
 language. Bidirectional systems also provide good quality error messages, in contrast to sometimes incomprehensible type errors
@@ -123,7 +132,7 @@ existential types and user defined generalized algebraic data types.
 \section{Our contributions}
 \subsection*{Extension of Dunfield and Krishnaswami's system}
 We have fine-tuned the system for use in practical and user-friendly programming language, by
-extending subtyping and inference and adding extra type checking rules for typical language features like \verb+if+
+extending subtyping and inference and including additional type checking rules for typical language features like \verb+if+
 and \verb+let+ expressions, operators and exception handling. We extended their system by adding user defined
 generalized algebraic data types. Our approach of creating two representations of each constructor
 (one for type checking and one for type inference) in combination with bidirectionality of the original
@@ -131,11 +140,11 @@ system provides full expressive power to the programmer, by enabling parametriza
 treating constructors like functions.
 \subsection*{Definition of a language and implementation}
 We created a language with modern syntax and practical features like exception handling, handful of primitive types
-and standard library with many builtin operators, rich base of IO, utlity, convertion and traditional FP functions.
+and standard library with many builtin operators, rich base of IO, utility, conversion and traditional FP functions.
 We implemented interpreter of Bestrafer in Haskell. We put a lot of effort into
 creating reliable, useful and easy to use implementation of our language.
 To ensure correctness of the implementation we created almost 440 unit tests for the type system.
-We payed extra attention to producing readable and helpful type checking error messages.
+We payed particular attention to producing readable and helpful type checking error messages.
 For example:
 \begin{verbatim}
 prog.br:4:26
@@ -149,7 +158,7 @@ While trying to subtype: '(exists k : N . (Vec k a))' < '(Vec n1~ a~)'
 Hint: try using let to unpack '(exists k : N . (Vec k a))'
 before using it in the expression of type '(Vec n1~ a~)'
 \end{verbatim}
-Finally, we provided handful of example Bestrafer codes which showcase language syntax and features.
+Finally, we provide a handful of example Bestrafer codes which showcase language syntax and features.
 \chapter{Language description}
 \section{Language features}
 Bestrafer's syntax was designed to be concise, expressive, readable and beautiful.
@@ -236,6 +245,7 @@ data Value * where
   | I :: Int -> Value Int
   | B :: Bool -> Value Bool
 \end{verbatim}
+In the above definition, we use \verb+*+ to denote parameter that is used as a type-index.
 Our language also supports defining data types without value constructors, which may be used as annotations in GADTs,
 like types \verb+Ok+ and \verb+Fail+ used to annotate type \verb+Either+ in the following example.
 \begin{verbatim}
@@ -251,7 +261,7 @@ In the following example, we can see usage of the separate kind of natural numbe
 kind of types (\verb+*+) and kind of natural numbers (\verb+N+) to enforce type safety. It is possible to express
 natural numbers without addition of a separate kind, by defining type zero: \verb+data Zero+ and successor: \verb+data Succ *+.
 However, division into two kinds provides greater clarity and safety. Moreover, we are planning to add to our language
-unification modulo equality theory of natural numbers, which will only work on inhabitants of kind \verb+N+.
+unification modulo equality theory of natural numbers, which will only work on inhabitants of kind \verb+N+ (see \cref{natural}).
 \begin{verbatim}
 data Vec N 'A where
   | []  :: Vec 0 'A
@@ -345,7 +355,7 @@ The well-known \verb+printf+ function from the C programming language,
 uses a string to provide formating of a printed text. However, this approach
 has a major drawback: formated arguments are not statically type checked.
 As a result of that, writing \verb+printf("%d", 3.14);+ will print meaningless int,
-without emiting any warning or error. That's where the GADTs come to the rescue.
+without emitting any warning or error. That's where the GADTs come to the rescue.
 We reimplemented Andrew Kennedy and Claudio Russo's\cite{gadt-oop} solution for that problem, originally written in \verb+C#+.
 In the following example, we define \verb+Format+ data type which is used to express intended formating of a
 printed string. By chaining constructors together we define type of intended printing function,
@@ -389,7 +399,7 @@ def main =
 \end{verbatim}
 
 It is worth mentioning, that it is possible to implement statically typed printf function
-whithout using GADTs, utilizing continuation passing style (CPS)\cite{unparsing}.
+without using GADTs, utilizing continuation passing style (CPS)\cite{unparsing}.
 However, the GADT solution provides better encapsulation of implementation and
 is easier to comprehend. We show Bestrafer implementation of the CPS approach in the following example.
 \begin{verbatim}
@@ -421,30 +431,176 @@ Bestrafer uses an extended version of recent bidirectional type system by Dunfie
 Their unique approach enables mixing existential and universal quantifiers in higher-rank polymorphism. This is made possible by
 their novel polarized subtyping rule, which fixes the order in which quantifiers are instantiated, making the
 problem decidable and keeps the fundamental properties of subtyping, like stability under substitution and transitivity.
-Contrary to most mainstream functional languages like Haskell and OCaml,
-the usage of existential types in their system is not tied to data types declarations. This means that existential types
+In contrast to most mainstream functional languages like Haskell and OCaml,
+the usage of existential types in their system is not tied to data type declarations. This means that existential types
 do not have to be packaged within another data type; instead they can be used like any other type constructor.
 Their system also features a guarded type $P \supset A $ (\textit{$P$ implies $A$})
 and an asserting type $A \wedge  P$ (\textit{$A$ with $P$}).
 Similarly to Hindley-Milner they distinguish between monotypes and polytypes.
-While their system is bidirectional, their approach relies heavily on checking against known type, providing only few inference
-rules that eliminate need for most tedious type annotations.
+While their system is bidirectional, their approach relies heavily on checking against known type. Still they provide a few inference
+rules that eliminate the most tedious type annotations.
 They provide algorithms for type checking, subtyping, checking pattern matching coverage and finally checking and eliminating propositions.
-We call the typing judgement principal, if it is not result of guessing. Dunfield and Krishnaswami's system features principality tracking,
-where in following rules: \textbf{!} means principal judgement and \cancel{\textbf{!}} or omitted means non-principal.
+Dunfield and Krishnaswami's system features principality tracking. We call the typing judgement principal, if it is not result of guessing.
+In the following rules: \textbf{!} means principal judgement and \cancel{\textbf{!}} or omitted means non-principal.
 Information about principality is used, for example, in match coverage algorithm, where propositions are assumed only
-for principal judgements.
+for principal judgments.
 \subsection*{Typing and subtyping rules}
+In the following figures we present selection of typing and subtyping rules from Dunfield and Krishnaswami's paper.
+\subsubsection*{Polarity}
+\begin{equation*}
+  \begin{split}
+    \begin{array}{ll}{\operatorname{pol}(\forall \alpha : \kappa . A)} & {=-} \\
+    {\operatorname{pol}(\exists \alpha : \kappa . A)} & {=+}
+    \\ {\operatorname{pol}(A)} & {=\circ \text { otherwise }}\end{array}
+  \end{split}
+  \hspace{3cm}
+  \begin{split}
+    \begin{array}{l}
+      {\operatorname{join}\left(+, \mathcal{P}_{2}\right)=+} \\
+      {\operatorname{join}\left(-, \mathcal{P}_{2}\right)=-} \\
+      {\operatorname{join}(\circ,+)=+} \\
+      {\operatorname{join}(\circ,-)=-} \\
+      {\operatorname{join}(\circ,\circ)=-}
+    \end{array}
+  \end{split}
+\end{equation*}
+\subsubsection*{Subtyping}
+\begin{mathpar}
+  \inferrule{\text { A not headed by } \forall / \exists \\
+             \text { B not headed by } \forall / \exists \\
+             \Gamma \vdash A \equiv B \dashv \Delta}
+             {\Gamma \vdash A<:^{\mathcal{P}} B \dashv \Delta} \and
+  \inferrule{\text { B not headed by } \forall \\
+             \Gamma, \, _{\blacktriangleright \hat{\alpha}}, \, \hat{\alpha} : \kappa
+             \vdash [\hat{\alpha} / \alpha] A <:^- B  \dashv
+              \Delta, \, _{\blacktriangleright \hat{\alpha}}, \, \Theta}
+             {\Gamma \vdash \forall \alpha : \kappa .\, A<:^- B \dashv \Delta} \and
+  \inferrule{\Gamma, \, \beta : \kappa \vdash
+             A<:^- B \dashv \Delta, \, \beta : \kappa, \, \Theta}
+            {\Gamma \vdash A<:^-\forall \beta : \kappa .\, B \dashv \Delta} \and
+  \inferrule{\Gamma, \, \alpha : \kappa \vdash
+            A<:^+ B \dashv \Delta, \, \alpha : \kappa, \, \Theta}
+           {\Gamma \vdash \exists \alpha : \kappa .\, A<:^+ B \dashv \Delta} \and
+  \inferrule{\text { A not headed by } \exists \\
+             \Gamma, \, _{\blacktriangleright \hat{\beta}}, \, \hat{\beta} : \kappa
+             \vdash A<:^+[\hat{\beta} / \beta] B \dashv
+             \Delta, \, _{\blacktriangleright \hat{\beta}}, \, \Theta}
+            {\Gamma \vdash A<:^+\exists \beta : \kappa .\, B \dashv \Delta} \and
+  \inferrule{\Gamma \vdash A <:^- B \dashv \Delta \\ \mathit{neg}(A) \\ \mathit{nonpos}(B)}
+            {\Gamma \vdash A <:^+ B \dashv \Delta} \and
+  \inferrule{\Gamma \vdash A <:^- B \dashv \Delta \\ \mathit{nonpos}(A) \\ \mathit{neg}(B)}
+            {\Gamma \vdash A <:^+ B \dashv \Delta} \and
+  \inferrule{\Gamma \vdash A <:^+ B \dashv \Delta \\ \mathit{pos}(A) \\ \mathit{nonneg}(B)}
+            {\Gamma \vdash A <:^- B \dashv \Delta} \and
+  \inferrule{\Gamma \vdash A <:^+ B \dashv \Delta \\ \mathit{nonneg}(A) \\ \mathit{pos}(B)}
+            {\Gamma \vdash A <:^- B \dashv \Delta}
+\end{mathpar}
+\subsubsection*{Typing}
+$e \: \textit{chk-I}$ -- expression is a checked introduction form.
+\begin{mathpar}
+  \inferrule{\\}{()\: \textit{chk-I}} \and
+  \inferrule{\\}{\lambda x. \, e \: \textit{chk-I}} \and
+  \inferrule{\\}{(e_1, e_2) \: \textit{chk-I}}
+\end{mathpar}
+\SaveVerb{unit}+()+
+\SaveVerb{case}+case+
 
+\noindent$\Gamma \vdash e \Leftarrow A \: p \dashv \Theta$ -- under the context $\Gamma$, expression e checks against type A.
+         $\Gamma \vdash e \Rightarrow A \: p \dashv \Theta$ -- under the context $\Gamma$, expression e synthesizes type A.
+\begin{mathpar}
+  \inferrule{(x : A \: p) \in \Gamma}{\Gamma \vdash x \Rightarrow[\Gamma] A \: p \dashv \Gamma} \and
+  \inferrule{\Gamma \vdash e \Rightarrow A \: q \dashv \Theta \\
+             \Theta \vdash A<: ^ {\text { join }(\text { pol }(B), \text { pol }(A)) } B \dashv \Delta}
+             {\Gamma \vdash e \Leftarrow B \: p \dashv \Delta} \and
+  \inferrule{\Gamma \vdash A \: \textbf{!} \: \mathit{type} \\
+             \Gamma \vdash e \Leftarrow [\Gamma]A \: \textbf{!} \dashv \Delta}
+             {\Gamma \vdash (e : A) \Rightarrow [\Delta] A \: \textbf{!} \dashv \Delta} \and
+  \inferrule{\\}{\Gamma \vdash () \Leftarrow \UseVerb{unit} \: p \dashv \Gamma} \and
+  \inferrule{\\}{\Gamma[\hat{\alpha} : \star] \vdash () \Leftarrow \hat{\alpha}
+                 \dashv \Gamma[\hat{\alpha} : \star=\UseVerb{unit}]} \and
+  \inferrule{v \: \textit{chk-I} \\ \Gamma, \, \alpha : \kappa \vdash v \Leftarrow A \: p
+             \dashv \Delta, \, \alpha : \kappa, \, \Theta}
+            {\Gamma \vdash v \Leftarrow \forall \alpha : \kappa. \, A \: p \dashv \Delta} \and
+  \inferrule{e \: \textit{chk-I} \\ \Gamma, \, \hat{\alpha} : \kappa
+             \vdash e \Leftarrow [\hat{\alpha} / \alpha] A \dashv \Delta}
+             {\Gamma \vdash e \Leftarrow \exists \alpha : \kappa. \, A \:p \dashv \Delta} \and
+  \inferrule{v \: \textit{chk-I} \\ \Gamma, \, _{\blacktriangleright P} / P \dashv \Theta \\
+             \Theta \vdash v \Leftarrow [\Theta]A \: \textbf{!}
+             \dashv \Delta , \, _{\blacktriangleright P}, \, \Delta'}
+             {\Gamma \vdash v \Leftarrow P \supset A \: \textbf{!} \dashv \Delta} \and
+  \inferrule{v \: \textit{chk-I} \\ \Gamma, \, _{\blacktriangleright P} / P \dashv \bot}
+             {\Gamma \vdash v \Leftarrow P \supset A \: \textbf{!} \dashv \Gamma} \and
+  \inferrule{\text{$e$ not a \UseVerb{case}} \\ \Gamma \vdash P \: \mathit{true} \dashv \Theta \\
+             \Theta \vdash e \Leftarrow [\Theta]A \: p \dashv \Delta}
+             {\Gamma \vdash e \Leftarrow A \wedge P \: p \dashv \Delta} \and
+  \inferrule{\Gamma, \, x : A \: p \vdash e \Leftarrow B \: p \dashv
+             \Delta, \, x : A \: p, \, \Theta}
+             {\Gamma \vdash \lambda x. \, e \Leftarrow A \rightarrow B \: p \dashv \Delta} \and
+  \inferrule{\Gamma\left[\hat{\alpha}_{1} : \star, \hat{\alpha}_{2} : \star, \hat{\alpha} : \star=\hat{\alpha}_{1}
+             \rightarrow \hat{\alpha}_{2}\right], x : \hat{\alpha}_{1} \vdash e \Leftarrow \hat{\alpha}_{2} \dashv
+             \Delta, \, x : \hat{\alpha}_{1}, \, \Delta'}
+             {\Gamma[\hat{\alpha} : \star] \vdash \lambda x. \, e \Leftarrow \hat{\alpha} \dashv \Delta} \and
+  \inferrule{\Gamma \vdash e \Rightarrow A \: p \dashv \Theta \\
+             \Theta \vdash s : A \: p \gg C\lceil q\rceil \dashv \Delta}
+             {\Gamma \vdash e \: s \Rightarrow C \: q \dashv \Delta} \and
+  \inferrule{\Gamma \vdash e_1 \Leftarrow A_1 \: p \dashv \Theta \\
+             \Theta \vdash e_2 \Leftarrow [\Theta]A_2 \: p \dashv \Delta}
+            {\Gamma \vdash (e_1, e_2) \Leftarrow A_1 \times A_2 \: p \dashv \Delta} \and
+  \inferrule{\Gamma\left[\hat{\alpha}_{2} : \star, \hat{\alpha}_{1} : \star,
+             \hat{\alpha} : \star=\hat{\alpha}_{1} \times \hat{\alpha}_{2}\right]
+             \vdash e_{1} \Leftarrow \hat{\alpha}_{1} \dashv \Theta \\
+             \Theta \vdash e_{2} \Leftarrow[\Theta] \hat{\alpha}_{2} \dashv \Delta}
+            {\Gamma[\hat{\alpha} : \star] \vdash (e_1, e_2) \Leftarrow \hat{\alpha} \dashv \Delta}
+\end{mathpar}
+\vspace{1cm}
+\subsubsection*{Spine typing}
+$\Gamma \vdash s : A \: p \gg C\lceil q\rceil \dashv \Delta$ -- under the context $\Gamma$,
+passing spine $s$ to a function of type $A$ synthesizes type $C$; recover principality if possible.
+\vspace{0.2cm}
+\begin{mathpar}
+  \inferrule{\Gamma, \, \hat{\alpha} : \kappa \vdash e \; s :
+            [\hat{\alpha} / \alpha]A \gg C \: q \dashv \Delta}
+            {\Gamma \vdash e \; s : \forall \alpha : \kappa. \, A \: p \gg C \: q \dashv \Delta} \and
+  \inferrule{\Gamma \vdash P \: \mathit{true} \dashv \Theta \;\;\;\;
+             \Theta \vdash e \; s : [\Theta]A \: p \gg C \: q \dashv \Delta}
+            {\Gamma \vdash e \; s : P \supset A \: p \gg C \: q \dashv \Delta} \and
+  \inferrule{\\}{\Gamma \vdash \cdot : A \: p \gg A \: p\: \dashv \Gamma} \and
+  \inferrule{\Gamma \vdash e \Leftarrow A \: p \dashv \Theta \\
+             \Theta \vdash s : [\Theta]B \: p \gg C \: q \dashv \Delta}
+            {\Gamma \vdash e \; s : A \rightarrow B \: p \gg C \: q \dashv \Delta} \and
+  \inferrule{\Gamma \left[\hat{\alpha}_{2} : \star, \hat{\alpha}_{1} : \star, \hat{\alpha} : \star=\hat{\alpha}_{1}
+            \rightarrow \hat{\alpha}_{2}\right] \vdash e \; s :
+            (\hat{\alpha}_{1} \rightarrow \hat{\alpha}_{2}) \gg C \dashv \Delta}
+            {\Gamma [\hat{\alpha} : \star] \vdash e \; s : \hat{\alpha} \gg C \dashv \Delta} \and
+  \inferrule{\Gamma \vdash s : A \: \textbf{!} \gg C \cancel{\textbf{!}} \dashv \Delta \\
+            \mathit{FEV}(C) = \emptyset}
+            {\Gamma \vdash s : A \: \textbf{!} \gg C\lceil \textbf{!}\rceil \dashv \Delta} \and
+  \inferrule{\Gamma \vdash s : A \: p \gg C \: q \dashv \Delta \\
+             \big((p = \cancel{\textbf{!}}) \operatorname{or} \,
+             (q = \textbf{!}) \operatorname{or} \mathit{FEV}(C) \neq \emptyset \big)}
+            {\Gamma \vdash s : A \: p \gg C\lceil q\rceil \dashv \Delta}
+\end{mathpar}
 \section{Our variant of the system}
-We made some necessary modification to the type system to make our language useful and user friendly.
+We made some necessary modifications to the type system to make our language useful and user friendly.
 First of all we added typing rules for simple types such as
 \verb+Int+ or \verb+String+, operators, \verb+if+ statements, \verb+let+ expressions,
 \verb+error+ throwing and \verb+try+ - \verb+catch+ blocks, but we omit them in this thesis because
 they are not interesting and straightforward. However, it is important to remark, that \verb+let+ expression unpacks the
-existential types which is necessary to ensure correct order of inserting type variables to the context while defining
-recursive functions. We also added extra inference rules following the earlier work of Dunfield and Krishnaswami\cite{Dunfield13:bidir},
-to minize boilerplate type annotations and produce better quality type checking errors. Following
+existential types, which is necessary to enforce correct order of inserting type variables to the context while defining
+recursive functions.
+\begin{verbatim}
+  def filter :: forall n : N, a : * .
+    (a -> Bool) -> Vec n a -> exists k : N . Vec k a
+  def filter _ [] = []
+  def filter p (x : xs) =
+    let tail = filter p xs in
+    if p x then
+      x : tail
+    else
+      tail
+\end{verbatim}
+We also included additional inference rules following the earlier work of Dunfield and Krishnaswami\cite{Dunfield13:bidir},
+to minimize boilerplate type annotations and produce better quality type checking errors. Following
 remark of Dunfield and Krishnaswami\cite{gadt-popl19} we extended subtyping to functions and propositional types.
 The biggest modification is the introduction of user defined generalized algebraic data types. The last section
 of this chapter covers exhaustively typing rules and implementation details of GADTs. %We discarded separate rules for
@@ -453,7 +609,7 @@ of this chapter covers exhaustively typing rules and implementation details of G
 \subsection*{Types, monotypes and propositions}
 
 We distinguish between types (for clarity sometimes called big types) and monotypes.
-Monotypes consist of simplified types (whithout quantification and propositional types) and
+Monotypes consist of simplified types (without quantification and propositional types) and
 inhabitants of kind $\mathbb{N}$ (constructed from zero - \verb+0+ and successor - \verb+S+).
 As we can see from the following definition quantification and propositions are restricted to monotypes.
 However, our extended subtyping reduces number of programs which would not type check due to this restriction.
@@ -580,28 +736,28 @@ are based on type checking rules for asserting and guarding types.
 Rules $P \supset A \le^- B$ and $A \wedge P \le^+ B$ are obtained as a duality of previous two rules.
 \subsubsection*{Function subtyping:}
 \begin{mathpar}
-\inferrule{\Gamma \vdash A' \le^+ A \dashv \Theta \\
-           \Theta \vdash [\Theta]B \le^- [\Theta]B' \dashv \Delta}
-           {\Gamma \vdash A \rightarrow B \le^- A' \rightarrow B' \dashv \Delta}
+\inferrule{\Gamma \vdash A' <:^+ A \dashv \Theta \\
+           \Theta \vdash [\Theta]B <:^- [\Theta]B' \dashv \Delta}
+           {\Gamma \vdash A \rightarrow B <:^- A' \rightarrow B' \dashv \Delta}
 \end{mathpar}
 \subsubsection*{Propositional types subtyping:}
 \begin{mathpar}
-\inferrule{\text{$B$ not guarded} \\ \Gamma \vdash P \: \mathit{true} \dashv \Theta \\
-           \Theta \vdash [\Theta]A \le^- [\Theta]B \dashv \Delta}
-           {\Gamma \vdash P \supset A \le^- B \dashv \Delta} \and
-\inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \Theta \\
-           \Theta \vdash [\Theta]A \le^- [\Theta]B \dashv \Delta , \, _{\blacktriangleright P}, \, \Delta'}
-           {\Gamma \vdash A \le^- P \supset B \dashv \Delta} \and
-\inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \bot}
-          {\Gamma \vdash A \le^- P \supset B \dashv \Gamma} \and
-\inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \Theta \\
-           \Theta \vdash [\Theta]A \le^+ [\Theta]B \dashv \Delta , \, _{\blacktriangleright P}, \, \Delta'}
-           {\Gamma \vdash A \wedge P \le^+ B \dashv \Delta} \and
-\inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \bot}
-          {\Gamma \vdash A \wedge P \le^+ B \dashv \Gamma} \and \and
-\inferrule{\text{$A$ not asserting} \\ \Gamma \vdash P \: \mathit{true} \dashv \Theta \\
-           \Theta \vdash [\Theta]A \le^+ [\Theta]B \dashv \Delta}
-           {\Gamma \vdash A \le^+ B \wedge P \dashv \Delta} \and
+  \inferrule{\text{$B$ not guarded} \\ \Gamma \vdash P \: \mathit{true} \dashv \Theta \\
+            \Theta \vdash [\Theta]A <:^- [\Theta]B \dashv \Delta}
+            {\Gamma \vdash P \supset A <:^- B \dashv \Delta} \and
+  \inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \Theta \\
+            \Theta \vdash [\Theta]A <:^- [\Theta]B \dashv \Delta , \, _{\blacktriangleright P}, \, \Delta'}
+            {\Gamma \vdash A <:^- P \supset B \dashv \Delta} \and
+  \inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \bot}
+            {\Gamma \vdash A <:^- P \supset B \dashv \Gamma} \and
+  \inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \Theta \\
+            \Theta \vdash [\Theta]A <:^+ [\Theta]B \dashv \Delta , \, _{\blacktriangleright P}, \, \Delta'}
+            {\Gamma \vdash A \wedge P <:^+ B \dashv \Delta} \and
+  \inferrule{\Gamma, \, _{\blacktriangleright P} / P \dashv \bot}
+            {\Gamma \vdash A \wedge P <:^+ B \dashv \Gamma} \and
+  \inferrule{\text{$A$ not asserting} \\ \Gamma \vdash P \: \mathit{true} \dashv \Theta \\
+            \Theta \vdash [\Theta]A <:^+ [\Theta]B \dashv \Delta}
+            {\Gamma \vdash A <:^+ B \wedge P \dashv \Delta}
 \end{mathpar}
 \section{Our contribution - user defined GADTs}
 
@@ -614,13 +770,13 @@ data Vec N 'A where
   | (:) :: forall n : N . 'A -> Vec n 'A -> Vec (S n) 'A
 \end{verbatim}
 One could wonder why do we need named parameters in our type system.
-Couldn't we just use unnamed parameters and quantifiers, like in the example below ?
+Couldn't we just use unnamed parameters and quantifiers, like in the example below?
 \begin{verbatim}
 data Vec N * where
   | []  :: forall a : * . Vec 0 a
   | (:) :: forall n : N, a : * . a -> Vec n a -> Vec (S n) a
 \end{verbatim}
-It is that we can define \verb+Vec+ like this, but there is a drawback to that approach. Since we use
+It is true that we can define \verb+Vec+ like this, but there is a drawback to that approach. Since we use
 quantification over \verb+a+, our definition of \verb+Vec+ is restricted to monotypes. Thus, for example, we wouldn't be
 able to type check vector of mixed length vectors: \verb+Vec n (exists m : N . Vec m a)+. That's where
 named parameters come into play. They are capable of storing big types.
@@ -674,6 +830,7 @@ which may be filled with any big type or monotype.
   A_\dagger \mid n_\dagger                        & type template or monotype template
 \end{grammar}
 
+\vspace{2cm}
 \textbf{Proposition templates:}
 
 \begin{grammar}{P_\dagger,Q_\dagger\Coloneqq}{}
@@ -692,12 +849,12 @@ After that we substitute constructor's universally quantified variables with fre
 Then we convert arguments' type templates and propositions' templates to types and propositions
 by replacing parameters' indices with types and monotypes from checked type's parameters.
 Next, we check propositions. Finally, we check constructor's arguments against generated types.
-The following, quite lenghty, rule describes that process in the formal way:
+The following, quite lengthy, rule describes that process in the formal way:
 
 \begin{mathpar}
 prnc(A, \; p) = \begin{cases}
-  \cancel{\textbf{!}} & when \; FEV(A) \neq \emptyset \\
-  p                   & when \; FEV(A) = \emptyset
+  \cancel{\textbf{!}} & when \; \mathit{FEV}(A) \neq \emptyset \\
+  p                   & when \; \mathit{FEV}(A) = \emptyset
 \end{cases}
 
 \inferrule{\mathrm{T}_\mathit{constrName} = \mathrm{T} \\
@@ -742,7 +899,7 @@ parameters, which is not restricted to monotypes.
 
 \chapter{Remarks on semantics}
 Bestrafer is a call-by-value language, with some minor exceptions further discussed below.
-We implemented an interpreter of the language that realises big-step semantics.
+We implemented an interpreter of the language that realizes big-step semantics.
 Formal rules for semantics are typical and rather straightforward so we omit them in this thesis. However, addition
 of more complex features like user defined generalized algebraic data types, IO operations and exceptions creates
 some subtleties, which we cover in this chapter.
@@ -753,10 +910,13 @@ For example, if we consider type:
 data Pair 'A 'B where
   | Pair :: 'A -> 'B -> Pair 'A 'B
 \end{verbatim}
-partial aplication: \verb+Pair 42+ will be changed into \verb+\b -> Pair 42 b+.
+partial application: \verb+Pair 42+ will be changed into \verb+\b -> Pair 42 b+.
+
+Some languages, most notably OCaml, do not allow partial application of constructors.
+However, we believe that it helps to write more elegant and natural programs.
 \section{Function definitions and evaluation order}
-Top-level pattern matching definitions are just syntax sugar for lambda with a match expression inside.
-For instance, function definition:
+Top-level pattern matching definitions are just syntactic sugar for lambda with a match expression inside.
+For instance, the function definition:
 \begin{verbatim}
 def map _ [] = []
 def map f (x : xs) = f x : map f xs
@@ -769,23 +929,24 @@ will be desugared into:
 \end{verbatim}
 
 The top-level definitions are all mutually recursive and each of them is evaluated once, starting from the beginning
-down to the end of the source file. This may raise a question, what happens if some function uses the definition which is located
+down to the end of the source file. This may raise a question, what happens if some function uses a definition which is located
 further in the source file. In this situation the further definition will be evaluated at the time when it was called,
-its value will be remembered and it won't be evaluated for the second time.
-Another concern is what would happend in the previous situation if second function would throw an error and the first function would
+its value will be remembered and it won't be evaluated for the second time. This is possible because we evaluate mutually recursive
+definitions in a DFS order.
+Another concern is what would happened in the previous situation if second function would throw an error and the first function would
 handle it with a \verb+try-catch+ block. Because the further definition failed to evaluate we treat it as not evaluated and try to evaluate it
 on its next use or at the top-level.
 
 \chapter{Discussion and future work}
-Bideriactional type checking is an elegant and practical method of imlementing type systems with GADTs,
+Bidirectional type checking is an elegant and practical method of implementing type systems with GADTs,
 existential types and higher-rank polymorphism. Moreover, it produces better quality type errors
 and scales well with new features added to the language. Since top-level type annotations are considered
-good practice and help to document the code, bidirectional type system does not require much addiotional effort from the programmer.
+good practice and help to document the code, bidirectional type system does not require much additional effort from the programmer.
 Dunfield and Krishnaswami's system\cite{gadt-popl19} proves to perform well in the practical programming language implementation.
-Our extension of user defined GADTs fully utylizes bidirectional nature of their type system,
+Our extension of user defined GADTs fully utilizes bidirectional nature of their type system,
 allowing parametrization with polymorphic types and treating constructors as functions.
 
-\section{Unification modulo equality theory of natural numbers}
+\section{Unification modulo equality of natural numbers}\label{natural}
 We intend to extend the type system with unification modulo equality theory of natural numbers.
 This extension will allow to fully express the type of the append function on \verb+Vec+:
 \begin{verbatim}
@@ -796,7 +957,7 @@ def append :: forall n : N, m : N, a : * .
 def append [] ys = ys
 def append (x : xs) ys = x : append xs ys
 \end{verbatim}
-Instead of using existential as the funcion return type:
+Instead of using existential as the function return type:
 \begin{verbatim}
 def append :: forall n : N, m : N, a : * .
   Vec n a ->
@@ -807,7 +968,7 @@ def append (x : xs) ys = let tail = append xs ys in x : tail
 \end{verbatim}
 With that extension we will obtain programming language with similar capabilities as
 Dependent ML\cite{DependentML}. By using equality theory we will get intuitive operations
-on types of kind $\mathbb{N}$, in contrast to, for example, quite clumsy arithmetic
+on types of kind \verb+N+, in contrast to, for example, quite clumsy arithmetic
 defined with Haskell's type families.
 \section{Automatically unpacking existential quantifiers}
 In our language we have to use \verb+let+ expressions to unpack existential quantifiers.

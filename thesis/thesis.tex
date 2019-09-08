@@ -277,7 +277,7 @@ def map :: forall n : N, a : *, b : * .
 def map _ [] = []
 def map f (x : xs) = f x : map f xs
 \end{verbatim}
-To give programmer full flexibility and expressive power our language also has a standard non-indexed \verb+List+ data type.
+To give programmer full flexibility and expressive power, our language also has a standard non-indexed \verb+List+ data type.
 \begin{verbatim}
 data List 'A where
   | {}  :: List 'A
@@ -437,7 +437,7 @@ do not have to be packaged within another data type; instead they can be used li
 Their system also features a guarded type $P \supset A $ (\textit{$P$ implies $A$})
 and an asserting type $A \wedge  P$ (\textit{$A$ with $P$}).
 Similarly to Hindley-Milner they distinguish between monotypes and polytypes.
-While their system is bidirectional, their approach relies heavily on checking against known type. Still they provide a few inference
+While their system is bidirectional, their approach relies heavily on checking against known type. Still, they provide a few inference
 rules that eliminate the most tedious type annotations.
 They provide algorithms for type checking, subtyping, checking pattern matching coverage and finally checking and eliminating propositions.
 Dunfield and Krishnaswami's system features principality tracking. We call the typing judgement principal, if it is not result of guessing.

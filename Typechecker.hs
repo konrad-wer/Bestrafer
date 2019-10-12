@@ -624,7 +624,7 @@ checkExpr context expression checkedType principality = do
       checkExpr c (ESpine p (EVar p "-.u") [e]) t pr
     (c, EUnOp p UnOpNot e, t, pr) ->
       checkExpr c (ESpine p (EVar p "!u") [e]) t pr
-    (c, EError _ _, _, _) -> return c
+    (c, EError _ e, _, _) -> checkExpr c e TString Principal
     (c, ETry p e cs, t, pr) -> do
       mapM_ (lift . checkExceptionWellFormedness . fst) cs
       c2 <- checkExpr c e t pr
@@ -734,8 +734,9 @@ inferExpr c (ELambda _ x e) = do
   let c2 = CVar x (TEVar a) NotPrincipal : CMarker : CTypeVar (E b) KStar : CTypeVar (E a) KStar : c
   c3 <- dropContextToMarker <$> checkExpr c2 e (TEVar b) NotPrincipal
   return (TArrow (TEVar a) (TEVar b), NotPrincipal, c3)
-inferExpr c (EError _ _) =
-  return (TUniversal (UTypeVar "e") KStar (TUVar $ UTypeVar "e"), Principal, c)
+inferExpr c (EError _ e) = do
+  c2 <- checkExpr c e TString Principal
+  return (TUniversal (UTypeVar "e") KStar (TUVar $ UTypeVar "e"), Principal, c2)
 inferExpr c (ETuple _ es n) = do
   (ts, pr, c') <- foldM aux ([], Principal, c) es
   return (TProduct (reverse ts) n, pr, c')

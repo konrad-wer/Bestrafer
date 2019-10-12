@@ -476,7 +476,7 @@ eError = do
   pos <- getSourcePos
   rword "error"
   void $ symbol ":"
-  EError pos <$> stringLiteral
+  EError pos <$> expr
 
 eTry :: Parser (Expr SourcePos)
 eTry = do

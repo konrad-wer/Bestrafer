@@ -150,7 +150,9 @@ evalExpr c (ECase _ e bs) = do
         _ -> Nothing
 evalExpr c (ETry _ e cs) =
   evalExpr c e `catchStateT` map (makeExceptionHandler c) cs
-evalExpr _ (EError _ message) = liftIO . throw $ CustomException message
+evalExpr c (EError _ e) = do
+  StringValue message <- evalExpr c e
+  liftIO . throw $ CustomException message
 
 eval :: Program p -> ConstructorsContext -> IO [Value]
 eval program constrs = do

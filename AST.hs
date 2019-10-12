@@ -41,7 +41,7 @@ data Expr p
   | EBinOp  p BinOp (Expr p) (Expr p)
   | EUnOp   p UnOp (Expr p)
   | ETry    p (Expr p) [Catch p]
-  | EError  p String
+  | EError  p (Expr p)
 
 type Program p = [Expr p]
 

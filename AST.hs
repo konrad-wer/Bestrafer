@@ -326,8 +326,8 @@ instance Show Type where
   show (TEVar e) = show e
   show (TUniversal u k t) = "(∀ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
   show (TExistential u k t) = "(∃ " ++ show u ++ " : " ++ show k ++ " . " ++ show t ++ ")"
-  show (TImp prop t) = "(" ++ show prop ++ " => " ++ show t ++  ")"
-  show (TAnd t prop) = "(" ++ show t ++ " ^ " ++ show prop ++ ")"
+  show (TImp prop t) = "(" ++ showProp prop ++ " => " ++ show t ++  ")"
+  show (TAnd t prop) = "(" ++ show t ++ " ^ " ++ showProp prop ++ ")"
 
 showProp :: Proposition -> String
 showProp (m1, m2) = show m1 ++ " = " ++ show m2

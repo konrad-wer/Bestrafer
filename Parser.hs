@@ -563,7 +563,7 @@ pSimple =
   PBool   <$> getSourcePos <*> (rword "True" >> return True) <|>
   PBool   <$> getSourcePos <*> (rword "False" >> return False) <|>
   PFloat  <$> getSourcePos <*> try float <|>
-  PInt    <$> getSourcePos <*> (fromIntegral <$> integer) <|>
+  PInt    <$> getSourcePos <*> try (fromIntegral <$> integer) <|>
   PChar   <$> getSourcePos <*> charLiteral <|>
   PString <$> getSourcePos <*> stringLiteral <|>
   PVar    <$> getSourcePos <*> identifier <|>

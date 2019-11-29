@@ -1,0 +1,45 @@
+/*
+    Queue interface made using ADT and existential quantification.
+    Implementation with amortized O(1) dequeue operation
+*/
+
+data Maybe 'A where
+  | Nothing :: Maybe 'A
+  | Just :: 'A -> Maybe 'A
+
+data Queue 'A where
+  | Queue :: forall a : *.
+    a ->
+    ('A -> a -> a) ->
+    (a -> Maybe ('A, a)) -> Queue 'A
+
+def queue :: forall a : *. Queue a
+def queue =
+    Queue ({}, {})
+      (\x q -> (fst q, x ; snd q))
+      (\q -> case fst q of
+        | x ; xs -> Just (x, (xs, snd q))
+        | {} -> case snd q of
+          | {} -> Nothing
+          | xs ->
+            let xs = reverseL xs in
+            Just (headL xs, (xs, {})))
+
+def enqueue :: forall a : *. a -> Queue a -> Queue a
+def enqueue x q = case q of
+  | Queue xs push pop -> Queue (push x xs) push pop
+
+def dequeue :: forall a : *. Queue a -> Maybe (a, Queue a)
+def dequeue q = case q of
+  | Queue xs push pop -> case pop xs of
+    | Nothing -> Nothing
+    | Just (x, xs) -> Just (x, Queue xs push pop)
+
+def unwrap :: forall a : *. Maybe a -> a
+def unwrap (Just x) = x
+def unwrap Nothing = error: "unwrap on Nothing"
+
+def main :: ()
+def main =
+  let q = foldl (flip enqueue) queue [0,1,2,3,4,5,6,7,8,9] in
+  printInt . fst . unwrap <| dequeue q

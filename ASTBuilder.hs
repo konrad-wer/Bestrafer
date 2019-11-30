@@ -35,7 +35,7 @@ instance SourcePos ~ p => Show (ASTBuilderError p) where
   show (WrongConstrResultTypeError (ConstrDef p name _)) = sourcePosPretty p ++ "\nConstructor " ++ addQuotes name ++ " has a wrong result type"
   show (WrongConstrResultTypeParamsNumberError (ConstrDef p name _)) = sourcePosPretty p ++ "\nResult type of constructor "
     ++ addQuotes name ++ " has a wrong number of parameters"
-  show (WrongConstrResultTypeParameter (ConstrDef p name _) pname) = sourcePosPretty p ++ "\nParamter " ++ addQuotes pname ++
+  show (WrongConstrResultTypeParameter (ConstrDef p name _) pname) = sourcePosPretty p ++ "\nParameter " ++ addQuotes pname ++
     " has a wrong position in the result type of constructor " ++ addQuotes name
   show (GADTDuplicateParamError p typeName params) = sourcePosPretty p ++ "\nType " ++ addQuotes (typeName ++ " " ++ unwords params) ++
     " has a duplicate parameter"

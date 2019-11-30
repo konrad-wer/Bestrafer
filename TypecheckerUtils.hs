@@ -116,9 +116,9 @@ instance SourcePos ~ p => Show (TypeError p) where
     addQuotes (show t2)
   show (ProductArityError e t) = sourcePosPretty (getPos e) ++ "\nTuple " ++ addQuotes (show e) ++ " has a different arity than its type " ++
     addQuotes (show t)
-  show (SpineInferenceError e t) = sourcePosPretty (getPos e) ++ "\nCouldn't apply expresion " ++ addQuotes (show e) ++
-    " to an expresion of type " ++ addQuotes (show t)
-  show (TypeInferenceError e)  = sourcePosPretty (getPos e) ++ "\nCouldn't infer type of expresion " ++ addQuotes (show e) ++
+  show (SpineInferenceError e t) = sourcePosPretty (getPos e) ++ "\nCouldn't apply expression " ++ addQuotes (show e) ++
+    " to an expression of type " ++ addQuotes (show t)
+  show (TypeInferenceError e)  = sourcePosPretty (getPos e) ++ "\nCouldn't infer type of expression " ++ addQuotes (show e) ++
     ",\ntry providing a type annotation"
   show (EquationAlreadyExistsError p u m1 m2) = sourcePosPretty p ++ "\nConflicting equation for " ++ addQuotes (show u) ++
     " exists in the context (namely: " ++ addQuotes (show u ++ " = " ++ show m1) ++ "),\nwhile trying to add equation " ++

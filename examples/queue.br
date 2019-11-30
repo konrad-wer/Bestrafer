@@ -1,6 +1,6 @@
 /*
     Queue interface made using ADT and existential quantification.
-    Implementation with amortized O(1) dequeue operation
+    Implementation with O(1) enqueue and amortized O(1) dequeue operations.
 */
 
 data Maybe 'A where

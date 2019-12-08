@@ -1,0 +1,59 @@
+/*
+  Implementing computations with state using "monadic" approach
+*/
+
+data State 'S 'A where
+  | St :: ('S -> ('S, 'A)) -> State 'S 'A
+
+def return :: forall s : *, a : *. a -> State s a
+def return a = St (\s -> (s, a))
+
+def bind :: forall s : *, a : *, b : *.
+  State s a -> (a -> State s b) -> State s b
+def bind (St f) g = St (\s1 ->
+  case f s1 of
+    | (s2, y) -> case g y of
+      | St h -> h s2)
+
+def bind_ :: forall s : *, a : *, b : *.
+  State s () -> (State s b) -> State s b
+def bind_ x y = bind x (\unit -> y)
+
+def set :: forall s : *. s -> State s ()
+def set s = St (\x -> (s, ()))
+
+def get :: forall s : *. State s s
+def get = St (\s -> (s, s))
+
+def runState :: forall s : *, a : *. State s a -> s -> (s, a)
+def runState (St f) s = f s
+
+def evalState :: forall s : *, a : *. State s a -> s -> a
+def evalState st = snd . runState st
+
+def execState :: forall s : *, a : *. State s a -> s -> s
+def execState st = fst . runState st
+
+/*
+  Usage example - random number generator
+*/
+
+def randInt :: State Int Int
+def randInt =
+  get `bind` (\s0 ->
+  let s = (s0 * 2343 + 12333) % 1214567 in
+  set s `bind_` return s)
+
+def randList :: Int -> State Int (List Int)
+def randList n =
+  if n <= 0 then return {}
+  else
+    randInt `bind` (\x ->
+    randList (n - 1) `bind` (\xs ->
+    return <| x ; xs))
+
+def main :: ()
+def main =
+  let seed = putStr "Seed: " |> readLnInt in
+  let len  = putStr "Length: " |> readLnInt in
+  evalState (randList len) seed |> iterL printInt

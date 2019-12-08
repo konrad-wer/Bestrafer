@@ -7,6 +7,7 @@ import Control.Monad.State
 import Control.Exception
 import Data.Char
 import Text.Read (readMaybe)
+import System.IO
 
 operatorsTypes :: [(Var, Type)]
 operatorsTypes =
@@ -181,10 +182,10 @@ bfrAppendFile :: Value
 bfrAppendFile = FunValue (\(StringValue x) -> return (FunValue (\(StringValue y) -> lift (appendFile x y >> return UnitValue))))
 
 bfrPutChar :: Value
-bfrPutChar = FunValue (\(CharValue x) -> lift (putChar x >> return UnitValue))
+bfrPutChar = FunValue (\(CharValue x) -> lift (putChar x >> hFlush stdout >> return UnitValue))
 
 bfrPutStr :: Value
-bfrPutStr = FunValue (\(StringValue x) -> lift (putStr x >> return UnitValue))
+bfrPutStr = FunValue (\(StringValue x) -> lift (putStr x >> hFlush stdout >> return UnitValue))
 
 bfrPutStrLn :: Value
 bfrPutStrLn = FunValue (\(StringValue x) -> lift (putStrLn x >> return UnitValue))

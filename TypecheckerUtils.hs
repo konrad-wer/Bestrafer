@@ -161,6 +161,11 @@ data TypecheckerState = TypecheckerState
 
 makeLenses ''TypecheckerState
 
+type TypecheckerMonad p = StateT TypecheckerState (Either (TypeError p))
+
+typeError :: TypeError p -> TypecheckerMonad p a
+typeError = lift . Left
+
 --simple utils------------------------------------------------------------------
 
 generateSubETypeVars :: ETypeVar -> (ETypeVar, ETypeVar)
@@ -169,14 +174,14 @@ generateSubETypeVars a = (ETypeVar $ eTypeVarName a ++ "-1", ETypeVar $ eTypeVar
 generateSubETypeVarsList :: ETypeVar -> Int -> [ETypeVar]
 generateSubETypeVarsList a n = [ETypeVar $ eTypeVarName a ++ "-" ++ show k | k <- [1..n]]
 
-generateFreshTypeVars :: (Var -> TypeVar) -> String -> [Var] -> StateT TypecheckerState (Either (TypeError p)) [TypeVar]
+generateFreshTypeVars :: (Var -> TypeVar) -> String -> [Var] -> TypecheckerMonad p [TypeVar]
 generateFreshTypeVars f trace names = do
   let n = fromIntegral $ length names
   firstFreshVarNum <- view freshVarNum <$> get
   modify $ over freshVarNum (+ n)
   return $ reverse . map f $ zipWith (++) names (map ((("#" ++ trace ++ "#") ++) . show) [firstFreshVarNum .. firstFreshVarNum + n - 1])
 
-generateFreshTypeVarName :: String -> Var -> StateT TypecheckerState (Either (TypeError p)) Var
+generateFreshTypeVarName :: String -> Var -> TypecheckerMonad p Var
 generateFreshTypeVarName trace name = do
   a <- ((name ++ "#" ++ trace ++ "#") ++) . show . view freshVarNum <$> get
   modify $ over freshVarNum (+ 1)
@@ -184,7 +189,7 @@ generateFreshTypeVarName trace name = do
 
 argsAndPropsFromConstrTemplate
  :: p -> [GADTParameter] -> [TypeVar] -> Constructor
- -> StateT TypecheckerState (Either (TypeError p)) ([Type], [Proposition])
+ -> TypecheckerMonad p ([Type], [Proposition])
 argsAndPropsFromConstrTemplate p params vars constr = do
   let paramsMap = Map.fromList (zip (constrTypeParmsTemplate constr) params)
   let uvarsToFreshUvars = zip (map fst (constrUVars constr)) vars
@@ -355,7 +360,7 @@ freeVariablesOfMonotype (MEVar x) = Set.singleton $ eTypeVarName x
 
 --Context utils-----------------------------------------------------------------
 
-varContextLookup :: Context -> Var -> p ->  StateT TypecheckerState (Either (TypeError p)) ContextEntry
+varContextLookup :: Context -> Var -> p ->  TypecheckerMonad p ContextEntry
 varContextLookup  (entry @ (CVar y _ _): c) x p
   | x == y = return entry
   | otherwise = varContextLookup c x p
@@ -363,7 +368,7 @@ varContextLookup (_ : c) x p = varContextLookup c x p
 varContextLookup [] x p = do
   fContext <- view funContext <$> get
   case Map.lookup x fContext of
-    Nothing -> lift . Left $ UndeclaredVariableError p x
+    Nothing -> typeError $ UndeclaredVariableError p x
     Just t -> return $ CVar x t Principal
 
 uTypeVarEqContextLookup :: Context -> UTypeVar -> Maybe ContextEntry
@@ -645,86 +650,86 @@ applyContextToProposition p c (m1, m2) = do
 
 --Expanding patterns------------------------------------------------------------
 
-expandUnitPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
+expandUnitPatterns :: [Branch p] -> TypecheckerMonad p [Branch p]
 expandUnitPatterns [] = return []
-expandUnitPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandUnitPatterns (([], _, p) : _) = typeError $ TooShortPatternError p
 expandUnitPatterns ((PUnit _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandUnitPatterns bs
 expandUnitPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandUnitPatterns bs
 expandUnitPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandUnitPatterns bs
-expandUnitPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Unit" ptrn
+expandUnitPatterns ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "Unit" ptrn
 
-expandBoolPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) ([Branch p], [Branch p])
+expandBoolPatterns :: [Branch p] -> TypecheckerMonad p ([Branch p], [Branch p])
 expandBoolPatterns [] = return ([],[])
-expandBoolPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandBoolPatterns (([], _, p) : _) = typeError $ TooShortPatternError p
 expandBoolPatterns ((PBool _ False : ptrns, e, p2) : bs) = cross ((ptrns, e, p2) :) id <$> expandBoolPatterns bs
 expandBoolPatterns ((PBool _ True : ptrns, e, p2) : bs) = cross id ((ptrns, e, p2) :) <$> expandBoolPatterns bs
 expandBoolPatterns ((PWild _ : ptrns, e, p2) : bs) = cross ((ptrns, e, p2) :) ((ptrns, e, p2) :) <$> expandBoolPatterns bs
 expandBoolPatterns ((PVar _ _ : ptrns, e, p2) : bs) = cross ((ptrns, e, p2) :) ((ptrns, e, p2) :) <$> expandBoolPatterns bs
-expandBoolPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Bool" ptrn
+expandBoolPatterns ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "Bool" ptrn
 
-expandIntPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
+expandIntPatterns :: [Branch p] -> TypecheckerMonad p [Branch p]
 expandIntPatterns [] = return []
-expandIntPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandIntPatterns (([], _, p) : _) = typeError $ TooShortPatternError p
 expandIntPatterns ((PInt {} : _, _, _) : bs) = expandIntPatterns bs
 expandIntPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandIntPatterns bs
 expandIntPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandIntPatterns bs
-expandIntPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Int" ptrn
+expandIntPatterns ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "Int" ptrn
 
-expandFloatPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
+expandFloatPatterns :: [Branch p] -> TypecheckerMonad p [Branch p]
 expandFloatPatterns [] = return []
-expandFloatPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandFloatPatterns (([], _, p) : _) = typeError $ TooShortPatternError p
 expandFloatPatterns ((PFloat {} : _, _, _) : bs) = expandFloatPatterns bs
 expandFloatPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandFloatPatterns bs
 expandFloatPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandFloatPatterns bs
-expandFloatPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Float" ptrn
+expandFloatPatterns ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "Float" ptrn
 
-expandCharPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
+expandCharPatterns :: [Branch p] -> TypecheckerMonad p [Branch p]
 expandCharPatterns [] = return []
-expandCharPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandCharPatterns (([], _, p) : _) = typeError $ TooShortPatternError p
 expandCharPatterns ((PChar {} : _, _, _) : bs) = expandCharPatterns bs
 expandCharPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandCharPatterns bs
 expandCharPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandCharPatterns bs
-expandCharPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Char" ptrn
+expandCharPatterns ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "Char" ptrn
 
-expandStringPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
+expandStringPatterns :: [Branch p] -> TypecheckerMonad p [Branch p]
 expandStringPatterns [] = return []
-expandStringPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandStringPatterns (([], _, p) : _) = typeError $ TooShortPatternError p
 expandStringPatterns ((PString {} : _, _, _) : bs) = expandStringPatterns bs
 expandStringPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandStringPatterns bs
 expandStringPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandStringPatterns bs
-expandStringPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "String" ptrn
+expandStringPatterns ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "String" ptrn
 
-expandVarPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
+expandVarPatterns :: [Branch p] -> TypecheckerMonad p [Branch p]
 expandVarPatterns [] = return []
-expandVarPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandVarPatterns (([], _, p) : _) = typeError $ TooShortPatternError p
 expandVarPatterns ((PWild _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandVarPatterns bs
 expandVarPatterns ((PVar _ _ : ptrns, e, p2) : bs) = ((ptrns, e, p2) :) <$> expandVarPatterns bs
-expandVarPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Var" ptrn
+expandVarPatterns ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "Var" ptrn
 
-expandTuplePatterns :: Int -> [Branch p] -> StateT TypecheckerState (Either (TypeError p)) [Branch p]
+expandTuplePatterns :: Int -> [Branch p] -> TypecheckerMonad p [Branch p]
 expandTuplePatterns _ [] = return []
-expandTuplePatterns _ (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandTuplePatterns _ (([], _, p) : _) = typeError $ TooShortPatternError p
 expandTuplePatterns n ((PTuple p1 args m : ptrns, e, p2) : bs)
   | n == m = ((args ++ ptrns, e, p2) :) <$> expandTuplePatterns n bs
-  | otherwise = lift . Left $ PatternTypeError ("Tuple" ++ show n) $ PTuple p1 args m
+  | otherwise = typeError $ PatternTypeError ("Tuple" ++ show n) $ PTuple p1 args m
 expandTuplePatterns n ((PWild p1 : ptrns, e, p2) : bs) =
   ((map (const (PWild p1)) [1..n] ++ ptrns, e, p2) :) <$> expandTuplePatterns n bs
 expandTuplePatterns n ((PVar p1 _ : ptrns, e, p2) : bs) =
   ((map (const (PWild p1)) [1..n] ++ ptrns, e, p2) :) <$> expandTuplePatterns n bs
-expandTuplePatterns n ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError ("Tuple of arity:" ++ show n) ptrn
+expandTuplePatterns n ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError ("Tuple of arity:" ++ show n) ptrn
 
-expandVecPatterns :: [Branch p] -> StateT TypecheckerState (Either (TypeError p)) ([Branch p], [Branch p])
+expandVecPatterns :: [Branch p] -> TypecheckerMonad p ([Branch p], [Branch p])
 expandVecPatterns [] = return ([], [])
-expandVecPatterns (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandVecPatterns (([], _, p) : _) = typeError $ TooShortPatternError p
 expandVecPatterns ((PWild p1 : ptrns, e, p2) : bs) =
   cross ((ptrns, e, p2) :) ((PWild p1 : PWild p1 : ptrns, e, p2) :) <$> expandVecPatterns bs
 expandVecPatterns ((PVar p1 _ : ptrns, e, p2) : bs) =
   cross ((ptrns, e, p2) :) ((PWild p1 : PWild p1 : ptrns, e, p2) :) <$> expandVecPatterns bs
-expandVecPatterns ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "Vec" ptrn
+expandVecPatterns ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "Vec" ptrn
 
 expandGADTVarPatterns ::
   String -> p -> [Pattern p] -> Expr p -> p -> [Branch p]
-  -> StateT TypecheckerState (Either (TypeError p)) (Map.Map String [Branch p])
+  -> TypecheckerMonad p (Map.Map String [Branch p])
 expandGADTVarPatterns typeName p1 ptrns e p2 bs = do
   cs <- view constrContext <$> get
   bs' <- expandGADTPatterns typeName bs
@@ -733,38 +738,38 @@ expandGADTVarPatterns typeName p1 ptrns e p2 bs = do
     produceWilds cs k b =
       (map (const (PWild p1)) (maybe [] constrArgsTemplates (Map.lookup k cs)) ++ ptrns, e, p2) : b
 
-expandGADTPatterns :: String -> [Branch p] -> StateT TypecheckerState (Either (TypeError p)) (Map.Map String [Branch p])
+expandGADTPatterns :: String -> [Branch p] -> TypecheckerMonad p (Map.Map String [Branch p])
 expandGADTPatterns typeName [] = do
   cs <- view constrContext <$> get
   return . Map.fromList . map (pair (fst, const [])) . Map.toList . Map.filter ((typeName ==) . constrTypeName) $ cs
-expandGADTPatterns _ (([], _, p) : _) = lift . Left $ TooShortPatternError p
+expandGADTPatterns _ (([], _, p) : _) = typeError $ TooShortPatternError p
 expandGADTPatterns typeName ((PConstr p1 constrName args : ptrns, e, p2) : bs) = do
   bs' <- expandGADTPatterns typeName bs
   if Map.member constrName bs' then
     return $ Map.adjust ((args ++ ptrns, e, p2) :) constrName bs'
   else
-    lift . Left $ NotConstructorOfError (PConstr p1 constrName args) constrName typeName
+    typeError $ NotConstructorOfError (PConstr p1 constrName args) constrName typeName
 expandGADTPatterns typeName ((PWild p1 : ptrns, e, p2) : bs) =
   expandGADTVarPatterns typeName p1 ptrns e p2 bs
 expandGADTPatterns typeName ((PVar p1 _ : ptrns, e, p2) : bs) =
   expandGADTVarPatterns typeName p1 ptrns e p2 bs
-expandGADTPatterns _ ((ptrn : _, _, _) : _) =  lift . Left $ PatternTypeError "GADT" ptrn
+expandGADTPatterns _ ((ptrn : _, _, _) : _) =  typeError $ PatternTypeError "GADT" ptrn
 
-gadtPatternsGuarded :: String -> [Branch p] -> StateT TypecheckerState (Either (TypeError p)) Bool
+gadtPatternsGuarded :: String -> [Branch p] -> TypecheckerMonad p Bool
 gadtPatternsGuarded _ [] = return False
 gadtPatternsGuarded typeName ((PConstr p constrName args : _, _, _) : _) = do
   lookupRes <- Map.lookup constrName . view constrContext <$> get
   case lookupRes of
-    Nothing -> lift . Left $ UndeclaredConstructorInPatternError (PConstr p constrName args) constrName
+    Nothing -> typeError $ UndeclaredConstructorInPatternError (PConstr p constrName args) constrName
     Just constr
       | constrTypeName constr /= typeName ->
-        lift . Left $ MismatchedConstructorInPatternError (PConstr p constrName args) typeName (constrTypeName constr)
+        typeError $ MismatchedConstructorInPatternError (PConstr p constrName args) typeName (constrTypeName constr)
       | length (constrArgsTemplates constr) /= length args ->
-        lift . Left $ MismatchedConstructorArityInPatternError
+        typeError $ MismatchedConstructorArityInPatternError
         (PConstr p constrName args) constrName
         (length $ constrArgsTemplates constr) (length args)
       | otherwise -> return True
 gadtPatternsGuarded typeName ((PWild _ : _, _, _) : bs) = gadtPatternsGuarded typeName bs
 gadtPatternsGuarded typeName ((PVar {} : _, _, _) : bs) = gadtPatternsGuarded typeName bs
-gadtPatternsGuarded _ (([], _, p) : _) = lift . Left $ TooShortPatternError p
-gadtPatternsGuarded _ ((ptrn : _, _, _) : _) = lift . Left $ PatternTypeError "Vec" ptrn
+gadtPatternsGuarded _ (([], _, p) : _) = typeError $ TooShortPatternError p
+gadtPatternsGuarded _ ((ptrn : _, _, _) : _) = typeError $ PatternTypeError "Vec" ptrn

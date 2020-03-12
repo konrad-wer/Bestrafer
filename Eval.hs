@@ -11,33 +11,33 @@ import Control.Exception
 
 makeExceptionHandler :: EvalContext -> Catch p -> HandlerT Value
 makeExceptionHandler c (BestraferException _ "ArithmeticException" Nothing, expr) =
-  HandlerT ((\_ -> evalExpr c expr) :: ArithException -> StateT EvalState IO Value)
+  HandlerT ((\_ -> evalExpr c expr) :: ArithException -> EvalMonad Value)
 makeExceptionHandler c (BestraferException _ "IOException" Nothing, expr) =
-  HandlerT ((\_ -> evalExpr c expr) :: IOException -> StateT EvalState IO Value)
+  HandlerT ((\_ -> evalExpr c expr) :: IOException -> EvalMonad Value)
 makeExceptionHandler c (BestraferException _ "RuntimeException" Nothing, expr) =
-  HandlerT ((\_ -> evalExpr c expr) :: CustomException -> StateT EvalState IO Value)
+  HandlerT ((\_ -> evalExpr c expr) :: CustomException -> EvalMonad Value)
 makeExceptionHandler c (BestraferException _ _ Nothing, expr) =
-  HandlerT ((\_ -> evalExpr c expr) :: SomeException -> StateT EvalState IO Value)
+  HandlerT ((\_ -> evalExpr c expr) :: SomeException -> EvalMonad Value)
 makeExceptionHandler c (BestraferException _ "ArithmeticException" (Just v), expr) =
-  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: ArithException -> StateT EvalState IO Value)
+  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: ArithException -> EvalMonad Value)
 makeExceptionHandler c (BestraferException _ "IOException" (Just v), expr) =
-  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: IOException -> StateT EvalState IO Value)
+  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: IOException -> EvalMonad Value)
 makeExceptionHandler c (BestraferException _ "RuntimeException" (Just v), expr) =
-  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: CustomException -> StateT EvalState IO Value)
+  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: CustomException -> EvalMonad Value)
 makeExceptionHandler c (BestraferException _ _ (Just v), expr) =
-  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: SomeException -> StateT EvalState IO Value)
+  HandlerT ((\exc -> evalExpr (addToEnv v (StringValue $ show exc) c) expr) :: SomeException -> EvalMonad Value)
 
 
-valueOfGlobalContextEntry :: DefinitionValue -> StateT EvalState IO Value
+valueOfGlobalContextEntry :: DefinitionValue -> EvalMonad Value
 valueOfGlobalContextEntry (Evaluated v) = return v
 valueOfGlobalContextEntry (NotEvaluated e) = e ()
 
-valueOfVar :: Value -> StateT EvalState IO Value
+valueOfVar :: Value -> EvalMonad Value
 valueOfVar (DefValue (Evaluated v)) = return v
 valueOfVar (DefValue (NotEvaluated e)) = e ()
 valueOfVar v = return v
 
-evalExpr :: EvalContext -> Expr p -> StateT EvalState IO Value
+evalExpr :: EvalContext -> Expr p -> EvalMonad Value
 evalExpr c (EAnnot _ e _) = evalExpr c e
 evalExpr _ EUnit {} = return UnitValue
 evalExpr _ (EBool   _ b) = return $ BoolValue b
@@ -125,7 +125,7 @@ evalExpr c (ECase _ e bs) = do
   v <- evalExpr c e
   fromJust . msum $ map (match c [v]) bs
   where
-    match :: EvalContext -> [Value] -> Branch p -> Maybe (StateT EvalState IO Value)
+    match :: EvalContext -> [Value] -> Branch p -> Maybe (EvalMonad Value)
     match context values branch =
       case (context, values, branch) of
         (cb, [], ([], eb, _)) -> return $ evalExpr cb eb

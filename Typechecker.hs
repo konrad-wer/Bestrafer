@@ -10,7 +10,7 @@ import Control.Monad.Trans.Maybe
 
 import Control.Lens hiding (Context)
 
-checkedIntroductionForm :: Expr p -> StateT TypecheckerState (Either (TypeError p)) Bool
+checkedIntroductionForm :: Expr p -> TypecheckerMonad p Bool
 checkedIntroductionForm EUnit {}   = return True
 checkedIntroductionForm EBool {}   = return True
 checkedIntroductionForm EInt {}    = return True
@@ -22,7 +22,7 @@ checkedIntroductionForm ETuple {}  = return True
 checkedIntroductionForm (EConstr p constrName es) = do
   lookupRes <- Map.lookup constrName . view constrContext <$> get
   case lookupRes of
-    Nothing -> lift . Left $ UndeclaredConstructorError (EConstr p constrName es) constrName
+    Nothing -> typeError $ UndeclaredConstructorError (EConstr p constrName es) constrName
     Just constr -> return (length (constrArgsTemplates constr) == length es)
 checkedIntroductionForm _ = return False
 
@@ -50,16 +50,16 @@ checkBranchWellFormedness b @ (branchPtrns, _, _) = do
     getVars (PString _ _) = mzero
     getVars (PConstr _ _ ptrns) = ptrns >>= getVars
 
-checkTypeWellFormednessWithPrnc :: p -> Context -> Type -> Principality -> StateT TypecheckerState (Either (TypeError p)) ()
+checkTypeWellFormednessWithPrnc :: p -> Context -> Type -> Principality -> TypecheckerMonad p ()
 checkTypeWellFormednessWithPrnc p c t NotPrincipal = checkTypeWellFormedness p c t
 checkTypeWellFormednessWithPrnc p c t Principal =
   case Set.toList . freeExistentialVariables $ t of
     [] -> checkTypeWellFormedness p c t
-    vars -> lift . Left $ TypeFormednessPrcFEVError p vars
+    vars -> typeError $ TypeFormednessPrcFEVError p vars
 
 checkGADTParameterWellFormedness ::
   p -> Context -> (GADTDefParameter, GADTParameter)
-  -> StateT TypecheckerState (Either (TypeError p)) ()
+  -> TypecheckerMonad p ()
 checkGADTParameterWellFormedness p c (GADTDefParamType _, ParameterType t) = checkTypeWellFormedness p c t
 checkGADTParameterWellFormedness p c (GADTDefParamMonotype k, ParameterMonotype m) = checkMonotypeHasKind p NoClue c m k
 checkGADTParameterWellFormedness p c (GADTDefParamType _, ParameterMonotype m) =
@@ -67,7 +67,7 @@ checkGADTParameterWellFormedness p c (GADTDefParamType _, ParameterMonotype m) =
 checkGADTParameterWellFormedness p c (GADTDefParamMonotype k, ParameterType t) =
   lift (typeToMonotype p t) >>= flip (checkMonotypeHasKind p NoClue c) k
 
-checkTypeWellFormedness :: p -> Context -> Type -> StateT TypecheckerState (Either (TypeError p)) ()
+checkTypeWellFormedness :: p -> Context -> Type -> TypecheckerMonad p ()
 checkTypeWellFormedness _ _ TUnit   = return ()
 checkTypeWellFormedness _ _ TBool   = return ()
 checkTypeWellFormedness _ _ TInt    = return ()
@@ -78,9 +78,9 @@ checkTypeWellFormedness p c (TArrow t1 t2)  = checkTypeWellFormedness p c t1 >> 
 checkTypeWellFormedness p c (TGADT name ts) = do
   gadtDefParams <- Map.lookup name . view gadtDefs <$> get
   case gadtDefParams of
-    Nothing -> lift . Left $ UndeclaredGADTError p name
+    Nothing -> typeError $ UndeclaredGADTError p name
     Just params
-      | length params /= length ts -> lift . Left $ MismatchedGADTArityError p name (length params) $ length ts
+      | length params /= length ts -> typeError $ MismatchedGADTArityError p name (length params) $ length ts
       | otherwise -> foldM_ ((.)(.)(.) (checkGADTParameterWellFormedness p c) (flip const)) () $ zip params ts
 checkTypeWellFormedness p c (TProduct ts _) = foldM_ ((.)(.)(.) (checkTypeWellFormedness p c) (flip const)) () ts
 checkTypeWellFormedness p c (TImp pr t) = checkPropWellFormedness p c pr >> checkTypeWellFormedness p c t
@@ -91,27 +91,27 @@ checkTypeWellFormedness p c (TEVar x) =
   case typeVarContextLookup c $ eTypeVarName x of
     Just (CTypeVar (E _) KStar) -> return ()
     Just (CETypeVar _ KStar _) -> return ()
-    Just (CTypeVar (E _) KNat) -> lift . Left $ TypeHasWrongKindError p (TEVar x) KStar KNat
-    Just (CETypeVar _ KNat _) -> lift . Left $ TypeHasWrongKindError p (TEVar x) KStar KNat
-    _ -> lift . Left $ UndeclaredETypeVarError p x
+    Just (CTypeVar (E _) KNat) -> typeError $ TypeHasWrongKindError p (TEVar x) KStar KNat
+    Just (CETypeVar _ KNat _) -> typeError $ TypeHasWrongKindError p (TEVar x) KStar KNat
+    _ -> typeError $ UndeclaredETypeVarError p x
 checkTypeWellFormedness p c (TUVar x) =
   case typeVarContextLookup c $ uTypeVarName x of
     Just (CTypeVar (U _) KStar) -> return ()
-    Just (CTypeVar (U _) KNat) -> lift . Left $ TypeHasWrongKindError p (TUVar x) KStar KNat
-    _ -> lift . Left $ UndeclaredUTypeVarError p x NoClue
+    Just (CTypeVar (U _) KNat) -> typeError $ TypeHasWrongKindError p (TUVar x) KStar KNat
+    _ -> typeError $ UndeclaredUTypeVarError p x NoClue
 
-checkPropWellFormedness :: p -> Context -> Proposition -> StateT TypecheckerState (Either (TypeError p)) ()
+checkPropWellFormedness :: p -> Context -> Proposition -> TypecheckerMonad p ()
 checkPropWellFormedness p c (m1, m2) = inferMonotypeKind p NoClue c m1 >>= checkMonotypeHasKind p NoClue c m2
 
-checkMonotypeHasKind :: p -> ErrorClue p -> Context -> Monotype -> Kind -> StateT TypecheckerState (Either (TypeError p)) ()
+checkMonotypeHasKind :: p -> ErrorClue p -> Context -> Monotype -> Kind -> TypecheckerMonad p ()
 checkMonotypeHasKind p clue c m k1 = do
   k2 <- inferMonotypeKind p clue c m
   if k1 == k2 then
     return ()
   else
-    lift . Left $ MonotypeHasWrongKindError p m k1 k2
+    typeError $ MonotypeHasWrongKindError p m k1 k2
 
-inferMonotypeKind :: p -> ErrorClue p-> Context -> Monotype -> StateT TypecheckerState (Either (TypeError p)) Kind
+inferMonotypeKind :: p -> ErrorClue p-> Context -> Monotype -> TypecheckerMonad p Kind
 inferMonotypeKind _ _ _ MUnit   = return KStar
 inferMonotypeKind _ _ _ MBool   = return KStar
 inferMonotypeKind _ _ _ MInt    = return KStar
@@ -126,9 +126,9 @@ inferMonotypeKind p clue c (MArrow m1 m2) =
 inferMonotypeKind p clue c (MGADT name ms) = do
   gadtDefParams <- Map.lookup name . view gadtDefs <$> get
   case gadtDefParams of
-    Nothing -> lift . Left $ UndeclaredGADTError p name
+    Nothing -> typeError $ UndeclaredGADTError p name
     Just params
-      | length params /= length ms -> lift . Left $ MismatchedGADTArityError p name (length params) $ length ms
+      | length params /= length ms -> typeError $ MismatchedGADTArityError p name (length params) $ length ms
       | otherwise -> let mparams = map paramToKind params in
         foldM_ ((.)(.)(.) (uncurry (checkMonotypeHasKind p clue c)) (flip const)) () (zip ms mparams) >> return KStar
   where
@@ -140,15 +140,15 @@ inferMonotypeKind p _ c (MEVar x) =
   case typeVarContextLookup c $ eTypeVarName x of
     Just (CTypeVar (E _) k) -> return k
     Just (CETypeVar _ k _) -> return k
-    _ ->  lift . Left $ UndeclaredETypeVarError p x
+    _ ->  typeError $ UndeclaredETypeVarError p x
 inferMonotypeKind p clue c (MUVar x) =
   case typeVarContextLookup c $ uTypeVarName x of
     Just (CTypeVar (U _) k) -> return k
-    _ -> lift . Left $ UndeclaredUTypeVarError p x clue
+    _ -> typeError $ UndeclaredUTypeVarError p x clue
 
 subtype
   :: Context -> Type -> Polarity -> Type -> p -> ErrorClue p
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 subtype c (TArrow a b) Negative (TArrow a' b') p clue = do
   c2 <- subtype c a' Positive a p clue
   b2  <- lift $ applyContextToType p c2 b
@@ -213,11 +213,11 @@ subtype c t1 pol t2 p clue
   | pos pol && (nonpos . polarity $ t1) && (neg . polarity $ t2) = subtype c t1 Negative t2 p clue
   | neg pol && (pos . polarity $ t1) && (nonneg . polarity $ t2) = subtype c t1 Positive t2 p clue
   | neg pol && (nonneg . polarity $ t1) && (pos . polarity $ t2) = subtype c t1 Positive t2 p clue
-  | otherwise = lift . Left $ NotSubtypeError p t1 t2
+  | otherwise = typeError $ NotSubtypeError p t1 t2
 
 equivalentGADTParameter ::
   Context -> GADTParameter -> GADTParameter -> p -> ErrorClue p
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 equivalentGADTParameter c (ParameterType t1) (ParameterType t2) p clue = equivalentType c t1 t2 p clue
 equivalentGADTParameter c (ParameterMonotype m1) (ParameterMonotype m2) p clue = do
   k <- inferMonotypeKind p clue c m1
@@ -234,7 +234,7 @@ equivalentPropositionalType ::
   Context
  -> Proposition -> Proposition
  -> Type -> Type -> p -> ErrorClue p
- -> StateT TypecheckerState (Either (TypeError p)) Context
+ -> TypecheckerMonad p Context
 equivalentPropositionalType c q1 q2 a b p clue = do
   c2 <- equivalentProp c q1 q2 p clue
   a' <- lift $ applyContextToType p c2 a
@@ -246,7 +246,7 @@ equivalentQuantifierType ::
   -> UTypeVar -> Type
   -> UTypeVar -> Type
   -> Kind -> p -> ErrorClue p
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 equivalentQuantifierType c x1 t1 x2 t2 k p clue = do
   u <- UTypeVar <$> generateFreshTypeVarName "equivalentQuantifierType" (uTypeVarName x1 ++ " " ++ uTypeVarName x2)
   let t1' = substituteUVarInType x1 (U u) t1
@@ -254,7 +254,7 @@ equivalentQuantifierType c x1 t1 x2 t2 k p clue = do
   c2 <- equivalentType (CTypeVar (U u) k : CMarker : c) t1' t2' p clue
   return $ dropContextToMarker c2
 
-equivalentType :: Context -> Type -> Type -> p -> ErrorClue p -> StateT TypecheckerState (Either (TypeError p)) Context
+equivalentType :: Context -> Type -> Type -> p -> ErrorClue p -> TypecheckerMonad p Context
 equivalentType c TUnit   TUnit _ _   = return c
 equivalentType c TBool   TBool _ _   = return c
 equivalentType c TInt    TInt _ _    = return c
@@ -267,10 +267,10 @@ equivalentType c (TArrow a1 a2) (TArrow b1 b2) p clue = do
   b2' <- lift $ applyContextToType p c2 b2
   equivalentType c2 a2' b2' p clue
 equivalentType c (TGADT n1 []) (TGADT n2 []) p _
-  | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TGADT n1 []) (TGADT n2 [])
+  | n1 /= n2 = typeError $ TypesNotEquivalentError p (TGADT n1 []) (TGADT n2 [])
   | otherwise = return c
 equivalentType c (TGADT n1 (t1 : ts1)) (TGADT n2 (t2 : ts2)) p clue
-   | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TGADT n1 (t1 : ts1)) (TGADT n2 (t2 : ts2))
+   | n1 /= n2 = typeError $ TypesNotEquivalentError p (TGADT n1 (t1 : ts1)) (TGADT n2 (t2 : ts2))
    | otherwise = do
      c2 <- equivalentGADTParameter c t1 t2 p clue
      foldM aux c2 $ zip ts1 ts2
@@ -280,10 +280,10 @@ equivalentType c (TGADT n1 (t1 : ts1)) (TGADT n2 (t2 : ts2)) p clue
          tr' <- lift $ applyContextToGADTParameter p _c tr
          equivalentGADTParameter _c tl' tr' p clue
 equivalentType c (TProduct [] n1) (TProduct [] n2) p _
-  | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TProduct [] n1) (TProduct [] n2)
+  | n1 /= n2 = typeError $ TypesNotEquivalentError p (TProduct [] n1) (TProduct [] n2)
   | otherwise = return c
 equivalentType c (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2) p clue
-   | n1 /= n2 = lift . Left $ TypesNotEquivalentError p (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2)
+   | n1 /= n2 = typeError $ TypesNotEquivalentError p (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2)
    | otherwise = do
      c2 <- equivalentType c t1 t2 p clue
      foldM aux c2 $ zip ts1 ts2
@@ -295,33 +295,33 @@ equivalentType c (TProduct (t1 : ts1) n1) (TProduct (t2 : ts2) n2) p clue
 equivalentType c (TImp q1 a) (TImp q2 b) p clue = equivalentPropositionalType c q1 q2 a b p clue
 equivalentType c (TAnd a q1) (TAnd b q2) p clue = equivalentPropositionalType c q1 q2 a b p clue
 equivalentType c (TUniversal x1 k1 t1) (TUniversal x2 k2 t2) p clue
-  | k1 /= k2 = lift . Left $ TypesNotEquivalentError p (TUniversal x1 k1 t1) (TUniversal x2 k2 t2)
+  | k1 /= k2 = typeError $ TypesNotEquivalentError p (TUniversal x1 k1 t1) (TUniversal x2 k2 t2)
   | otherwise =  equivalentQuantifierType c x1 t1 x2 t2 k1 p clue
 equivalentType c (TExistential x1 k1 t1) (TExistential x2 k2 t2) p clue
-  | k1 /= k2 = lift . Left $ TypesNotEquivalentError p (TExistential x1 k1 t1) (TExistential x2 k2 t2)
+  | k1 /= k2 = typeError $ TypesNotEquivalentError p (TExistential x1 k1 t1) (TExistential x2 k2 t2)
   | otherwise =  equivalentQuantifierType c x1 t1 x2 t2 k1 p clue
 equivalentType c (TUVar a) (TUVar b) p _
   | a == b = return c
-  | otherwise = lift . Left $ TypesNotEquivalentError p (TUVar a) (TUVar b)
+  | otherwise = typeError $ TypesNotEquivalentError p (TUVar a) (TUVar b)
 equivalentType c t1 @ (TEVar a) t2 p clue
   | t1 == t2 = return c
   | otherwise = do
       m <- lift $ typeToMonotype p t2
       if eTypeVarName a `Set.member` freeVariablesOfMonotype m then
-        lift . Left $ TypesNotEquivalentError p t1 t2
+        typeError $ TypesNotEquivalentError p t1 t2
       else
         instantiateEVar c a m KStar p clue
 equivalentType c t1 (TEVar b) p clue = do
   m <- lift $ typeToMonotype p t1
   if eTypeVarName b `Set.member` freeVariablesOfMonotype m then
-    lift . Left $ TypesNotEquivalentError p t1 $ TEVar b
+    typeError $ TypesNotEquivalentError p t1 $ TEVar b
   else
     instantiateEVar c b m KStar p clue
-equivalentType _ t1 t2 p _ = lift . Left $ TypesNotEquivalentError p t1 t2
+equivalentType _ t1 t2 p _ = typeError $ TypesNotEquivalentError p t1 t2
 
 equivalentProp
   :: Context -> Proposition -> Proposition -> p -> ErrorClue p
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 equivalentProp c (p1, p2) (q1, q2) p clue = do
   k <- inferMonotypeKind p clue c p1
   checkMonotypeHasKind p clue c p2 k
@@ -334,7 +334,7 @@ equivalentProp c (p1, p2) (q1, q2) p clue = do
 
 instantiateEVarNAry
   :: Context -> [ETypeVar] -> [(Monotype, Kind)] -> p -> ErrorClue p
-  -> StateT TypecheckerState (Either (TypeError p))Context
+  -> TypecheckerMonad p Context
 instantiateEVarNAry c [] [] _ _ = return c
 instantiateEVarNAry c (a1 : as) ((m1, k1) : mks) p clue = do
   c2 <- instantiateEVar c a1 m1 k1 p clue
@@ -343,11 +343,11 @@ instantiateEVarNAry c (a1 : as) ((m1, k1) : mks) p clue = do
     aux _c  (_a, (m, k)) = do
       m'<- lift $ applyContextToMonotype p _c m
       instantiateEVar _c _a m' k p clue
-instantiateEVarNAry _ _ _ p _ = lift . Left $ InternalCompilerTypeError p "instantiateEVarNAry"
+instantiateEVarNAry _ _ _ p _ = typeError $ InternalCompilerTypeError p "instantiateEVarNAry"
 
 instantiateEVar
   :: Context -> ETypeVar -> Monotype -> Kind -> p -> ErrorClue p
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 instantiateEVar c a MZero   KNat  p _ = lift $ eTypeVarContextReplace c a KNat  MZero   [] p
 instantiateEVar c a MUnit   KStar p _ = lift $ eTypeVarContextReplace c a KStar MUnit   [] p
 instantiateEVar c a MBool   KStar p _ = lift $ eTypeVarContextReplace c a KStar MBool   [] p
@@ -377,17 +377,17 @@ instantiateEVar c a (MProduct ms n) KStar p clue = do
 instantiateEVar c a (MEVar b) k1 p clue
   | a == b = do
       case typeVarContextLookup c (eTypeVarName a) of
-        Just (CTypeVar (E _) k) -> if k == k1 then return () else lift . Left $ ETypeVarKindMismatchError p a k k1
-        Just (CETypeVar _ k _) -> if k == k1 then return () else lift . Left $ ETypeVarKindMismatchError p a k k1
-        _ ->  lift . Left $ UndeclaredETypeVarError p a
+        Just (CTypeVar (E _) k) -> if k == k1 then return () else typeError $ ETypeVarKindMismatchError p a k k1
+        Just (CETypeVar _ k _) -> if k == k1 then return () else typeError $ ETypeVarKindMismatchError p a k k1
+        _ ->  typeError $ UndeclaredETypeVarError p a
       return c
   | otherwise = do
       c2 <- lift $ takeContextToETypeVar a c p
       replaceB <- case typeVarContextLookup c2 (eTypeVarName b) of
-        Just (CTypeVar (E _) k) -> if k == k1 then return True else lift . Left $ ETypeVarKindMismatchError p b k k1
-        Just (CETypeVar _ k _)  -> if k == k1 then return True else lift . Left $ ETypeVarKindMismatchError p a k k1
+        Just (CTypeVar (E _) k) -> if k == k1 then return True else typeError $ ETypeVarKindMismatchError p b k k1
+        Just (CETypeVar _ k _)  -> if k == k1 then return True else typeError $ ETypeVarKindMismatchError p a k k1
         Nothing -> return False
-        _ ->  lift . Left $ UndeclaredETypeVarError p b
+        _ ->  typeError $ UndeclaredETypeVarError p b
       if replaceB then
         lift $ eTypeVarContextReplace c b k1 (MEVar a) [] p
       else (do
@@ -401,7 +401,7 @@ instantiateEVar c a m k p clue = do
 
 checkEquationNAry
   :: Context -> [Monotype] -> [Monotype] -> [Kind] -> p -> ErrorClue p
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 checkEquationNAry c [] [] [] _ _ = return c
 checkEquationNAry c (m1 : ms1) (m2 : ms2) (k1 : ks) p clue = do
   c2 <- checkEquation c m1 m2 k1 p clue
@@ -412,11 +412,11 @@ checkEquationNAry c (m1 : ms1) (m2 : ms2) (k1 : ks) p clue = do
       ml' <- lift $ applyContextToMonotype p _c ml
       mr' <- lift $ applyContextToMonotype p _c mr
       checkEquation _c ml' mr' k p clue
-checkEquationNAry _ _ _ _ p _ = lift . Left $ InternalCompilerTypeError p "checkEquationNAry"
+checkEquationNAry _ _ _ _ p _ = typeError $ InternalCompilerTypeError p "checkEquationNAry"
 
 checkEquation
   :: Context -> Monotype -> Monotype -> Kind -> p -> ErrorClue p
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 checkEquation c MUnit   MUnit   KStar _ _ = return c
 checkEquation c MBool   MBool   KStar _ _ = return c
 checkEquation c MInt    MInt    KStar _ _ = return c
@@ -426,38 +426,38 @@ checkEquation c MString MString KStar _ _ = return c
 checkEquation c MZero   MZero   KNat  _ _ = return c
 checkEquation c (MUVar a) (MUVar b) k p clue
   | a == b = return c
-  | otherwise = lift . Left $ EquationFalseError p (MUVar a) (MUVar b) k clue
+  | otherwise = typeError $ EquationFalseError p (MUVar a) (MUVar b) k clue
 checkEquation c (MArrow m1 m2) (MArrow n1 n2) KStar p clue = do
   c2 <- checkEquation c m1 n1 KStar p clue
   m2' <- lift $ applyContextToMonotype p c2 m2
   n2' <- lift $ applyContextToMonotype p c2 n2
   checkEquation c2 m2' n2' KStar p clue
 checkEquation c (MGADT n1 ms1) (MGADT n2 ms2) KStar p clue
-  | n1 /= n2 = lift . Left $ EquationFalseError p (MGADT n1 ms1) (MGADT n2 ms2) KStar clue
+  | n1 /= n2 = typeError $ EquationFalseError p (MGADT n1 ms1) (MGADT n2 ms2) KStar clue
   | otherwise = do
     ks <- mapM (inferMonotypeKind p clue c) ms1
     checkEquationNAry c ms1 ms2 ks p clue
 checkEquation c (MProduct ms1 n1) (MProduct ms2 n2) KStar p clue
-  | n1 /= n2 = lift . Left $ EquationFalseError p (MProduct ms1 n1) (MProduct ms2 n2) KStar clue
+  | n1 /= n2 = typeError $ EquationFalseError p (MProduct ms1 n1) (MProduct ms2 n2) KStar clue
   | otherwise = checkEquationNAry c ms1 ms2 (map (const KStar) ms1) p clue
 checkEquation c (MSucc n1) (MSucc n2) KNat p clue = checkEquation c n1 n2 KNat p clue
 checkEquation c m1 @ (MEVar a) m2 k p clue
   | m1 == m2 = return c
-  | eTypeVarName a `Set.member` freeVariablesOfMonotype m2 = lift . Left $ EquationFalseError p m1 m2 k clue
+  | eTypeVarName a `Set.member` freeVariablesOfMonotype m2 = typeError $ EquationFalseError p m1 m2 k clue
   | otherwise = instantiateEVar c a m2 k p clue
 checkEquation c m1 m2 @ (MEVar b) k p clue
-  | eTypeVarName b `Set.member` freeVariablesOfMonotype m1 = lift . Left $ EquationFalseError p m1 m2 k clue
+  | eTypeVarName b `Set.member` freeVariablesOfMonotype m1 = typeError $ EquationFalseError p m1 m2 k clue
   | otherwise = instantiateEVar c b m1 k p clue
-checkEquation _ m1 m2 k p clue = lift . Left $ EquationFalseError p m1 m2 k clue
+checkEquation _ m1 m2 k p clue = typeError $ EquationFalseError p m1 m2 k clue
 
-checkPropTrue :: Context -> Proposition -> p -> ErrorClue p -> StateT TypecheckerState (Either (TypeError p)) Context
+checkPropTrue :: Context -> Proposition -> p -> ErrorClue p -> TypecheckerMonad p Context
 checkPropTrue c (m1, m2) p clue = do
   k <- inferMonotypeKind p clue c m1
   checkEquation c m1 m2 k p clue
 
 eliminatePropEquation
   :: Context -> Proposition -> p -> ErrorClue p
-  -> MaybeT (StateT TypecheckerState (Either (TypeError p))) Context
+  -> MaybeT (TypecheckerMonad p) Context
 eliminatePropEquation c (m1, m2) p clue = do
   k <- lift $ inferMonotypeKind p clue c m1
   eliminateEquation c m1 m2 k p clue
@@ -486,7 +486,7 @@ headConstructorClash _ _ = True
 
 eliminateEquationNAry
   :: Context -> [Monotype] -> [Monotype] -> [Kind] -> p -> ErrorClue p
-  -> MaybeT (StateT TypecheckerState (Either (TypeError p))) Context
+  -> MaybeT (TypecheckerMonad p) Context
 eliminateEquationNAry c [] [] [] _ _ = return c
 eliminateEquationNAry c (m1 : ms1) (m2 : ms2) (k1 : ks) p clue = do
   c2 <- eliminateEquation c m1 m2 k1 p clue
@@ -497,24 +497,24 @@ eliminateEquationNAry c (m1 : ms1) (m2 : ms2) (k1 : ks) p clue = do
       ml' <- lift . lift $ applyContextToMonotype p _c ml
       mr' <- lift . lift $ applyContextToMonotype p _c mr
       eliminateEquation _c ml' mr' k p clue
-eliminateEquationNAry _ _ _ _ p _ = lift . lift . Left $ InternalCompilerTypeError p "eliminateEquationNAry"
+eliminateEquationNAry _ _ _ _ p _ = lift . typeError $ InternalCompilerTypeError p "eliminateEquationNAry"
 
 eliminateEquationOneUVar
   :: Context -> UTypeVar -> Monotype -> Kind -> p -> ErrorClue p
-  -> MaybeT (StateT TypecheckerState (Either (TypeError p))) Context
+  -> MaybeT (TypecheckerMonad p) Context
 eliminateEquationOneUVar c a m _ p clue
   | MUVar a /= m && uTypeVarName a `Set.member` freeVariablesOfMonotype m = fail "InFreeVars"
   | not $ Set.member (uTypeVarName a) (freeVariablesOfMonotype m) = do
       c2 <- lift . lift $ takeContextToUTypeVar a c p clue
       case uTypeVarEqContextLookup c2 a of
         Nothing -> return (CUTypeVarEq a m : c)
-        Just (CUTypeVarEq _ m') -> lift . lift . Left $ EquationAlreadyExistsError p a m' m
-        _ -> lift . lift . Left $ InternalCompilerTypeError p "eliminateEquationOneUVar"
-  | otherwise = lift . lift . Left $ InternalCompilerTypeError p "eliminateEquationOneUVar"
+        Just (CUTypeVarEq _ m') -> lift . typeError $ EquationAlreadyExistsError p a m' m
+        _ -> lift . typeError $ InternalCompilerTypeError p "eliminateEquationOneUVar"
+  | otherwise = lift . typeError $ InternalCompilerTypeError p "eliminateEquationOneUVar"
 
 eliminateEquation
   :: Context -> Monotype -> Monotype -> Kind -> p -> ErrorClue p
-  -> MaybeT (StateT TypecheckerState (Either (TypeError p))) Context
+  -> MaybeT (TypecheckerMonad p) Context
 eliminateEquation c MUnit   MUnit   KStar _ _ = return c
 eliminateEquation c MInt    MInt    KStar _ _ = return c
 eliminateEquation c MBool   MBool   KStar _ _ = return c
@@ -542,17 +542,17 @@ eliminateEquation c (MUVar a) (MUVar b) _ p clue
       c2 <- lift . lift $ takeContextToUTypeVar a c p clue
       case uTypeVarEqContextLookup c2 a of
         Nothing -> return (CUTypeVarEq a (MUVar b) : c)
-        Just (CUTypeVarEq _ m) -> lift . lift . Left $ EquationAlreadyExistsError p a m (MUVar b)
-        _ -> lift . lift . Left $ InternalCompilerTypeError p "eliminateEquation"
+        Just (CUTypeVarEq _ m) -> lift . typeError $ EquationAlreadyExistsError p a m (MUVar b)
+        _ -> lift . typeError $ InternalCompilerTypeError p "eliminateEquation"
 eliminateEquation c (MUVar a) m k p clue = eliminateEquationOneUVar c a m k p clue
 eliminateEquation c m (MUVar a) k p clue = eliminateEquationOneUVar c a m k p clue
 eliminateEquation _ m1 m2 k p _
   | headConstructorClash m1 m2 = fail "Head clash"
-  | otherwise = lift . lift . Left $ EliminateEquationError p m1 m2 k
+  | otherwise = lift . typeError $ EliminateEquationError p m1 m2 k
 
 inferSpine ::
   Context -> Spine p -> Type -> Principality
-  -> StateT TypecheckerState (Either (TypeError p)) (Type, Principality, Context)
+  -> TypecheckerMonad p (Type, Principality, Context)
 inferSpine c [] t pr = return (t, pr, c)
 inferSpine c (e : s) (TArrow t1 t2) pr = do
   c2 <- checkExpr c e t1 pr
@@ -569,11 +569,11 @@ inferSpine c (e : s) (TEVar a) NotPrincipal = do
   let (a1, a2) = generateSubETypeVars a
   c2 <- lift $ eTypeVarContextReplace c a KStar (MArrow (MEVar a1) (MEVar a2)) [CTypeVar (E a2) KStar, CTypeVar (E a1) KStar] $ getPos e
   inferSpine c2 (e : s) (TArrow (TEVar a1) (TEVar a2)) NotPrincipal
-inferSpine _ (e : _) t _ = lift . Left $ SpineInferenceError e t
+inferSpine _ (e : _) t _ = typeError $ SpineInferenceError e t
 
 inferSpineRecoverPrnc ::
   Context -> Spine p -> Type -> Principality
-  -> StateT TypecheckerState (Either (TypeError p)) (Type, Principality, Context)
+  -> TypecheckerMonad p (Type, Principality, Context)
 inferSpineRecoverPrnc c s t pr = do
   (t2, pr2, c2) <- inferSpine c s t pr
   if pr == Principal && pr2 == NotPrincipal && null (freeExistentialVariables t2) then
@@ -581,7 +581,7 @@ inferSpineRecoverPrnc c s t pr = do
   else
     return (t2, pr2, c2)
 
-checkExpr :: Context -> Expr p -> Type -> Principality -> StateT TypecheckerState (Either (TypeError p)) Context
+checkExpr :: Context -> Expr p -> Type -> Principality -> TypecheckerMonad p Context
 checkExpr context expression checkedType principality = do
   checkedIntroductionFormOfExpr <- checkedIntroductionForm expression
   case (context, expression, checkedType, principality) of
@@ -671,7 +671,7 @@ checkExpr context expression checkedType principality = do
     (c, ETuple _ [] 0, TProduct [] 0, _) -> return c
     (c, ETuple p (e1 : es) n1, TProduct (t1 : ts) n2, pr) ->
       if n1 /= n2 then
-        lift . Left $ ProductArityError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2)
+        typeError $ ProductArityError (ETuple p (e1 : es) n1) (TProduct (t1 : ts) n2)
       else do
         c2 <- checkExpr c e1 t1 pr
         foldM aux c2 $ zip es ts
@@ -692,12 +692,12 @@ checkExpr context expression checkedType principality = do
     (c, EConstr p constrName es, TGADT typeName ts, pr) -> do
       lookupRes <- Map.lookup constrName . view constrContext <$> get
       case lookupRes of
-        Nothing -> lift . Left $ UndeclaredConstructorError (EConstr p constrName es) constrName
+        Nothing -> typeError $ UndeclaredConstructorError (EConstr p constrName es) constrName
         Just constr
           | constrTypeName constr /= typeName ->
-            lift . Left $ MismatchedConstructorError (EConstr p constrName es) typeName (constrTypeName constr)
+            typeError $ MismatchedConstructorError (EConstr p constrName es) typeName (constrTypeName constr)
           | length (constrArgsTemplates constr) /= length es ->
-            lift . Left $ MismatchedConstructorArityError (EConstr p constrName es) constrName (length $ constrArgsTemplates constr) (length es)
+            typeError $ MismatchedConstructorArityError (EConstr p constrName es) constrName (length $ constrArgsTemplates constr) (length es)
           | otherwise -> do
             evars <- generateFreshTypeVars (E . ETypeVar) "checkExpr" (map (uTypeVarName . fst) (constrUVars constr))
             (args, props) <- argsAndPropsFromConstrTemplate p ts evars constr
@@ -720,7 +720,7 @@ checkExpr context expression checkedType principality = do
       t'  <- lift $ applyContextToType (getPos e) c2 t
       subtype c2 t2' (joinPolarity (polarity t') (polarity t2')) t' (getPos e) (SubtypingClue t2' t')
 
-inferExpr :: Context -> Expr p -> StateT TypecheckerState (Either (TypeError p)) (Type, Principality, Context)
+inferExpr :: Context -> Expr p -> TypecheckerMonad p (Type, Principality, Context)
 inferExpr c (EDef _ _ e) = inferExpr c e
 inferExpr c (EUnit     _) = return (TUnit, Principal, c)
 inferExpr c (EBool   _ _) = return (TBool, Principal, c)
@@ -759,7 +759,7 @@ inferExpr c (EAnnot p e t) = do
 inferExpr c (EConstr p constrName es) = do
     lookupRes <- Map.lookup constrName . view constrContext <$> get
     case lookupRes of
-      Nothing -> lift . Left $ UndeclaredConstructorError (EConstr p constrName es) constrName
+      Nothing -> typeError $ UndeclaredConstructorError (EConstr p constrName es) constrName
       Just constr -> inferSpineRecoverPrnc c es (constrFunVersion constr) Principal
 inferExpr c (ESpine _ e s) = do
   (t, pr, c2) <- inferExpr c e
@@ -777,11 +777,11 @@ inferExpr c (EUnOp p UnOpMinusFloat e) =
 inferExpr c (EUnOp p UnOpNot e) =
   inferExpr c (ESpine p (EVar p "!u") [e])
 
-inferExpr _ e = lift . Left $ TypeInferenceError e
+inferExpr _ e = typeError $ TypeInferenceError e
 
 checkBranches ::
   Context -> [Branch p] -> [Type] -> Principality -> Type -> Principality
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 checkBranches c [] _ _ _ _ = return c
 checkBranches c (b : bs) ts pr1 t pr2 = do
   lift $ checkBranchWellFormedness b
@@ -791,10 +791,10 @@ checkBranches c (b : bs) ts pr1 t pr2 = do
 
 checkBranch ::
   Context -> Branch p -> [Type] -> Principality -> Type -> Principality
-  -> StateT TypecheckerState (Either (TypeError p)) Context
+  -> TypecheckerMonad p Context
 checkBranch c ([], e, _) [] _ te pr = checkExpr c e te pr
-checkBranch _ ([], _, p) _ _ _ _ = lift . Left $ TooShortPatternError p
-checkBranch _ (_, _, p) [] _ _ _ = lift . Left $ TooLongPatternError p
+checkBranch _ ([], _, p) _ _ _ _ = typeError $ TooShortPatternError p
+checkBranch _ (_, _, p) [] _ _ _ = typeError $ TooLongPatternError p
 checkBranch c b (TAnd t _ : ts) NotPrincipal te pr = checkBranch c b (t : ts) NotPrincipal te pr
 checkBranch c b (TAnd t prop : ts) Principal te pr =
   checkBranchIncorporatingProps (getPosFromBranch b) c [prop] b (t : ts) Principal te pr
@@ -807,7 +807,7 @@ checkBranch c (PFloat  _ _ : ptrns, e, p) (TFloat : ts)  pr1 te pr2 = checkBranc
 checkBranch c (PChar   _ _ : ptrns, e, p) (TChar: ts)    pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
 checkBranch c (PString _ _ : ptrns, e, p) (TString : ts) pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
 checkBranch c (PTuple p1 pargs n1 : ptrns, e, p2) (TProduct targs n2 : ts) pr1 te pr2
-  | n1 /= n2 = lift . Left $ MismatchedProductArityInPatternError (PTuple p1 pargs n1) (TProduct targs n2)
+  | n1 /= n2 = typeError $ MismatchedProductArityInPatternError (PTuple p1 pargs n1) (TProduct targs n2)
   | otherwise = checkBranch c (pargs ++ ptrns, e, p2) (targs ++ ts) pr1 te pr2
 checkBranch c (PWild _ : ptrns, e, p) (_ : ts) pr1 te pr2 = checkBranch c (ptrns, e, p) ts pr1 te pr2
 checkBranch c (PVar _ x : ptrns, e, p) (t : ts) pr1 te pr2 =
@@ -815,12 +815,12 @@ checkBranch c (PVar _ x : ptrns, e, p) (t : ts) pr1 te pr2 =
 checkBranch c (PConstr p1 constrName pargs : ptrns, e, p2) (TGADT typeName params : ts) pr1 te pr2 = do
   lookupRes <- Map.lookup constrName . view constrContext <$> get
   case lookupRes of
-    Nothing -> lift . Left $ UndeclaredConstructorInPatternError (PConstr p1 constrName pargs) constrName
+    Nothing -> typeError $ UndeclaredConstructorInPatternError (PConstr p1 constrName pargs) constrName
     Just constr
       | constrTypeName constr /= typeName ->
-        lift . Left $ MismatchedConstructorInPatternError (PConstr p1 constrName pargs) typeName (constrTypeName constr)
+        typeError $ MismatchedConstructorInPatternError (PConstr p1 constrName pargs) typeName (constrTypeName constr)
       | length (constrArgsTemplates constr) /= length pargs ->
-        lift . Left $ MismatchedConstructorArityInPatternError
+        typeError $ MismatchedConstructorArityInPatternError
         (PConstr p1 constrName pargs) constrName
         (length $ constrArgsTemplates constr) (length pargs)
       | otherwise -> do
@@ -830,11 +830,11 @@ checkBranch c (PConstr p1 constrName pargs : ptrns, e, p2) (TGADT typeName param
         case pr1 of
           NotPrincipal -> dropContextToMarker <$> checkBranch c2 (pargs ++ ptrns, e, p2) (args ++ ts) pr1 te pr2
           Principal -> dropContextToMarker <$> checkBranchIncorporatingProps p1 c2 props (pargs ++ ptrns, e, p2) (args ++ ts) pr1 te pr2
-checkBranch _ (ptrn : _, _, _) (t : _) _ _ _ = lift . Left $ PatternMatchingTypecheckingError ptrn t
+checkBranch _ (ptrn : _, _, _) (t : _) _ _ _ = typeError $ PatternMatchingTypecheckingError ptrn t
 
 checkBranchIncorporatingProps ::
  p -> Context -> [Proposition] -> Branch p -> [Type] -> Principality -> Type -> Principality
- -> StateT TypecheckerState (Either (TypeError p)) Context
+ -> TypecheckerMonad p Context
 checkBranchIncorporatingProps _ c [] b ts Principal te pr =
   checkBranch c b ts Principal te pr
 checkBranchIncorporatingProps p c (prop : props) b ts Principal te pr = do
@@ -845,11 +845,11 @@ checkBranchIncorporatingProps p c (prop : props) b ts Principal te pr = do
       te' <- lift $ applyContextToType (getPosFromBranch b) c2 te
       ts' <- mapM (lift . applyContextToType (getPosFromBranch b) c2) ts
       dropContextToMarker <$> checkBranchIncorporatingProps p c2 props b ts' Principal te' pr
-checkBranchIncorporatingProps p _ _ _ _ NotPrincipal _ _ = lift . Left $ InternalCompilerTypeError p "checkBranchIncorporatingProps"
+checkBranchIncorporatingProps p _ _ _ _ NotPrincipal _ _ = typeError $ InternalCompilerTypeError p "checkBranchIncorporatingProps"
 
 checkCoverage ::
   p -> Context -> [Branch p] -> [Type] -> Principality
-  -> StateT TypecheckerState (Either (TypeError p)) ()
+  -> TypecheckerMonad p ()
 checkCoverage _ _ (([], _, _) : _) [] _ = return ()
 checkCoverage p c bs (TUnit : ts) pr = do
   bs' <- expandUnitPatterns bs
@@ -890,15 +890,15 @@ checkCoverage p c bs (TGADT typeName params : ts) pr = do
 checkCoverage p c bs (_ : ts) pr = do
   bs' <- expandVarPatterns bs
   checkCoverage p c bs' ts pr
-checkCoverage p _ _ _ _ = lift . Left $ PatternMatchingNonExhaustiveError p
+checkCoverage p _ _ _ _ = typeError $ PatternMatchingNonExhaustiveError p
 
 checkConstrCoverage ::
   p -> Context -> [GADTParameter] -> [Type] -> Principality
-  -> (String, [Branch p]) -> StateT TypecheckerState (Either (TypeError p)) ()
+  -> (String, [Branch p]) -> TypecheckerMonad p ()
 checkConstrCoverage p c params ts pr (constrName, bs) = do
   lookupRes <- Map.lookup constrName . view constrContext <$> get
   case lookupRes of
-    Nothing -> lift . Left $ InternalCompilerTypeError p "checkConstrCoverage"
+    Nothing -> typeError $ InternalCompilerTypeError p "checkConstrCoverage"
     Just constr -> do
       uvars <- generateFreshTypeVars (U . UTypeVar) "checkConstrCoverage" (map (uTypeVarName . fst) (constrUVars constr))
       (args, props) <- argsAndPropsFromConstrTemplate p params uvars constr
@@ -909,7 +909,7 @@ checkConstrCoverage p c params ts pr (constrName, bs) = do
 
 checkCoverageAssumingProps ::
    p -> Context -> [Proposition] -> [Branch p] -> [Type] -> Principality
-  -> StateT TypecheckerState (Either (TypeError p)) ()
+  -> TypecheckerMonad p ()
 checkCoverageAssumingProps p c [] bs ts Principal = checkCoverage p c bs ts Principal
 checkCoverageAssumingProps p c ((m1, m2) : props) bs ts Principal = do
   m1' <- lift $ applyContextToMonotype p c m1
@@ -920,4 +920,4 @@ checkCoverageAssumingProps p c ((m1, m2) : props) bs ts Principal = do
     Just c2 -> do
       ts' <- mapM (lift . applyContextToType p c2) ts
       checkCoverageAssumingProps p c2 props bs ts' Principal
-checkCoverageAssumingProps p _ _ _ _ NotPrincipal = lift . Left $ InternalCompilerTypeError p "checkCoverageAssumingProps"
+checkCoverageAssumingProps p _ _ _ _ NotPrincipal = typeError $ InternalCompilerTypeError p "checkCoverageAssumingProps"

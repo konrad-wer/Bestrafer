@@ -99,5 +99,7 @@ data EvalState = EvalState
 
 makeLenses ''EvalState
 
+type EvalMonad = StateT EvalState IO
+
 addToEnv :: Var -> Value -> EvalContext -> EvalContext
 addToEnv = Map.insert

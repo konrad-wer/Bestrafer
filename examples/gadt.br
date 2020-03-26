@@ -6,7 +6,7 @@ data Maybe 'A where
   | Just :: 'A -> Maybe 'A
 
 //definition of Vector data type (similar to builtin Vec data type)
-//that utilizes types of kind N (natural numbers) to annot Vector's length
+//that utilizes types of kind N (natural numbers) to annotate Vector's length
 
 data Vector N 'A where
   | Nil :: Vector 0 'A

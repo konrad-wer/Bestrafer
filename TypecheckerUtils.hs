@@ -179,7 +179,7 @@ generateFreshTypeVars f trace names = do
   let n = fromIntegral $ length names
   firstFreshVarNum <- view freshVarNum <$> get
   modify $ over freshVarNum (+ n)
-  return $ reverse . map f $ zipWith (++) names (map ((("#" ++ trace ++ "#") ++) . show) [firstFreshVarNum .. firstFreshVarNum + n - 1])
+  return $ map f $ zipWith (++) names (map ((("#" ++ trace ++ "#") ++) . show) [firstFreshVarNum .. firstFreshVarNum + n - 1])
 
 generateFreshTypeVarName :: String -> Var -> TypecheckerMonad p Var
 generateFreshTypeVarName trace name = do
@@ -192,9 +192,9 @@ argsAndPropsFromConstrTemplate
  -> TypecheckerMonad p ([Type], [Proposition])
 argsAndPropsFromConstrTemplate p params vars constr = do
   let paramsMap = Map.fromList (zip (constrTypeParmsTemplate constr) params)
-  let uvarsToFreshUvars = zip (map fst (constrUVars constr)) vars
-  let tArgs = map (flip (foldl (flip $ uncurry substituteUVarInTypeTemplate)) uvarsToFreshUvars) $ constrArgsTemplates constr
-  let tProps = map (flip (foldl (flip $ uncurry substituteUVarInPropTemplate)) uvarsToFreshUvars) $ constrProps constr
+  let uvarsToFreshVars = zip (map fst (constrUVars constr)) vars
+  let tArgs = map (flip (foldl (flip $ uncurry substituteUVarInTypeTemplate)) uvarsToFreshVars) $ constrArgsTemplates constr
+  let tProps = map (flip (foldl (flip $ uncurry substituteUVarInPropTemplate)) uvarsToFreshVars) $ constrProps constr
   args <- lift $ mapM (typeFromTemplate paramsMap p) tArgs
   props <- lift $ mapM (propositionFromTemplate paramsMap p) tProps
   return (args, props)

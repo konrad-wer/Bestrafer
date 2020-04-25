@@ -1,0 +1,89 @@
+/*
+  Red black trees with statically checked invariants.
+*/
+
+data Black
+data Red
+
+
+data Either 'A 'B where
+  | Left  :: 'A -> Either 'A 'B
+  | Right :: 'B -> Either 'A 'B
+
+
+data RBTree * N 'A where
+  | Black :: ∀ c1 : *, c2 : *, n : N . RBTree c1 n 'A -> 'A -> RBTree c2 n 'A -> RBTree Black (S n) 'A
+  | Red   :: ∀ n : N . RBTree Black n 'A -> 'A -> RBTree Black n 'A -> RBTree Red n 'A
+  | Empty :: RBTree Black 0 'A
+
+
+data InvalidTree N 'A where
+  | InvalidLeft  :: forall c : *, n : N . RBTree Red n 'A -> 'A -> RBTree Black n 'A -> InvalidTree n 'A
+  | InvalidRight :: forall c : *, n : N . RBTree Black n 'A -> 'A -> RBTree Red n 'A -> InvalidTree n 'A
+
+
+def insIntoBlack :: forall n : N, a : * . a -> RBTree Black n a -> exists c : *. RBTree c n a
+def insIntoBlack x Empty = Red Empty x Empty
+def insIntoBlack x (Black l y r) =
+   if x == y then
+    Black l y r
+  else if x < y then
+    case l of
+      | Empty -> Black (Red Empty x Empty) y r
+      | Black _ _ _ -> let l2 = insIntoBlack x l in Black l2  y r
+      | Red _ _ _ ->
+        case insIntoRed x l of
+          | Right l2 -> Black l2 y r
+          | Left (InvalidLeft (Red lll lly llr) ly lr) -> Red (Black lll lly llr) ly (Black lr y r)
+          | Left (InvalidRight ll ly (Red lrl lry lrr)) -> Red (Black ll ly lrl) lry (Black lrr y r)
+  else
+     case r of
+      | Empty -> Black r y (Red Empty x Empty)
+      | Black _ _ _ -> let r2 = insIntoBlack x r in Black l y r2
+      | Red _ _ _ ->
+        case insIntoRed x r of
+          | Right r2 -> Black l y r2
+          | Left (InvalidLeft (Red rll rly rlr) ry rr) -> Red (Black l y rll) rly (Black rlr ry rr)
+          | Left (InvalidRight rl ry (Red rrl rry rrr)) -> Red (Black l y rl) ry (Black rrl rry rrr)
+
+
+def insIntoRed :: forall n : N, a : * . a -> RBTree Red n a -> Either (InvalidTree n a) (RBTree Red n a)
+def insIntoRed x (Red l y r) =
+  if x == y then
+    Right (Red l y r)
+  else if x < y then
+    case insIntoBlack x l of
+      | Red ll ly lr ->  Left <| InvalidLeft (Red ll ly lr) y r
+      | Black  ll ly lr -> Right <| Red (Black  ll ly lr) y r
+      | Empty -> Right <| Red Empty y r
+  else
+    case insIntoBlack x r of
+      | Red rl ry rr ->  Left <| InvalidRight l y (Red rl ry rr)
+      | Black  rl ry rr -> Right <| Red l y (Black rl ry rr)
+      | Empty -> Right <| Red l y Empty
+
+
+def insert :: forall n : N, a : * . a -> RBTree Black n a -> exists m : N . RBTree Black m a
+def insert x t = case insIntoBlack x t of
+  | Red l y r -> Black l y r
+  | Black l y r -> Black l y r
+  | Empty -> Empty
+
+
+def treeFromVec :: forall n : N, a : * . Vec n a -> exists m : N . RBTree Black m a
+def treeFromVec [] = Empty
+def treeFromVec (x : xs) =
+  let t = treeFromVec xs in
+  insert x t
+
+
+def inOrder :: forall c : *, n : N, a : *. RBTree c n a ->  List a
+def inOrder Empty = {}
+def inOrder (Red l x r) = inOrder l @ {x} @ inOrder r
+def inOrder (Black l x r) = inOrder l @ {x} @ inOrder r
+
+
+def main :: ()
+def main =
+  let t = treeFromVec [1,3,4,5,6,7,8,9,10,11,12] in
+  iterL printInt <| inOrder t

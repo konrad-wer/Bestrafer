@@ -6,9 +6,7 @@ data Black
 data Red
 
 
-data Either 'A 'B where
-  | Left  :: 'A -> Either 'A 'B
-  | Right :: 'B -> Either 'A 'B
+data Either 'A 'B = Left 'A | Right 'B
 
 
 data RBTree * N 'A where

@@ -610,6 +610,23 @@ functionDefCase = do
   e <- expr
   return $ FunDefCase pos name args e
 
+adtConstrDef :: TypeTemplate -> Parser (ConstrDef SourcePos)
+adtConstrDef resType = do
+  pos <- getSourcePos
+  name <- upperIdentifier
+  args <- many ttSimple
+  return $ ConstrDef pos name (foldr TTArrow resType args)
+
+adtDef :: Parser (ProgramBlock SourcePos)
+adtDef = do
+  pos <- getSourcePos
+  rword "data"
+  name <- upperIdentifier
+  params <- many gadtParamIdentifier
+  void $ symbol "="
+  constructors <- sepBy1 (adtConstrDef (TTGADT name ((ParameterTypeT . TTParam) <$> params))) (symbol "|")
+  return $ GADTDef pos name (GADTDefParamType <$> params) constructors
+
 constrDef :: Parser (ConstrDef SourcePos)
 constrDef = do
   pos <- getSourcePos
@@ -632,6 +649,7 @@ programBlock :: Parser (ProgramBlock SourcePos)
 programBlock =
   try functionDefCase <|>
   functionTypeAnnot <|>
+  try adtDef <|>
   gadtDef
 
 program :: Parser [ProgramBlock SourcePos]

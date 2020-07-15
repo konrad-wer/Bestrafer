@@ -2,8 +2,7 @@
   Implementing computations with state using "monadic" approach
 */
 
-data State 'S 'A where
-  | St :: ('S -> ('S, 'A)) -> State 'S 'A
+data State 'S 'A = St ('S -> ('S, 'A))
 
 def return :: forall s : *, a : *. a -> State s a
 def return a = St (\s -> (s, a))

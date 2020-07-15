@@ -3,9 +3,7 @@
     Implementation with O(1) enqueue and amortized O(1) dequeue operations.
 */
 
-data Maybe 'A where
-  | Nothing :: Maybe 'A
-  | Just :: 'A -> Maybe 'A
+data Maybe 'A = Nothing | Just 'A
 
 data Queue 'A where
   | Queue :: forall a : *.

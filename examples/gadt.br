@@ -1,9 +1,7 @@
 
 //definition of typical algebraic data type Maybe
 
-data Maybe 'A where
-  | Nothing :: Maybe 'A
-  | Just :: 'A -> Maybe 'A
+data Maybe 'A = Nothing | Just 'A
 
 //definition of Vector data type (similar to builtin Vec data type)
 //that utilizes types of kind N (natural numbers) to annotate Vector's length

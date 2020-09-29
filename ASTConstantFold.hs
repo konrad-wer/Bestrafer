@@ -37,10 +37,10 @@ foldConstants _ e@EInt {} = e
 foldConstants _ e@EFloat {} = e
 foldConstants _ e@EChar  {} = e
 foldConstants _ e@EString {} = e
-foldConstants fc (ELambda p x e) = ELambda p x $ foldConstants fc e
+foldConstants fc (ELambda p x e) = ELambda p x $ foldConstants (Map.delete x fc) e
 foldConstants fc (ESpine  p e es) = ESpine p (foldConstants fc e) (foldConstants fc <$> es)
 foldConstants fc (EDef    p x e) = EDef p x $ foldConstants fc e
-foldConstants fc (ERec    p t x e1 e2) = ERec p t x (foldConstants fc e1) (foldConstants fc e2)
+foldConstants fc (ERec    p t x e1 e2) = ERec p t x (foldConstants (Map.delete x fc) e1) (foldConstants (Map.delete x fc) e2)
 foldConstants fc (EAnnot  _ e _) = foldConstants fc e
 foldConstants fc (ETuple  p es n) = ETuple p (foldConstants fc <$> es) n
 foldConstants fc (EConstr p name es) = EConstr p name $ foldConstants fc <$> es
@@ -97,7 +97,8 @@ foldConstants fc (EBinOp p binOp e1 e2) =
     (op, e1', e2') -> EBinOp p op e1' e2'
 
 foldConstantsBranch :: FoldingContext p -> Branch p -> Branch p
-foldConstantsBranch fc (ptrn, e, p) = (ptrn, foldConstants fc e, p)
+foldConstantsBranch fc (ptrn, e, p) = (ptrn, foldConstants (Map.filterWithKey (\x _ -> and $ not <$> (isVarInPattern x <$> ptrn)) fc) e, p)
 
 foldConstantsCatch :: FoldingContext p -> Catch p -> Catch p
-foldConstantsCatch fc (exc, e) = (exc, foldConstants fc e)
+foldConstantsCatch fc (exc@(BestraferException _ _ Nothing), e) = (exc, foldConstants fc e)
+foldConstantsCatch fc (exc@(BestraferException _ _ (Just v)), e) = (exc, foldConstants (Map.delete v fc) e)

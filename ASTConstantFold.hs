@@ -24,7 +24,7 @@ inRelation r (EInt _ n) (EInt _ m) = r n m
 inRelation r (EFloat _ x) (EFloat _ y) = r x y
 inRelation r (EChar _ c1) (EChar _ c2) = r c1 c2
 inRelation r (EString _ s1) (EString _ s2) = r s1 s2
-inRelation _ e1 e2 = error $ "Internal Internal interpreter error while constant folding " ++ addQuotes (show e1) ++
+inRelation _ e1 e2 = error $ "Internal interpreter error while constant folding " ++ addQuotes (show e1) ++
   " and " ++ addQuotes (show e2) ++ ".\nThat should not have happened. Please contact language creator"
 
 type FoldingContext p = Map.Map Var (Expr p)

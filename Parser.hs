@@ -324,7 +324,19 @@ infixFunParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
 infixFunParser = do
   pos <- getSourcePos
   op <- between (symbol "`") (symbol "`") identifier
-  return $ EBinOp pos (BinOp op)
+  return $ (.)(.)(.) (ESpine pos (EVar pos op)) (flip $ flip (:) . (: []))
+
+backPipeParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
+backPipeParser = do
+  pos <- getSourcePos
+  void $ symbol "<|"
+  return $ curry (uncurry (ESpine pos) . cross id (: []))
+
+pipeParser :: Parser (Expr SourcePos -> Expr SourcePos -> Expr SourcePos)
+pipeParser = do
+  pos <- getSourcePos
+  void $ symbol "|>"
+  return $ curry (uncurry (flip (ESpine pos)) . cross (: []) id)
 
 operators :: [[Operator Parser (Expr SourcePos)]]
 operators =
@@ -357,8 +369,8 @@ operators =
     InfixN (binOpParser ">")],
    [InfixL (binOpParser "&&")],
    [InfixL (binOpParser "||")],
-   [InfixL (binOpParser "|>"),
-    InfixR (binOpParser "<|")]]
+   [InfixL pipeParser,
+    InfixR backPipeParser]]
 
 expr :: Parser (Expr SourcePos)
 expr = makeExprParser eTerm operators
@@ -460,7 +472,7 @@ eCase = do
   e <- expr
   rword "of"
   bs <- some branch
-  return $ ECase pos e bs
+  return $ ECase pos [e] bs
 
 branch :: Parser (Branch SourcePos)
 branch = do

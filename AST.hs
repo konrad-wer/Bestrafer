@@ -35,7 +35,7 @@ data Expr p
   | EAnnot  p (Expr p) Type
   | ETuple  p [Expr p] Int
   | EConstr p String [Expr p]
-  | ECase   p (Expr p) [Branch p]
+  | ECase   p [Expr p] [Branch p]
   | EIf     p (Expr p) (Expr p) (Expr p)
   | ELet    p Var (Expr p) (Expr p)
   | EBinOp  p BinOp (Expr p) (Expr p)

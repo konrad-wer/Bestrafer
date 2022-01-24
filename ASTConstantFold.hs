@@ -44,7 +44,7 @@ foldConstants fc (ERec    p t x e1 e2) = ERec p t x (foldConstants (Map.delete x
 foldConstants fc (EAnnot  _ e _) = foldConstants fc e
 foldConstants fc (ETuple  p es n) = ETuple p (foldConstants fc <$> es) n
 foldConstants fc (EConstr p name es) = EConstr p name $ foldConstants fc <$> es
-foldConstants fc (ECase   p e bs) = ECase p (foldConstants fc e) (foldConstantsBranch fc <$> bs)
+foldConstants fc (ECase   p es bs) = ECase p (foldConstants fc <$> es) (foldConstantsBranch fc <$> bs)
 foldConstants fc (EIf     p e1 e2 e3) =
   case foldConstants fc e1 of
     EBool _ True -> foldConstants fc e2
@@ -75,16 +75,42 @@ foldConstants fc (EUnOp p UnOpNot e) =
 foldConstants fc (EBinOp p binOp e1 e2) =
   case (binOp, foldConstants fc e1, foldConstants fc e2) of
     (BinOp "+", EInt _ n, EInt _ m) -> EInt p $ n + m
+    (BinOp "+", EBinOp p' (BinOp "+") (EInt _ n) e, EInt _ m) -> EBinOp p' (BinOp "+") (EInt p $ n + m) e
+    (BinOp "+", EBinOp p' (BinOp "+") e (EInt _ n), EInt _ m) -> EBinOp p' (BinOp "+") e (EInt p $ n + m)
+    (BinOp "+", EInt _ n, EBinOp p' (BinOp "+") (EInt _ m) e) -> EBinOp p' (BinOp "+") (EInt p $ n + m) e
+    (BinOp "+", EInt _ n, EBinOp p' (BinOp "+") e (EInt _ m)) -> EBinOp p' (BinOp "+") e (EInt p $ n + m)
     (BinOp "-", EInt _ n, EInt _ m) -> EInt p $ n - m
+    (BinOp "-", EBinOp p' (BinOp "-") (EInt _ n) e, EInt _ m) -> EBinOp p' (BinOp "-") (EInt p $ n - m) e
+    (BinOp "-", EBinOp p' (BinOp "-") e (EInt _ n), EInt _ m) -> EBinOp p' (BinOp "-") e (EInt p $ n + m)
+    (BinOp "-", EInt _ n, EBinOp p' (BinOp "-") (EInt _ m) e) -> EBinOp p' (BinOp "-") (EInt p $ n - m) e
+    (BinOp "-", EInt _ n, EBinOp p' (BinOp "-") e (EInt _ m)) -> EBinOp p' (BinOp "-") (EInt p $ n + m) e
     (BinOp "*", EInt _ n, EInt _ m) -> EInt p $ n * m
+    (BinOp "*", EBinOp p' (BinOp "*") (EInt _ n) e, EInt _ m) -> EBinOp p' (BinOp "*") (EInt p $ n * m) e
+    (BinOp "*", EBinOp p' (BinOp "*") e (EInt _ n), EInt _ m) -> EBinOp p' (BinOp "*") e (EInt p $ n * m)
+    (BinOp "*", EInt _ n, EBinOp p' (BinOp "*") (EInt _ m) e) -> EBinOp p' (BinOp "*") (EInt p $ n * m) e
+    (BinOp "*", EInt _ n, EBinOp p' (BinOp "*") e (EInt _ m)) -> EBinOp p' (BinOp "*") e (EInt p $ n * m)
     (BinOp "/", EInt _ n, EInt _ m) -> EInt p $ n `div` m
     (BinOp "%", EInt _ n, EInt _ m) -> EInt p $ n `mod` m
     (BinOp "+.", EFloat _ x, EFloat _ y) -> EFloat p $ x + y
+    (BinOp "+.", EBinOp p' (BinOp "+.") (EFloat _ n) e, EFloat _ m) -> EBinOp p' (BinOp "+.") (EFloat p $ n + m) e
+    (BinOp "+.", EBinOp p' (BinOp "+.") e (EFloat _ n), EFloat _ m) -> EBinOp p' (BinOp "+.") e (EFloat p $ n + m)
+    (BinOp "+.", EFloat _ n, EBinOp p' (BinOp "+.") (EFloat _ m) e) -> EBinOp p' (BinOp "+.") (EFloat p $ n + m) e
+    (BinOp "+.", EFloat _ n, EBinOp p' (BinOp "+.") e (EFloat _ m)) -> EBinOp p' (BinOp "+.") e (EFloat p $ n + m)
     (BinOp "-.", EFloat _ x, EFloat _ y) -> EFloat p $ x - y
     (BinOp "*.", EFloat _ x, EFloat _ y) -> EFloat p $ x * y
+    (BinOp "*.", EBinOp p' (BinOp "*.") (EFloat _ n) e, EFloat _ m) -> EBinOp p' (BinOp "*.") (EFloat p $ n * m) e
+    (BinOp "*.", EBinOp p' (BinOp "*.") e (EFloat _ n), EFloat _ m) -> EBinOp p' (BinOp "*.") e (EFloat p $ n * m)
+    (BinOp "*.", EFloat _ n, EBinOp p' (BinOp "*.") (EFloat _ m) e) -> EBinOp p' (BinOp "*.") (EFloat p $ n * m) e
+    (BinOp "*.", EFloat _ n, EBinOp p' (BinOp "*.") e (EFloat _ m)) -> EBinOp p' (BinOp "*.") e (EFloat p $ n * m)
     (BinOp "/.", EFloat _ x, EFloat _ y) -> EFloat p $ x / y
     (BinOp "&&", EBool _ b1, EBool _ b2) -> EBool p $ b1 && b2
+    (BinOp "&&", EBool _ False, _) -> EBool p False
+    (BinOp "&&", EBool _ b1, EBinOp p' (BinOp "&&") (EBool _ b2) e) -> EBinOp p' (BinOp "&&") (EBool p $ b1 && b2) e
+    (BinOp "&&", EBinOp p' (BinOp "&&") e (EBool _ b1), EBool _ b2) -> EBinOp p' (BinOp "&&") e (EBool p $ b1 && b2)
     (BinOp "||", EBool _ b1, EBool _ b2) -> EBool p $ b1 || b2
+    (BinOp "||", EBool _ True, _) -> EBool p True
+    (BinOp "||", EBool _ b1, EBinOp p' (BinOp "||") (EBool _ b2) e) -> EBinOp p' (BinOp "||") (EBool p $ b1 || b2) e
+    (BinOp "||", EBinOp p' (BinOp "||") e (EBool _ b1), EBool _ b2) -> EBinOp p' (BinOp "||") e (EBool p $ b1 || b2)
     (BinOp "^", EString _ s1, EString _ s2) -> EString p $ s1 ++ s2
     (BinOp "==", e1', e2') | isFolded e1' && isFolded e2' -> EBool p $ inRelation (==) e1' e2'
     (BinOp "==", EConstr _ name1 [], EConstr _ name2 [])  -> EBool p $ name1 == name2

@@ -121,9 +121,9 @@ evalExpr c (EConstr p name args) = do
     let vars = ("#" ++) . show .  (+ freshVar) <$> [0 .. ca Map.! name - length args - 1]
     let f = foldr (ELambda p) (EConstr p name (args ++ map (EVar p) vars)) vars
     evalExpr c f
-evalExpr c (ECase _ e bs) = do
-  v <- evalExpr c e
-  fromJust . msum $ map (match c [v]) bs
+evalExpr c (ECase _ es bs) = do
+  vs <- mapM (evalExpr c) es
+  fromJust . msum $ map (match c vs) bs
   where
     match :: EvalContext -> [Value] -> Branch p -> Maybe (EvalMonad Value)
     match context values branch =
@@ -158,6 +158,6 @@ eval :: Program p -> ConstructorsContext -> IO [Value]
 eval program constrs = do
   let userFunctions = map (\(EDef p name e) -> (name, NotEvaluated (\() -> evalExpr Map.empty (EDef p name e)))) program
   let gc = Map.fromList $ builtinFunctions ++ userFunctions
-  let ca = Map.map  (length . constrArgsTemplates) constrs
+  let ca = Map.map (length . constrArgsTemplates) constrs
   let startState = EvalState {_constrArities = ca, _globalContext = gc, _freshVarNum = 0}
   evalStateT (mapM (evalExpr Map.empty) program) startState

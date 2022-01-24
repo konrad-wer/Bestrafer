@@ -6,9 +6,13 @@ import System.Environment
 import Typechecker
 import TypecheckerUtils
 import CommonUtils
+import HILTranslate
+import ASTConstantFold
 import Eval
+import Codegen
 import Control.Monad (void)
 import Control.Monad.State
+import Data.List (intercalate)
 
 readArgs :: [a] -> Maybe [a]
 readArgs [] = Nothing
@@ -33,6 +37,17 @@ main = do
             let startState = TypecheckerState { _freshVarNum = 0, _constrContext = cContext, _gadtDefs = gDefs, _funContext = fContext } in
             case iterM (void . flip evalStateT startState . inferExpr []) prog of
               Right () -> do
-                          void $ eval prog cContext
+                          let foldedProg = foldProgram prog
+                          --
+                          --
+                          -- putStrLn "\n===========================================================\n"
+                          --void $ eval foldedProg cContext
+                          let hilProg = translateProgramToHIL foldedProg cContext
+                          -- void $ eval foldedProg cContext
+                          --putStrLn $ intercalate "\n\n" $ map show foldedProg
+                          -- putStrLn "\n===========================================================\n"
+                          --putStrLn $ intercalate "\n\n" $ map show hilProg
+                          -- putStrLn "\n===========================================================\n"
+                          putStrLn $ generateProgram hilProg
                           return ()
               Left err -> print  err

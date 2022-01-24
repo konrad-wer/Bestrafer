@@ -636,14 +636,17 @@ checkExpr context expression checkedType principality = do
         aux _c (BestraferException _ _ (Just v), _e) = do
           t' <- lift $ applyContextToType p _c t
           dropContextToMarker <$> checkExpr (CVar v TString Principal : CMarker : _c) _e t' pr
-    (c, ECase p e bs, t1, pr1) -> do
-      (t2, pr2, c2) <- inferExpr c e
+    (c, ECase p es bs, t1, pr1) -> do
+      (t2, pr2, c2) <- inferExpr c $ ETuple p es (length es)
       t1' <- lift $ applyContextToType p c2 t1
       t2' <- lift $ applyContextToType p c2 t2
-      c3 <- checkBranches c2 bs [t2'] pr2 t1' pr1
+      c3 <- checkBranches c2 bs (getProdTypes t2') pr2 t1' pr1
       t2'' <- lift $ applyContextToType p c3 t2'
-      checkCoverage p c3 bs [t2''] pr2
+      checkCoverage p c3 bs (getProdTypes t2'') pr2
       return c3
+      where
+        getProdTypes (TProduct ts _) = ts
+        getProdTypes _ = []
     (c, e, TUniversal a k t, pr) | checkedIntroductionFormOfExpr ->
       dropContextToMarker <$> checkExpr (CTypeVar (U a) k : CMarker : c) e t pr
     (c, e, TExistential a k t, _) | checkedIntroductionFormOfExpr -> do

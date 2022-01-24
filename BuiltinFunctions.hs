@@ -43,11 +43,7 @@ operatorsTypes =
     (TExistential (UTypeVar "m") KNat $ TGADT "Vec" [ParameterMonotype $ MUVar $ UTypeVar "m", ParameterType $ TUVar $ UTypeVar "a"])),
     (".", TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TUniversal (UTypeVar "c") KStar $
     TArrow (TArrow (TUVar $ UTypeVar "b") (TUVar $ UTypeVar "c")) $ TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b"))
-    (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "c"))),
-    ("|>",  TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TArrow (TUVar $ UTypeVar "a") $
-    TArrow (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b")) (TUVar $ UTypeVar "b")),
-    ("<|",  TUniversal (UTypeVar "a") KStar . TUniversal (UTypeVar "b") KStar . TArrow
-    (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b")) $ TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "b"))
+    (TArrow (TUVar $ UTypeVar "a") (TUVar $ UTypeVar "c")))
   ]
 
 ioFunctionsTypes :: [(Var, Type)]
@@ -169,9 +165,6 @@ concatList = FunValue (\(ListValue x) -> return (FunValue (\(ListValue y) -> ret
 compose :: Value
 compose = FunValue (\(FunValue f) -> return (FunValue (\(FunValue g) -> return $ FunValue (f <=< g))))
 
-pipe :: Value
-pipe = FunValue (\x -> return $ FunValue (\(FunValue f) -> f x))
-
 bfrReadFile :: Value
 bfrReadFile = FunValue (\(StringValue x) -> lift (StringValue <$> readFile x))
 
@@ -234,9 +227,7 @@ operators =
     (">",  Evaluated greater),
     ("@",  Evaluated concatList),
     ("++", Evaluated concatVec),
-    (".",  Evaluated compose),
-    ("|>", Evaluated pipe),
-    ("<|", Evaluated $ FunValue return)
+    (".",  Evaluated compose)
   ]
 
 ioFunctions :: [(Var, DefinitionValue)]

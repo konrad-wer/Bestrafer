@@ -9,6 +9,7 @@ import Control.Monad.State
 import Control.Monad.Trans.Maybe
 
 import Control.Lens hiding (Context)
+import GHC.Base (undefined)
 
 checkedIntroductionForm :: Expr p -> TypecheckerMonad p Bool
 checkedIntroductionForm EUnit {}   = return True
@@ -747,9 +748,12 @@ inferExpr c (ETuple _ es n) = do
     prncAnd Principal Principal = Principal
     prncAnd _ _ = NotPrincipal
 inferExpr c (EVar p x) = do
-  (CVar _ t pr) <- varContextLookup c x p
-  t2 <- lift $ applyContextToType p c t
-  return (t2, pr, c)
+  r <- varContextLookup c x p
+  case r of
+    CVar _ t pr -> do
+      t2 <- lift $ applyContextToType p c t
+      return (t2, pr, c)
+    _ -> undefined
 inferExpr c (EAnnot p e t) = do
   checkTypeWellFormednessWithPrnc p c t Principal
   t2 <- lift $ applyContextToType p c t
